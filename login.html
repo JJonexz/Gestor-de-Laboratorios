@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MiTécnica · Ingresá a tu cuenta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Barlow+Condensed:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --azul:        #1A4E8C;
+  --azul-dark:   #123570;
+  --azul-mid:    #1e5fa8;
+  --azul-light:  #e8f0fb;
+  --rojo:        #CC2222;
+  --verde:       #1F7A2E;
+  --gris:        #f0f2f6;
+  --gris2:       #dde1e8;
+  --texto:       #1a2035;
+  --muted:       #6b7a99;
+  --blanco:      #ffffff;
+  --radius:      10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body {
+  font-family:'Barlow',sans-serif;
+  background: linear-gradient(135deg, #0d2a5c 0%, #1A4E8C 50%, #1e6bad 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+body::before {
+  content:'';position:absolute;inset:0;
+  background-image:radial-gradient(circle at 20% 20%, rgba(255,255,255,.04) 1px, transparent 1px),radial-gradient(circle at 80% 80%, rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size:40px 40px;pointer-events:none;
+}
+body::after {
+  content:'';position:absolute;top:-10%;left:-5%;width:50%;height:130%;
+  background:rgba(255,255,255,.03);transform:rotate(-8deg);pointer-events:none;
+}
+.login-wrapper {
+  display:flex;width:min(920px,96vw);min-height:520px;
+  border-radius:20px;overflow:hidden;
+  box-shadow:0 32px 80px rgba(0,0,0,.4);position:relative;z-index:1;
+}
+.login-left {
+  flex:1.1;background:rgba(255,255,255,.07);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.15);border-right:none;
+  border-radius:20px 0 0 20px;padding:48px 40px;
+  display:flex;flex-direction:column;justify-content:space-between;color:#fff;
+}
+.left-logo{display:flex;align-items:center;gap:14px;}
+.left-logo img{width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,.3));}
+.left-logo-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;line-height:1.1;letter-spacing:.5px;}
+.left-logo-sub{font-size:11px;opacity:.7;font-weight:400;margin-top:2px;letter-spacing:.05em;}
+.left-middle h1{font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:900;line-height:1.1;margin-bottom:14px;letter-spacing:-.5px;}
+.left-middle h1 span{color:#7ec8ff;}
+.left-middle p{font-size:14px;line-height:1.65;opacity:.78;max-width:280px;}
+.left-badges{display:flex;flex-direction:column;gap:8px;}
+.badge{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:500;}
+.badge-icon{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.login-right {
+  flex:1;background:#fff;border-radius:0 20px 20px 0;
+  padding:48px 40px;display:flex;flex-direction:column;justify-content:center;
+}
+.login-form-title{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;color:var(--azul);margin-bottom:6px;letter-spacing:.3px;}
+.login-form-sub{font-size:13px;color:var(--muted);margin-bottom:30px;}
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--texto);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;}
+.form-input{width:100%;padding:12px 14px;border:2px solid var(--gris2);border-radius:var(--radius);font-family:'Barlow',sans-serif;font-size:14px;color:var(--texto);background:var(--gris);transition:border-color .18s,background .18s,box-shadow .18s;outline:none;}
+.form-input:focus{border-color:var(--azul);background:#fff;box-shadow:0 0 0 3px rgba(26,78,140,.12);}
+.form-input::placeholder{color:#b0b8cc;}
+.password-wrap{position:relative;}
+.toggle-pass{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px;transition:color .15s;}
+.toggle-pass:hover{color:var(--azul);}
+.role-selector{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:22px;}
+.role-btn{border:2px solid var(--gris2);border-radius:var(--radius);padding:10px 8px;cursor:pointer;background:var(--gris);transition:all .18s;text-align:center;}
+.role-btn-icon{font-size:20px;display:block;margin-bottom:4px;}
+.role-btn-label{font-size:12px;font-weight:700;color:var(--muted);display:block;text-transform:uppercase;letter-spacing:.05em;}
+.role-btn.sel{border-color:var(--azul);background:var(--azul-light);}
+.role-btn.sel .role-btn-label{color:var(--azul);}
+.role-btn:hover:not(.sel){border-color:#b0bedc;background:#f0f4fb;}
+.btn-login{width:100%;padding:14px;background:var(--azul);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;letter-spacing:.5px;border:none;border-radius:var(--radius);cursor:pointer;transition:background .18s,transform .12s,box-shadow .18s;box-shadow:0 4px 16px rgba(26,78,140,.35);text-transform:uppercase;}
+.btn-login:hover{background:var(--azul-dark);box-shadow:0 6px 22px rgba(26,78,140,.45);}
+.btn-login:active{transform:translateY(1px);}
+.login-error{background:#fdeaea;border:1px solid #f5c0c0;border-radius:8px;padding:10px 14px;font-size:13px;color:var(--rojo);font-weight:600;margin-bottom:16px;display:none;animation:shakeX .4s ease;}
+@keyframes shakeX{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.login-error.show{display:block;}
+.demo-hint{margin-top:20px;padding:12px 14px;background:#f7f9ff;border:1px solid #dde8f8;border-radius:8px;font-size:12px;color:var(--muted);}
+.demo-hint strong{color:var(--azul);display:block;margin-bottom:4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;}
+.demo-user{display:flex;justify-content:space-between;align-items:center;padding:3px 0;}
+.demo-user span:last-child{background:var(--gris);border-radius:4px;padding:2px 7px;font-family:monospace;font-size:11px;color:var(--texto);cursor:pointer;}
+.demo-user span:last-child:hover{background:var(--azul-light);color:var(--azul);}
+@media(max-width:640px){.login-left{display:none;}.login-right{border-radius:20px;padding:36px 24px;}.login-wrapper{border-radius:20px;}}
+</style>
+</head>
+<body>
+<div class="login-wrapper">
+  <div class="login-left">
+    <div class="left-logo">
+      <img src="img/logo.webp" alt="Logo EEST N°1" onerror="this.style.display='none'">
+      <div>
+        <div class="left-logo-title">EEST N°1</div>
+        <div class="left-logo-sub">RAÚL SCALABRINI ORTIZ</div>
+      </div>
+    </div>
+    <div class="left-middle">
+      <h1>Sistema de<br>Gestión de<br><span>Laboratorios</span></h1>
+      <p>Coordiná los turnos de los laboratorios informáticos de forma ordenada, clara y sin superposiciones.</p>
+    </div>
+    <div class="left-badges">
+      <div class="badge"><div class="badge-icon">📅</div><span>Calendario semanal en tiempo real</span></div>
+      <div class="badge"><div class="badge-icon">🔄</div><span>Ciclos didácticos de 3 clases</span></div>
+      <div class="badge"><div class="badge-icon">📋</div><span>Lista de espera automática</span></div>
+    </div>
+  </div>
+  <div class="login-right">
+    <div class="login-form-title">Ingresá a MiTécnica</div>
+    <div class="login-form-sub">Gestión de Laboratorios Informáticos · v2.0</div>
+    <div class="login-error" id="login-error">Usuario o contraseña incorrectos.</div>
+    <div class="form-group">
+      <label class="form-label">Usuario</label>
+      <input class="form-input" type="text" id="f-usuario" placeholder="Ej: ces.roberto" autocomplete="username" spellcheck="false">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Contraseña</label>
+      <div class="password-wrap">
+        <input class="form-input" type="password" id="f-pass" placeholder="••••••••" autocomplete="current-password">
+        <button class="toggle-pass" type="button" onclick="togglePass()">👁</button>
+      </div>
+    </div>
+    <div style="margin-bottom:22px;">
+      <label class="form-label" style="margin-bottom:8px;">Entrás como…</label>
+      <div class="role-selector">
+        <label class="role-btn sel" id="role-prof" onclick="selRole('prof')">
+          <span class="role-btn-icon">👤</span>
+          <span class="role-btn-label">Docente</span>
+        </label>
+        <label class="role-btn" id="role-admin" onclick="selRole('admin')">
+          <span class="role-btn-icon">🔑</span>
+          <span class="role-btn-label">Directivo</span>
+        </label>
+      </div>
+    </div>
+    <button class="btn-login" onclick="doLogin()">Ingresar →</button>
+    <div class="demo-hint">
+      <strong>Accesos de demostración</strong>
+      <div class="demo-user"><span>🧑‍🏫 ces.roberto (docente)</span><span onclick="fillDemo('ces.roberto','ces123','prof')">usar</span></div>
+      <div class="demo-user"><span>👩‍🏫 dimartino.claudia</span><span onclick="fillDemo('dimartino.claudia','dim123','prof')">usar</span></div>
+      <div class="demo-user"><span>🔑 admin (directivo)</span><span onclick="fillDemo('admin','admin123','admin')">usar</span></div>
+    </div>
+  </div>
+</div>
+<script>
+const USERS = {
+  'ces.roberto':       {pass:'ces123',   role:'prof',  id:1, display:'Prof. Ces'},
+  'dimartino.claudia': {pass:'dim123',   role:'prof',  id:2, display:'Prof. Di Martino'},
+  'pieroni.marcelo':   {pass:'pie123',   role:'prof',  id:3, display:'Prof. Pieroni'},
+  'reichert.sandra':   {pass:'rei123',   role:'prof',  id:4, display:'Prof. Reichert'},
+  'arnaiz.gustavo':    {pass:'arn123',   role:'prof',  id:5, display:'Prof. Arnaiz'},
+  'admin':             {pass:'admin123', role:'admin', id:0, display:'Administrador'},
+};
+let selectedRole='prof';
+function selRole(r){
+  selectedRole=r;
+  document.getElementById('role-prof').classList.toggle('sel',r==='prof');
+  document.getElementById('role-admin').classList.toggle('sel',r==='admin');
+}
+function togglePass(){
+  const f=document.getElementById('f-pass');
+  f.type=f.type==='password'?'text':'password';
+}
+function fillDemo(u,p,r){
+  document.getElementById('f-usuario').value=u;
+  document.getElementById('f-pass').value=p;
+  selRole(r);
+}
+function doLogin(){
+  const user=document.getElementById('f-usuario').value.trim().toLowerCase();
+  const pass=document.getElementById('f-pass').value;
+  const err=document.getElementById('login-error');
+  err.classList.remove('show');
+  const found=USERS[user];
+  if(!found||found.pass!==pass||found.role!==selectedRole){
+    err.classList.add('show');
+    err.style.animation='none';err.offsetHeight;err.style.animation='shakeX .4s ease';
+    return;
+  }
+  sessionStorage.setItem('session',JSON.stringify({user,role:found.role,id:found.id,display:found.display}));
+  window.location.href='index.html';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+if(sessionStorage.getItem('session')) window.location.href='index.html';
+</script>
+</body>
+</html>
