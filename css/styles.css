@@ -835,3 +835,499 @@ button:focus-visible, a:focus-visible { border-radius: var(--radius-sm); }
   .mod-n { font-size: 11px; }
 }
 
+
+/* ===== v4 — VISTA DIARIA + HORARIOS REALES + RECREOS ===== */
+
+/* Barra de navegación de días */
+.day-nav-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px 6px;
+  background: var(--superficie);
+  border-bottom: 2px solid var(--azul);
+}
+.day-nav-arrow {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--gris-borde);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.day-nav-arrow:hover { background: var(--azul); color: #fff; border-color: var(--azul); }
+.day-nav-bar {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.day-nav-btn {
+  flex: 1;
+  min-width: 72px;
+  max-width: 120px;
+  padding: 10px 8px 8px;
+  border-radius: 10px;
+  border: 2px solid var(--gris-borde);
+  background: var(--superficie);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s;
+  position: relative;
+}
+.day-nav-btn:hover { border-color: var(--azul); background: rgba(30,100,200,.06); }
+.day-nav-btn.active { border-color: var(--azul); background: var(--azul); color: #fff; }
+.day-nav-btn.hoy:not(.active) { border-color: var(--verde); }
+.day-nav-nombre { font-weight: 800; font-size: 16px; letter-spacing: 1px; }
+.day-nav-fecha { font-size: 12px; opacity: 0.75; font-weight: 500; }
+.day-nav-hoy-dot {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--verde);
+}
+.day-nav-btn.active .day-nav-hoy-dot { background: #fff; }
+
+/* Estructura de horarios horizontal */
+.turno-section {
+  margin-bottom: 18px;
+}
+.turno-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, var(--azul) 0%, rgba(30,100,200,.7) 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-radius: 8px 8px 0 0;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.horario-grid {
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid var(--gris-borde);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+.horario-slot {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1.5px solid var(--gris-borde);
+  min-height: 80px;
+}
+.horario-slot:last-child { border-bottom: none; }
+
+/* Bloque de hora — DOBLE DE TAMAÑO (era ~80px, ahora ~160px) */
+.slot-time-block {
+  flex-shrink: 0;
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 14px 10px;
+  background: var(--fondo);
+  border-right: 2px solid var(--azul);
+  text-align: center;
+}
+.slot-time-block.recreo {
+  background: linear-gradient(135deg, #fff8e1, #fffde7);
+  border-right-color: #f59e0b;
+}
+.slot-hora-inicio {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--azul);
+  font-family: 'Barlow Condensed', sans-serif;
+  line-height: 1;
+}
+.slot-hora-sep {
+  font-size: 12px;
+  color: var(--texto-muted);
+  line-height: 1;
+}
+.slot-hora-fin {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--texto-muted);
+  font-family: 'Barlow Condensed', sans-serif;
+  line-height: 1;
+}
+.slot-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--texto-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+.slot-icon {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+/* Labs en fila horizontal */
+.slot-labs-row {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+.slot-lab-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-left: 1.5px solid var(--gris-borde);
+  min-width: 0;
+}
+.slot-lab-cell:first-child { border-left: none; }
+.slot-lab-badge {
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--texto-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--fondo);
+  border-bottom: 1px solid var(--gris-borde);
+}
+
+/* Eventos — DOBLE DE TAMAÑO */
+.big-event {
+  flex: 1;
+  margin: 6px;
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 60px;
+}
+.big-event:hover { opacity: 0.85; transform: scale(1.01); }
+.big-event .event-title {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.big-event .event-sub {
+  font-size: 12px;
+  opacity: 0.8;
+  font-weight: 500;
+}
+.big-event .event-materia {
+  font-size: 11px;
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* Recreo slot especial */
+.recreo-slot {
+  background: linear-gradient(90deg, #fffde7, #fff);
+  min-height: 70px;
+}
+.recreo-slot .slot-time-block {
+  border-right-color: #f59e0b;
+}
+.slot-content.recreo-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+}
+.recreo-evento {
+  font-size: 17px;
+  font-weight: 800;
+  color: #92400e;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.recreo-notas {
+  font-size: 12px;
+  color: #b45309;
+  font-weight: 500;
+}
+.recreo-edit-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #f59e0b;
+  background: #fff8e1;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.recreo-edit-btn:hover { background: #fde68a; }
+
+/* Semana nav buttons más grandes */
+.week-btn {
+  padding: 9px 18px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  min-width: 110px !important;
+}
+
+/* Sidebar más amplio */
+.sidebar {
+  width: 240px !important;
+  min-width: 220px !important;
+  font-size: 14px !important;
+}
+.lab-card {
+  padding: 12px 14px !important;
+  margin-bottom: 8px !important;
+}
+.lab-card-name { font-size: 14px !important; }
+.cta-btn { padding: 12px 16px !important; font-size: 14px !important; }
+.sec-label { font-size: 11px !important; margin-bottom: 8px !important; }
+
+/* Ajustes generales */
+.cal-wrap { padding: 0; }
+#cal-body { padding: 12px 16px; }
+
+/* ===================================================
+   TABLA AULAS × HORAS (filas=aulas, columnas=horas)
+   =================================================== */
+
+/* Restaurar barra de días */
+.day-nav-container { display: flex; }
+
+.at-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1.5px solid var(--gris-borde);
+  background: var(--blanco);
+  box-shadow: var(--sombra);
+  -webkit-overflow-scrolling: touch;
+}
+
+.at-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+/* Esquina y celda de aula */
+.at-corner {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--fondo);
+  border-right: 2px solid var(--azul);
+  border-bottom: 2px solid var(--gris-borde);
+  min-width: 140px;
+  width: 140px;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--texto-muted);
+}
+
+/* Cabecera de turno (span de columnas) */
+.at-turno-span {
+  background: linear-gradient(135deg, var(--azul) 0%, #2563eb 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 5px 8px;
+  border-left: 2px solid rgba(255,255,255,.2);
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.at-turno-span:first-of-type { border-left: none; }
+.at-turno-icon { margin-right: 5px; }
+
+/* Cabecera de recreo (col delgada) */
+.at-recreo-col-header {
+  background: #fef3c7;
+  border-left: 1.5px solid #fde68a;
+  border-bottom: 2px solid #fde68a;
+  text-align: center;
+  width: 36px;
+  min-width: 36px;
+  font-size: 13px;
+  padding: 4px 2px;
+  vertical-align: middle;
+}
+.at-recreo-hora {
+  border-top: none;
+}
+.at-recreo-edit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Cabecera de hora (módulo) */
+.at-hora-header {
+  background: var(--fondo);
+  border-left: 1px solid var(--gris-borde);
+  border-bottom: 2px solid var(--gris-borde);
+  text-align: center;
+  padding: 4px 6px;
+  min-width: 90px;
+  width: 90px;
+  vertical-align: middle;
+}
+.at-hora-ini {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--azul);
+  font-family: 'Barlow Condensed', sans-serif;
+  line-height: 1;
+}
+.at-hora-num {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--texto-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 2px;
+}
+
+/* Filas de aula */
+.at-row { border-bottom: 1px solid var(--gris-borde); }
+.at-row:last-child { border-bottom: none; }
+.at-row-alt { background: rgba(0,0,0,.018); }
+
+/* Celda de nombre de aula (sticky) */
+.at-lab-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--fondo);
+  border-right: 2px solid var(--azul);
+  padding: 6px 10px;
+  min-width: 140px;
+  width: 140px;
+  vertical-align: middle;
+}
+.at-row-alt .at-lab-cell { background: #f3f4f6; }
+.at-lab-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.at-lab-status {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 2px;
+}
+.at-status-libre { color: var(--verde); }
+.at-status-ocup  { color: var(--rojo);  }
+
+/* Celda de evento */
+.at-event-cell {
+  border-left: 1px solid var(--gris-borde);
+  padding: 4px;
+  vertical-align: middle;
+  height: 58px;
+}
+
+/* Celda de recreo */
+.at-recreo-cell {
+  background: linear-gradient(180deg, #fffde7 0%, #fef3c7 100%);
+  border-left: 1.5px solid #fde68a;
+  width: 36px;
+  min-width: 36px;
+}
+
+/* Evento dentro de celda */
+.at-event {
+  border-radius: 6px;
+  padding: 5px 7px;
+  cursor: pointer;
+  transition: opacity 0.12s, transform 0.1s;
+  height: 100%;
+  min-height: 46px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.at-event::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
+  background: rgba(0,0,0,.15);
+}
+.at-event:hover { opacity: 0.82; transform: scale(1.03); }
+
+.at-ev-curso {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.at-ev-prof {
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Libre */
+.at-libre {
+  background: var(--fondo);
+  border: 1.5px dashed #d1d5db;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+}
+.at-libre:hover { opacity: 1; border-color: var(--azul); }
+.at-ev-plus {
+  font-size: 22px;
+  color: #9ca3af;
+  font-weight: 300;
+  line-height: 1;
+}
+.at-libre:hover .at-ev-plus { color: var(--azul); }
+
