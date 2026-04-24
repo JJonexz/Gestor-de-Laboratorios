@@ -1,0 +1,48 @@
+[
+  {
+    "id": 101,
+    "semanaOffset": 0,
+    "dia": 2,
+    "modulo": 6,
+    "lab": "B",
+    "curso": "2°A",
+    "orient": "info",
+    "profeId": 4,
+    "secuencia": "Laboratorio de subredes IPv4 — práctica con Packet Tracer",
+    "cicloClases": 1,
+    "estado": "pendiente",
+    "esRenovacion": false,
+    "renovacionNum": 0
+  },
+  {
+    "id": 102,
+    "semanaOffset": 0,
+    "dia": 4,
+    "modulo": 4,
+    "lab": "A",
+    "curso": "3°C",
+    "orient": "const",
+    "profeId": 2,
+    "secuencia": "Cálculo de estructuras: planillas digitales",
+    "cicloClases": 1,
+    "estado": "pendiente",
+    "esRenovacion": false,
+    "renovacionNum": 0
+  },
+  {
+    "id": 103,
+    "semanaOffset": 0,
+    "dia": 1,
+    "modulo": 10,
+    "lab": "A",
+    "curso": "6°A",
+    "orient": "info",
+    "profeId": 4,
+    "secuencia": "Seguridad perimetral — firewall y ACLs",
+    "cicloClases": 1,
+    "estado": "pendiente",
+    "esRenovacion": true,
+    "reservaOriginalId": 10,
+    "renovacionNum": 2
+  }
+]

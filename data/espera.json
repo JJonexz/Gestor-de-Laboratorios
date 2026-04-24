@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "profeId": 5,
+    "lab": "A",
+    "dia": 3,
+    "modulo": 0,
+    "semanaOffset": 0
+  },
+  {
+    "id": 2,
+    "profeId": 6,
+    "lab": "B",
+    "dia": 1,
+    "modulo": 6,
+    "semanaOffset": 0
+  }
+]
