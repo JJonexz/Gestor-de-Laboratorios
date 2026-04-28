@@ -462,25 +462,5 @@
 <div id="toast-container" role="region" aria-label="Notificaciones" aria-live="polite"></div>
 
 <script src="js/app.js"></script>
-
-<!-- Diagnóstico de Carga -->
-<script>
-  window.addEventListener('load', function() {
-    setTimeout(function() {
-      var status = [];
-      status.push('📊 ESTADO DEL SISTEMA:');
-      status.push('Laboratorios: ' + (typeof LABS !== 'undefined' ? LABS.length : '?'));
-      status.push('Profesores: ' + (typeof PROFESORES !== 'undefined' ? PROFESORES.length : '?'));
-      status.push('Reservas: ' + (typeof RESERVAS !== 'undefined' ? RESERVAS.length : '?'));
-      status.push('localStorage: ' + (localStorage.getItem('gestor_eest1_db') ? 'Sí ✓' : 'No ✗'));
-      console.log(status.join('\n'));
-      
-      if (typeof LABS !== 'undefined' && LABS.length === 0) {
-        console.error('❌ PROBLEMA: LABS vacío. Los datos no se cargaron.');
-        console.error('Revisa en Network tab si data/*.json se descargan (status 200)');
-      }
-    }, 1000);
-  });
-</script>
 </body>
 </html>

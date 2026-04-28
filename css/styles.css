@@ -445,6 +445,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .at-ev-plus { font-size: 17px; color: #9ca3af; font-weight: 300; line-height: 1; }
 .at-libre:hover .at-ev-plus { color: var(--navy); }
 
+.at-ocupado-otro { background: #f1f3f5; cursor: default; opacity: 0.6; }
+
 /* RESPONSIVE */
 @media (max-width: 900px) { .sidebar { display: none; } .bottom-cards { grid-template-columns: 1fr; } }
 @media (max-width: 700px) {
@@ -460,3 +462,4 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   .cal-cell { min-height: 44px; } .event { min-height: 36px; } .event-sub { display: none; }
   .at-event-cell { height: 44px; }
 }
+

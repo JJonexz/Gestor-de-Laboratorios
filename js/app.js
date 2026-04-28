@@ -25,22 +25,26 @@ const MODULOS = [
   { id:3,  label:'3° Mañana',   inicio:'9:50',  fin:'10:50', turno:'Mañana',     tipo:'clase',  icon:'🌅' },
   { id:4,  label:'4° Mañana',   inicio:'10:50', fin:'11:50', turno:'Mañana',     tipo:'clase',  icon:'🌅' },
   { id:5,  label:'5° Mañana',   inicio:'11:50', fin:'12:50', turno:'Mañana',     tipo:'clase',  icon:'🌅' },
+  
   { id:6,  label:'1° Tarde',    inicio:'13:00', fin:'14:00', turno:'Tarde',      tipo:'clase',  icon:'☀️' },
   { id:7,  label:'2° Tarde',    inicio:'14:00', fin:'15:00', turno:'Tarde',      tipo:'clase',  icon:'☀️' },
   { id:8,  label:'Recreo T',    inicio:'15:00', fin:'15:30', turno:'Tarde',      tipo:'recreo', icon:'🧃' },
   { id:9,  label:'3° Tarde',    inicio:'15:30', fin:'16:30', turno:'Tarde',      tipo:'clase',  icon:'☀️' },
   { id:10, label:'4° Tarde',    inicio:'16:30', fin:'17:30', turno:'Tarde',      tipo:'clase',  icon:'☀️' },
+  
   { id:11, label:'1° Vespert.', inicio:'17:40', fin:'18:40', turno:'Vespertino', tipo:'clase',  icon:'🌆' },
   { id:12, label:'2° Vespert.', inicio:'18:40', fin:'19:40', turno:'Vespertino', tipo:'clase',  icon:'🌆' },
   { id:13, label:'Recreo V',    inicio:'19:40', fin:'20:00', turno:'Vespertino', tipo:'recreo', icon:'🌙' },
   { id:14, label:'3° Vespert.', inicio:'20:00', fin:'21:00', turno:'Vespertino', tipo:'clase',  icon:'🌆' },
   { id:15, label:'4° Vespert.', inicio:'21:00', fin:'22:00', turno:'Vespertino', tipo:'clase',  icon:'🌆' },
 ];
+
 const MODULOS_CLASE = MODULOS.filter(function(m){ return m.tipo==='clase'; });
+
 const TURNOS_CONFIG = [
-  { label:'Mañana',     icon:'🌅', modulos:[0,1,3,4,5]   },
-  { label:'Tarde',      icon:'☀️', modulos:[6,7,9,10]    },
-  { label:'Vespertino', icon:'🌆', modulos:[11,12,14,15] },
+  { label:'Mañana',     icon:'🌅', modulos:[0,1,2,3,4,5]    },
+  { label:'Tarde',      icon:'☀️', modulos:[6,7,8,9,10]     },
+  { label:'Vespertino', icon:'🌆', modulos:[11,12,13,14,15] },
 ];
 const ORIENTACIONES = {
   info:  { nombre:'Informática',  ev:'ev-info',  emoji:'💻', ob:'ob-info'  },
@@ -114,21 +118,14 @@ function loadFromJSON(callback) {
   ];
   var results = {};
   var pending = files.length;
-  console.log('📥 Iniciando carga de datos JSON...', files.length, 'archivos');
 
   files.forEach(function(f) {
     fetch(f.url)
-      .then(function(r){ 
-        console.log('✅ Respuesta recibida:', f.url, 'Status:', r.status);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json(); 
-      })
+      .then(function(r){ return r.json(); })
       .then(function(data){
-        console.log('✓ Datos cargados:', f.key, '→', data.length || Object.keys(data).length, 'registros');
         results[f.key] = data;
         pending--;
         if (pending === 0) {
-          console.log('✅ TODOS los datos cargados correctamente');
           LABS         = results.labs        || [];
           PROFESORES   = results.profesores  || [];
           RESERVAS     = results.reservas    || [];
@@ -142,17 +139,15 @@ function loadFromJSON(callback) {
             arr.forEach(function(x){ if(x.id > maxId) maxId = x.id; });
           });
           nextId = Math.max(500, maxId + 1);
-          console.log('📊 Datos en memoria:', {labs: LABS.length, profesores: PROFESORES.length, reservas: RESERVAS.length});
           saveDB(); // guardar inmediatamente en localStorage
           if (callback) callback();
         }
       })
       .catch(function(err){
-        console.error('❌ Error cargando', f.url, ':', err.message);
+        console.warn('Error cargando', f.url, err);
         results[f.key] = [];
         pending--;
         if (pending === 0) {
-          console.warn('⚠️ Datos cargados con algunos errores');
           LABS         = results.labs        || [];
           PROFESORES   = results.profesores  || [];
           RESERVAS     = results.reservas    || [];
@@ -249,6 +244,12 @@ function getProfe(id){ return PROFESORES.find(function(p){ return p.id===id; })|
 function getLab(id)  { return LABS.find(function(l){ return l.id===id; })||{nombre:'—',ocupado:false,capacidad:0,notas:''}; }
 function getCurrentProfId(){ return (window.SESSION&&window.SESSION.id)?window.SESSION.id:1; }
 
+// Helper centralizado de rol — usa window.ROLE (SAEP) con fallback a modoUsuario
+function esDirectivo(){
+  var r = window.ROLE || (window.SESSION && window.SESSION.role) || modoUsuario;
+  return ['admin','director','subdirector'].indexOf(r) >= 0;
+}
+
 function getSemanaStart(offset){
   offset=offset||0;
   var d=new Date(HOY);
@@ -338,10 +339,12 @@ function closeSessionMenu(){
   if(m) m.classList.remove('open');
   if(t) t.setAttribute('aria-expanded','false');
 }
-function cerrarSesion(){
-  confirmar('¿Cerrar sesión y volver al inicio?',function(){
-    sessionStorage.removeItem('session');
-    window.location.href='login.html';
+function cerrarSesion() {
+  confirmar('¿Cerrar sesión y volver al inicio?', function() {
+    // Misma clave canónica que login.html usa para guardar
+    sessionStorage.removeItem('SAEP_session_data');
+    // replace() para no dejar index.html en el historial
+    window.location.replace('login.html');
   });
 }
 function selOrient(el,orient){
@@ -389,17 +392,18 @@ function renderDayNav(){
   var container=document.getElementById('day-nav-bar');
   if(!container) return;
   var html='';
-  for(var d=0;d<5;d++){
+  for(var d=0; d<5; d++){
     var fecha=getDiaDate(semanaOffset,d);
     var hoy=esHoy(semanaOffset,d);
     var activo=d===diaActual;
+    
+    // Se corrigió '\') por '')
     html+='<button class="day-nav-btn'+(activo?' active':'')+(hoy?' hoy':'')+'" onclick="irDia('+d+')"><span class="day-nav-nombre">'+DIAS_SEMANA[d]+'</span><span class="day-nav-fecha">'+formatFecha(fecha)+'</span>'+(hoy?'<span class="day-nav-hoy-dot"></span>':'')+'</button>';
-  }
+}
   container.innerHTML=html;
 }
 
 function renderCalendario(){
-  console.log('🎨 Renderizando calendario...');
   renderSidebar();
   var start=getSemanaStart(semanaOffset);
   var end=new Date(start); end.setDate(end.getDate()+4);
@@ -412,69 +416,95 @@ function renderCalendario(){
   var reservasDia=RESERVAS.filter(function(r){ return r.semanaOffset===semanaOffset&&r.dia===diaActual; });
   var solicDia=SOLICITUDES.filter(function(s){ return s.semanaOffset===semanaOffset&&s.dia===diaActual&&s.estado==='pendiente'; });
   var grid=document.getElementById('cal-body');
-  if(!grid) { console.error('❌ Elemento #cal-body no encontrado!'); return; }
+  if(!grid) return;
   var labsFiltrados=LABS.filter(function(l){ return filtroLab==='todos'||filtroLab===l.id; });
-  console.log('📊 Renderizando:', {labs: labsFiltrados.length, reservas: reservasDia.length});
+  // ── R2 y R1: helpers de rol ────────────────────────────────
+  var esDir=esDirectivo();
+  var miProfId=getCurrentProfId();
 
   var html='<div class="at-wrap"><table class="at-table" role="grid"><thead>';
+
+  // ── Fila 1: encabezados de turno ──
+  // El colspan incluye clases + recreo porque ahora están en la misma fila
   html+='<tr><th class="at-corner" rowspan="2">Espacio</th>';
   TURNOS_CONFIG.forEach(function(tc){
-    var cols=tc.modulos.filter(function(mid){ return MODULOS_CLASE.find(function(m){ return m.id===mid; }); });
-    if(!cols.length) return;
-    html+='<th class="at-turno-span" colspan="'+cols.length+'"><span class="at-turno-icon">'+tc.icon+'</span>'+tc.label+'</th>';
-    var recreoMod=MODULOS.find(function(m){ return m.tipo==='recreo'&&m.turno===tc.label; });
-    if(recreoMod) html+='<th class="at-recreo-col-header">☕</th>';
+    // Contar todos los módulos del turno (clase + recreo) para el colspan
+    var totalCols=tc.modulos.filter(function(mid){
+      return MODULOS.find(function(m){ return m.id===mid; });
+    }).length;
+    if(!totalCols) return;
+    html+='<th class="at-turno-span" colspan="'+totalCols+'"><span class="at-turno-icon">'+tc.icon+'</span>'+tc.label+'</th>';
   });
-  html+='</tr><tr>';
+  html+='</tr>';
+
+  // ── Fila 2: horas en orden cronológico (clase y recreo intercalados) ──
+  html+='<tr>';
   TURNOS_CONFIG.forEach(function(tc){
-    var cols=tc.modulos.filter(function(mid){ return MODULOS_CLASE.find(function(m){ return m.id===mid; }); });
-    if(!cols.length) return;
-    cols.forEach(function(mid){
-      var mod=MODULOS_CLASE.find(function(m){ return m.id===mid; });
-      html+='<th class="at-hora-header"><span class="at-hora-ini">'+mod.inicio+'</span><span class="at-hora-num">'+mod.label.replace('° Mañana','°M').replace('° Tarde','°T').replace('° Vespert.','°V')+'</span></th>';
+    tc.modulos.forEach(function(mid){
+      var mod=MODULOS.find(function(m){ return m.id===mid; });
+      if(!mod) return;
+      if(mod.tipo==='recreo'){
+        // R1c: botón de edición solo para directivos
+        var recInfo=RECREOS.find(function(r){ return r.modulo===mod.id; });
+        var recTitle=recInfo?recInfo.evento:'Recreo';
+        var editBtn=esDir
+          ? '<button class="at-recreo-edit" onclick="editarRecreo('+mod.id+')" title="'+recTitle+'">✏️</button>'
+          : '<span title="'+recTitle+'">'+mod.icon+'</span>';
+        html+='<th class="at-recreo-col-header at-recreo-hora"><span style="font-size:9px;display:block;">'+mod.inicio+'</span>'+editBtn+'</th>';
+      } else {
+        html+='<th class="at-hora-header"><span class="at-hora-ini">'+mod.inicio+'</span><span class="at-hora-num">'+mod.label.replace('° Mañana','°M').replace('° Tarde','°T').replace('° Vespert.','°V')+'</span></th>';
+      }
     });
-    var recreoMod=MODULOS.find(function(m){ return m.tipo==='recreo'&&m.turno===tc.label; });
-    if(recreoMod){
-      var recInfo=RECREOS.find(function(r){ return r.modulo===recreoMod.id; });
-      html+='<th class="at-recreo-col-header at-recreo-hora"><span style="font-size:9px;display:block;">'+recreoMod.inicio+'</span><button class="at-recreo-edit" onclick="editarRecreo('+recreoMod.id+')" title="'+(recInfo?recInfo.evento:'Recreo')+'">✏️</button></th>';
-    }
   });
   html+='</tr></thead><tbody>';
 
+  // ── Filas de laboratorios ──
   labsFiltrados.forEach(function(lab,labIdx){
     html+='<tr class="at-row'+(labIdx%2===1?' at-row-alt':'')+'">';
     html+='<td class="at-lab-cell"><div class="at-lab-name">'+lab.nombre+'</div><div class="at-lab-status '+(lab.ocupado?'at-status-ocup':'at-status-libre')+'">'+(lab.ocupado?'Mantenimiento':'Disponible')+'</div></td>';
+
     TURNOS_CONFIG.forEach(function(tc){
-      var cols=tc.modulos.filter(function(mid){ return MODULOS_CLASE.find(function(m){ return m.id===mid; }); });
-      if(!cols.length) return;
-      cols.forEach(function(mid){
+      tc.modulos.forEach(function(mid){
+        var mod=MODULOS.find(function(m){ return m.id===mid; });
+        if(!mod) return;
+
+        // ── Celda de recreo ──
+        if(mod.tipo==='recreo'){
+          var recInfo=RECREOS.find(function(r){ return r.modulo===mod.id; });
+          html+='<td class="at-recreo-cell" title="'+(recInfo?recInfo.evento:'Recreo')+'"></td>';
+          return;
+        }
+
+        // ── Celda de clase ──
         var r=reservasDia.find(function(x){ return x.modulo===mid&&x.lab===lab.id; });
         var s=solicDia.find(function(x){ return x.modulo===mid&&x.lab===lab.id; });
         html+='<td class="at-event-cell">';
+
         if(r){
           var oriOk=filtroOrient==='all'||r.orient===filtroOrient;
           if(!oriOk){
+            // Filtro de orientación activo y no coincide → mostrar como libre
             html+='<div class="at-event at-libre" role="button" tabindex="0" onclick="abrirModalReservaSlot('+diaActual+','+mid+',\''+lab.id+'\')" title="Disponible"><span class="at-ev-plus">+</span></div>';
+          } else if(!esDir && String(r.profeId)!==String(miProfId)){
+            // R2: Profesor viendo reserva ajena → celda opaca sin detalles ni acción
+            html+='<div class="at-event at-ocupado-otro" role="presentation" title="Turno ocupado por otro docente"><div class="at-ev-curso" style="color:var(--muted);">Ocupado</div></div>';
           } else {
+            // Directivo, o profesor viendo su propia reserva → mostrar completo
             var ori=ORIENTACIONES[r.orient]; var p=getProfe(r.profeId);
             html+='<div class="at-event '+ori.ev+'" role="button" tabindex="0" onclick="verDetalle('+r.id+')" title="'+r.curso+' — Prof. '+p.apellido+'"><div class="at-ev-curso">'+r.curso+' '+ori.emoji+'</div><div class="at-ev-prof">'+p.apellido+'</div></div>';
           }
         } else if(s){
-          var action=modoUsuario==='admin'?'verDetalleSolicitud('+s.id+')':'verDetalle_Pendiente('+s.id+')';
+          var action=esDir?'verDetalleSolicitud('+s.id+')':'verDetalle_Pendiente('+s.id+')';
           html+='<div class="at-event ev-pendiente" role="button" tabindex="0" onclick="'+action+'" title="Pendiente: '+s.curso+'"><div class="at-ev-curso">'+s.curso+' ⏳</div></div>';
         } else {
           html+='<div class="at-event at-libre" role="button" tabindex="0" onclick="abrirModalReservaSlot('+diaActual+','+mid+',\''+lab.id+'\')" title="Disponible — clic para reservar"><span class="at-ev-plus">+</span></div>';
         }
         html+='</td>';
       });
-      var recreoMod=MODULOS.find(function(m){ return m.tipo==='recreo'&&m.turno===tc.label; });
-      if(recreoMod){
-        var recInfo=RECREOS.find(function(r){ return r.modulo===recreoMod.id; });
-        html+='<td class="at-recreo-cell" title="'+(recInfo?recInfo.evento:'Recreo')+'"></td>';
-      }
     });
     html+='</tr>';
   });
+
   html+='</tbody></table></div>';
   grid.innerHTML=html;
   renderEsperaCalendario();
@@ -519,9 +549,14 @@ function renderEsperaCalendario(){
   var espera=LISTA_ESPERA.filter(function(e){ return e.semanaOffset===semanaOffset; });
   if(!espera.length){ el.innerHTML='<div class="empty-state">No hay docentes en lista de espera esta semana.</div>'; return; }
   var bgColors=['var(--navy)','var(--red)','var(--green)','var(--amber)'];
+  var esDir=esDirectivo();
   el.innerHTML=espera.map(function(e,i){
     var p=getProfe(e.profeId); var fecha=getDiaDate(e.semanaOffset,e.dia); var mod=getModulo(e.modulo);
-    return '<div class="espera-item"><div class="espera-badge" style="background:'+bgColors[i%4]+'">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div class="item-name">Prof. '+p.apellido+'</div><div class="item-sub">'+DIAS_SEMANA[e.dia]+' '+formatFecha(fecha)+' · '+mod.label+' · Lab.'+e.lab+'</div></div><div class="espera-actions">'+(modoUsuario==='admin'?'<button class="espera-btn" onclick="promoverEspera('+e.id+')">✓ Asignar</button>':'')+'<button class="espera-btn cancel" onclick="quitarEspera('+e.id+')">✕</button></div></div>';
+    // R1a: botón Asignar solo para directivos; botón ✕ también solo para directivos
+    var acciones=(esDir
+      ? '<button class="espera-btn" onclick="promoverEspera('+e.id+')">✓ Asignar</button><button class="espera-btn cancel" onclick="quitarEspera('+e.id+')">✕</button>'
+      : '');
+    return '<div class="espera-item"><div class="espera-badge" style="background:'+bgColors[i%4]+'">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div class="item-name">Prof. '+p.apellido+'</div><div class="item-sub">'+DIAS_SEMANA[e.dia]+' '+formatFecha(fecha)+' · '+mod.label+' · Lab.'+e.lab+'</div></div><div class="espera-actions">'+acciones+'</div></div>';
   }).join('');
 }
 
@@ -569,9 +604,10 @@ function verDetalle(reservaId){
   }
   var footer=document.getElementById('modal-detalle-footer');
   if(footer){
-    var isOwn=modoUsuario==='admin'||r.profeId===getCurrentProfId();
+    var isOwn=esDirectivo()||r.profeId===getCurrentProfId();
     var renovBtn='';
-    if(isOwn&&r.cicloClases>=3){
+    // R1b: botón renovar solo para directivos
+    if(isOwn && r.cicloClases>=3 && esDirectivo()){
       var renov=r.renovaciones||0;
       renovBtn=renov>=2
         ? '<button class="btn-ok" onclick="cerrarModal(\'modal-detalle\');renovarReserva('+r.id+')">🔄 Nueva reserva</button>'
@@ -818,7 +854,8 @@ function renderMisReservas(){
       var p=getProfe(r.profeId); var ori=ORIENTACIONES[r.orient]; var lab=getLab(r.lab); var mod=getModulo(r.modulo);
       var needsRenew=r.cicloClases>=3;
       var dots=[1,2,3].map(function(i){ var cls='empty'; if(i<r.cicloClases)cls='done'; else if(i===r.cicloClases)cls=needsRenew?'warn':'current'; return '<div class="ciclo-dot '+cls+'"></div>'; }).join('');
-      return '<div class="reserva-card"><div class="reserva-card-stripe '+r.orient+'"></div><div class="reserva-card-body"><div class="reserva-card-header"><div><div class="reserva-card-title">'+lab.nombre+'</div><div class="reserva-meta"><span class="meta-tag">'+DIAS_LARGO[r.dia]+' '+mod.inicio+'</span><span class="meta-tag orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span>'+(isAdmin?'<span class="meta-tag">Prof. '+p.apellido+'</span>':'')+'</div></div><div class="reserva-curso-badge">'+r.curso+'</div></div><div class="reserva-secuencia">"'+r.secuencia+'"</div><div class="ciclo-wrap"><div class="ciclo-dots">'+dots+'</div><span class="ciclo-text '+(needsRenew?'renew':'')+'">Clase '+r.cicloClases+'/3'+(needsRenew?((r.renovaciones||0)>=2?' · ¡Nueva reserva!':' · Renovar '+((r.renovaciones||0)+1)+'/2'):'')+'</span></div></div><div class="reserva-card-footer"><button class="btn-action btn-detail" onclick="verDetalle('+r.id+')">Ver detalle</button>'+(needsRenew?'<button class="btn-action btn-renew" onclick="renovarReserva('+r.id+')">↻ Renovar</button>':'')+'<button class="btn-action btn-cancel-r" onclick="cancelarReserva('+r.id+')">Cancelar</button></div></div>';
+      return '<div class="reserva-card"><div class="reserva-card-stripe '+r.orient+'"></div><div class="reserva-card-body"><div class="reserva-card-header"><div><div class="reserva-card-title">'+lab.nombre+'</div><div class="reserva-meta"><span class="meta-tag">'+DIAS_LARGO[r.dia]+' '+mod.inicio+'</span><span class="meta-tag orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span>'+(isAdmin?'<span class="meta-tag">Prof. '+p.apellido+'</span>':'')+'</div></div><div class="reserva-curso-badge">'+r.curso+'</div></div><div class="reserva-secuencia">"'+r.secuencia+'"</div><div class="ciclo-wrap"><div class="ciclo-dots">'+dots+'</div><span class="ciclo-text '+(needsRenew?'renew':'')+'">Clase '+r.cicloClases+'/3'+(needsRenew?((r.renovaciones||0)>=2?' · ¡Nueva reserva!':' · Renovar '+((r.renovaciones||0)+1)+'/2'):'')+'</span></div></div><div class="reserva-card-footer"><button class="btn-action btn-detail" onclick="verDetalle('+r.id+')">Ver detalle</button>'// DESPUÉS: botón Renovar solo visible para directivos
++(needsRenew&&esDirectivo()?'<button class="btn-action btn-renew" onclick="renovarReserva('+r.id+')">↻ Renovar</button>':'')+'<button class="btn-action btn-cancel-r" onclick="cancelarReserva('+r.id+')">Cancelar</button></div></div>';
     }).join('')+'</div>';
   }
   list.innerHTML=solHtml+reservasHtml;
@@ -1047,57 +1084,191 @@ function renderAll(){
 }
 
 // ============================================================
-// INIT
+// MÓDULO DE INYECCIÓN DEFENSIVA DE UI
+// Todos los accesos al DOM pasan por aquí.
+// Regla: verificar existencia física antes de escribir.
+// Si el elemento no existe → console.warn silencioso, sin throw.
 // ============================================================
-document.addEventListener('DOMContentLoaded',function(){
-  console.log('🚀 Inicializando aplicación...');
-  var raw=sessionStorage.getItem('session');
-  if(!raw){ console.log('❌ Sin sesión, redirigiendo a login...'); window.location.href='login.html'; return; }
-  var session;
-  try{ session=JSON.parse(raw); }
-  catch(e){ console.error('❌ Error parsing session:', e); window.location.href='login.html'; return; }
-  console.log('✅ Sesión iniciada:', session.display, '(' + session.role + ')');
-  window.SESSION=session;
-  modoUsuario=session.role==='admin'?'admin':'prof';
+var UIHelper = {
 
-  var dow=new Date().getDay();
-  diaActual=dow===0?4:(dow===6?0:dow-1);
-  diaActual=Math.max(0,Math.min(4,diaActual));
+  /**
+   * Escribe textContent en un elemento por ID.
+   * @param {string} id        - ID del elemento destino
+   * @param {string} text      - Texto a inyectar
+   * @param {string} [context] - Descripción para el warn (debug)
+   */
+  setText: function(id, text, context) {
+    var el = document.getElementById(id);
+    if (!el) {
+      console.warn('[UIHelper] Elemento no encontrado:', id, context || '');
+      return;
+    }
+    el.textContent = String(text);
+  },
 
-  var parts=session.display.replace('Prof. ','').split(' ');
-  var initials=parts.length>=2?(parts[0][0]+(parts[1]?parts[1][0]:'')).toUpperCase():session.display.substring(0,2).toUpperCase();
-  var avEl=document.getElementById('s-avatar');
-  var nameEl=document.getElementById('s-name');
-  var roleEl=document.getElementById('s-role');
-  var ddName=document.getElementById('sm-name');
-  var ddRole=document.getElementById('sm-role');
-  if(avEl) avEl.textContent=initials;
-  if(nameEl) nameEl.textContent=session.display;
-  if(roleEl){ roleEl.textContent=session.role==='admin'?'directivo':'docente'; if(session.role==='admin') roleEl.classList.add('admin'); }
-  if(ddName) ddName.textContent=session.display;
-  if(ddRole) ddRole.textContent=session.role==='admin'?'Directivo / Administrador':'Docente';
-  document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display=session.role==='admin'?'':'none'; });
+  /**
+   * Agrega o remueve una clase CSS de un elemento por ID.
+   * @param {string}  id        - ID del elemento destino
+   * @param {string}  className - Clase a agregar/remover
+   * @param {boolean} force     - true = agregar, false = remover
+   */
+  toggleClass: function(id, className, force) {
+    var el = document.getElementById(id);
+    if (!el) {
+      console.warn('[UIHelper] Elemento no encontrado para toggleClass:', id);
+      return;
+    }
+    el.classList.toggle(className, force);
+  },
 
-  document.addEventListener('click',function(e){
-    if(!e.target.closest('.session-widget')) closeSessionMenu();
-    if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+  /**
+   * Aplica display inline a todos los elementos que coincidan con un selector CSS.
+   * @param {string} selector    - Selector CSS (ej: '.admin-only')
+   * @param {string} displayVal  - Valor de display ('' para visible, 'none' para oculto)
+   */
+  setDisplayAll: function(selector, displayVal) {
+    try {
+      document.querySelectorAll(selector).forEach(function(el) {
+        el.style.display = displayVal;
+      });
+    } catch (e) {
+      console.warn('[UIHelper] Selector inválido:', selector, e);
+    }
+  },
+
+  /**
+   * Inyecta el avatar (iniciales) en el elemento de sesión.
+   * Extrae las dos primeras letras de apellido y nombre a partir de display.
+   * Acepta formato "Prof. Apellido", "Apellido, Nombre" o string libre.
+   * @param {string} display - Cadena de nombre a procesar
+   */
+  setAvatar: function(display) {
+    var el = document.getElementById('s-avatar');
+    if (!el) {
+      console.warn('[UIHelper] Elemento no encontrado: s-avatar');
+      return;
+    }
+    // Sanitizar: si display no es string o está vacío → placeholder
+    if (typeof display !== 'string' || !display.trim()) {
+      el.textContent = '?';
+      return;
+    }
+    // Eliminar prefijos honoríficos comunes antes de extraer iniciales
+    var cleaned  = display.replace(/^(Prof\.|Dr\.|Lic\.|Ing\.)\s*/i, '').trim();
+    // Separar por espacios, comas o puntos
+    var parts    = cleaned.split(/[\s,\.]+/).filter(function(p) { return p.length > 0; });
+    var initials = '';
+    if (parts.length >= 2) {
+      initials = (parts[0][0] + parts[1][0]).toUpperCase();
+    } else if (parts.length === 1) {
+      initials = parts[0].substring(0, 2).toUpperCase();
+    } else {
+      initials = '?';
+    }
+    el.textContent = initials;
+  }
+};
+
+// ============================================================
+// INIT — Ciclo de vida completo encapsulado en DOMContentLoaded
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+
+  // ── 1. EXTRACCIÓN Y VALIDACIÓN DE SESIÓN ──────────────────
+  // Toda la lógica de sessionStorage vive aquí, en un único scope.
+  var SESSION_KEY = 'SAEP_session_data';
+  var raw = null;
+
+  try {
+    raw = sessionStorage.getItem(SESSION_KEY);
+  } catch (storageErr) {
+    // sessionStorage puede estar bloqueado (modo privado de algunos navegadores)
+    console.warn('[INIT] sessionStorage no disponible:', storageErr);
+    window.location.replace('login.html');
+    return; // Detener ejecución del callback, nunca del hilo global
+  }
+
+  // Ausencia de clave → sesión inexistente → redirigir sin limpiar
+  if (!raw) {
+    window.location.replace('login.html');
+    return;
+  }
+
+  // ── 2. PARSEO DEFENSIVO ───────────────────────────────────
+  var session = null;
+  try {
+    session = JSON.parse(raw);
+  } catch (parseErr) {
+    // JSON corrupto: limpiar y redirigir
+    console.warn('[INIT] Sesión corrupta, limpiando storage:', parseErr);
+    sessionStorage.removeItem(SESSION_KEY);
+    window.location.replace('login.html');
+    return;
+  }
+
+  // Validación estructural mínima del payload
+  // (cubre el caso de JSON válido pero con campos faltantes)
+  if (!session || typeof session.role !== 'string' || typeof session.display !== 'string') {
+    console.warn('[INIT] Payload de sesión inválido:', session);
+    sessionStorage.removeItem(SESSION_KEY);
+    window.location.replace('login.html');
+    return;
+  }
+
+  // ── 3. PUBLICAR SESIÓN AL SCOPE GLOBAL ────────────────────
+  // window.SESSION es el único punto de verdad para el resto de app.js
+  window.SESSION = session;
+  modoUsuario = (['admin','director','subdirector'].indexOf(session.role) >= 0) ? 'admin' : 'prof';
+
+  // ── 4. INYECCIÓN DE UI (vía UIHelper, cero asignaciones directas) ──
+  UIHelper.setAvatar(session.display);
+  UIHelper.setText('s-name',  session.display,                        'header nombre');
+  UIHelper.setText('s-role',  session.role === 'admin' ? 'directivo' : 'docente', 'header rol');
+  UIHelper.setText('sm-name', session.display,                        'dropdown nombre');
+  UIHelper.setText('sm-role', session.role === 'admin' ? 'Directivo / Administrador' : 'Docente', 'dropdown rol largo');
+
+  // Clase visual del chip de rol (color admin vs docente)
+  UIHelper.toggleClass('s-role', 'admin', session.role === 'admin');
+
+  // Visibilidad de elementos exclusivos de admin
+  UIHelper.setDisplayAll('.admin-only', session.role === 'admin' ? '' : 'none');
+
+  // ── 5. DÍA INICIAL ───────────────────────────────────────
+  var dow = new Date().getDay();
+  // 0=dom→4(vie), 6=sáb→0(lun), resto→día anterior indexado en 0
+  diaActual = (dow === 0) ? 4 : (dow === 6) ? 0 : dow - 1;
+  diaActual = Math.max(0, Math.min(4, diaActual));
+
+  // ── 6. EVENTOS GLOBALES ───────────────────────────────────
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.session-widget')) closeSessionMenu();
+    if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
   });
-  document.addEventListener('keydown',function(e){
-    if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(function(m){ m.classList.remove('open'); });
-  });
-  ['f-lab','f-dia','f-modulo'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('change',checkConflict); });
 
-  // Intentar cargar desde localStorage, si no hay datos cargar desde JSON
-  console.log('💾 Intentando cargar datos...');
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.open').forEach(function(m) {
+        m.classList.remove('open');
+      });
+    }
+  });
+
+  // Listeners de conflicto en modal de reserva
+  ['f-lab', 'f-dia', 'f-modulo'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', checkConflict);
+  });
+
+  // ── 7. CARGA DE DATOS ─────────────────────────────────────
+  // Intento 1: localStorage (persiste entre recargas)
+  // Intento 2: archivos JSON (carga inicial o después de reset)
   var fromLS = loadFromLocalStorage();
   if (fromLS) {
-    console.log('📦 Datos cargados desde localStorage');
     renderCalendario();
   } else {
-    console.log('📥 Cargando desde archivos JSON...');
-    loadFromJSON(function(){
-      console.log('✅ JSON cargado, renderizando...');
+    loadFromJSON(function() {
       renderCalendario();
     });
   }
-});
+
+}); // fin DOMContentLoaded
