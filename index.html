@@ -483,6 +483,32 @@
 
 <div id="toast-container" role="region" aria-label="Notificaciones" aria-live="polite"></div>
 
-<script src="js/app.js"></script>
+<!--
+  Módulos de JavaScript — cargar EN ESTE ORDEN (cada uno depende del anterior)
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  config.js      → constantes y estado global                   │
+  │  db.js          → base de datos (localStorage + JSON)          │
+  │  helpers.js     → utilidades puras (fechas, lookups, roles)    │
+  │  ui.js          → toast, modales, UIHelper                     │
+  │  nav.js         → navegación entre páginas y filtros           │
+  │  calendario.js  → renderizado del calendario semanal           │
+  │  reservas.js    → modal de reserva + aprobación de solicitudes │
+  │  espera.js      → lista de espera                              │
+  │  misReservas.js → vista "Mis reservas"                         │
+  │  admin.js       → panel de administración + CRUD               │
+  │  init.js        → arranque (sesión, eventos, carga de datos)   │
+  └─────────────────────────────────────────────────────────────────┘
+-->
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/calendario.js"></script>
+<script src="js/reservas.js"></script>
+<script src="js/espera.js"></script>
+<script src="js/misReservas.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/init.js"></script>
 </body>
 </html>
