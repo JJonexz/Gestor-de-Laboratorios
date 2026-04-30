@@ -10,6 +10,7 @@ let semanaOffset = 0;
 let diaActual    = 0;
 let filtroOrient  = 'all';
 let filtroLab     = 'todos';
+let filtroTurno   = 'todos';  
 let modoUsuario   = 'prof';
 let editDocenteId = null;
 let editLabId     = null;
@@ -106,57 +107,56 @@ function loadFromLocalStorage() {
   }
 }
 
-function loadFromJSON(callback) {
-  var files = [
-    { key:'labs',        url:'data/labs.json'       },
-    { key:'profesores',  url:'data/profesores.json' },
-    { key:'reservas',    url:'data/reservas.json'   },
-    { key:'solicitudes', url:'data/solicitudes.json'},
-    { key:'espera',      url:'data/espera.json'     },
-    { key:'pautas',      url:'data/pautas.json'     },
-    { key:'recreos',     url:'data/recreos.json'    },
+function loadFromJSON(callback){
+  var files=[
+    {key:'labs',        url:'data/labs.json'       },
+    {key:'profesores',  url:'data/profesores.json' },
+    {key:'reservas',    url:'data/reservas.json'   },
+    {key:'solicitudes', url:'data/solicitudes.json'},
+    {key:'espera',      url:'data/espera.json'     },
+    {key:'pautas',      url:'data/pautas.json'     },
+    {key:'recreos',     url:'data/recreos.json'    },
   ];
-  var results = {};
-  var pending = files.length;
+  var results={};
+  var pending=files.length;
 
-  files.forEach(function(f) {
+  // Normaliza campos numéricos críticos para que === no falle
+  function normalizarEntrada(r){
+    return Object.assign({}, r, {
+      semanaOffset: parseInt(r.semanaOffset, 10) || 0,
+      dia:          parseInt(r.dia,          10) || 0,
+      modulo:       parseInt(r.modulo,       10) || 0,
+    });
+  }
+
+  function aplicar(){
+    LABS         = results.labs        || [];
+    PROFESORES   = results.profesores  || [];
+    RESERVAS     = (results.reservas    || []).map(normalizarEntrada);
+    SOLICITUDES  = (results.solicitudes || []).map(normalizarEntrada);
+    LISTA_ESPERA = (results.espera      || []).map(normalizarEntrada);
+    PAUTAS       = results.pautas      || [];
+    RECREOS      = results.recreos     || [];
+    var maxId=0;
+    [RESERVAS,SOLICITUDES,LISTA_ESPERA].forEach(function(arr){
+      arr.forEach(function(x){ if(x.id>maxId) maxId=x.id; });
+    });
+    nextId=Math.max(500, maxId+1);
+  }
+
+  files.forEach(function(f){
     fetch(f.url)
       .then(function(r){ return r.json(); })
       .then(function(data){
-        results[f.key] = data;
+        results[f.key]=data;
         pending--;
-        if (pending === 0) {
-          LABS         = results.labs        || [];
-          PROFESORES   = results.profesores  || [];
-          RESERVAS     = results.reservas    || [];
-          SOLICITUDES  = results.solicitudes || [];
-          LISTA_ESPERA = results.espera      || [];
-          PAUTAS       = results.pautas      || [];
-          RECREOS      = results.recreos     || [];
-          // Calcular nextId a partir de los datos cargados
-          var maxId = 0;
-          [RESERVAS, SOLICITUDES, LISTA_ESPERA].forEach(function(arr){
-            arr.forEach(function(x){ if(x.id > maxId) maxId = x.id; });
-          });
-          nextId = Math.max(500, maxId + 1);
-          saveDB(); // guardar inmediatamente en localStorage
-          if (callback) callback();
-        }
+        if(pending===0){ aplicar(); saveDB(); if(callback) callback(); }
       })
       .catch(function(err){
         console.warn('Error cargando', f.url, err);
-        results[f.key] = [];
+        results[f.key]=[];
         pending--;
-        if (pending === 0) {
-          LABS         = results.labs        || [];
-          PROFESORES   = results.profesores  || [];
-          RESERVAS     = results.reservas    || [];
-          SOLICITUDES  = results.solicitudes || [];
-          LISTA_ESPERA = results.espera      || [];
-          PAUTAS       = results.pautas      || [];
-          RECREOS      = results.recreos     || [];
-          if (callback) callback();
-        }
+        if(pending===0){ aplicar(); if(callback) callback(); }
       });
   });
 }
@@ -418,93 +418,72 @@ function renderCalendario(){
   var grid=document.getElementById('cal-body');
   if(!grid) return;
   var labsFiltrados=LABS.filter(function(l){ return filtroLab==='todos'||filtroLab===l.id; });
-  // ── R2 y R1: helpers de rol ────────────────────────────────
-  var esDir=esDirectivo();
-  var miProfId=getCurrentProfId();
+
+  // ── NUEVO: filtro de turno ──────────────────────────────────────────────
+  var turnosFiltrados=filtroTurno==='todos'
+    ? TURNOS_CONFIG
+    : TURNOS_CONFIG.filter(function(tc){ return tc.label===filtroTurno; });
+  // ────────────────────────────────────────────────────────────────────────
 
   var html='<div class="at-wrap"><table class="at-table" role="grid"><thead>';
-
-  // ── Fila 1: encabezados de turno ──
-  // El colspan incluye clases + recreo porque ahora están en la misma fila
   html+='<tr><th class="at-corner" rowspan="2">Espacio</th>';
-  TURNOS_CONFIG.forEach(function(tc){
-    // Contar todos los módulos del turno (clase + recreo) para el colspan
-    var totalCols=tc.modulos.filter(function(mid){
-      return MODULOS.find(function(m){ return m.id===mid; });
-    }).length;
-    if(!totalCols) return;
-    html+='<th class="at-turno-span" colspan="'+totalCols+'"><span class="at-turno-icon">'+tc.icon+'</span>'+tc.label+'</th>';
+  turnosFiltrados.forEach(function(tc){                                          // ← usa turnosFiltrados
+    var cols=tc.modulos.filter(function(mid){ return MODULOS_CLASE.find(function(m){ return m.id===mid; }); });
+    if(!cols.length) return;
+    html+='<th class="at-turno-span" colspan="'+cols.length+'"><span class="at-turno-icon">'+tc.icon+'</span>'+tc.label+'</th>';
+    var recreoMod=MODULOS.find(function(m){ return m.tipo==='recreo'&&m.turno===tc.label; });
+    if(recreoMod) html+='<th class="at-recreo-col-header">☕</th>';
   });
-  html+='</tr>';
-
-  // ── Fila 2: horas en orden cronológico (clase y recreo intercalados) ──
-  html+='<tr>';
-  TURNOS_CONFIG.forEach(function(tc){
-    tc.modulos.forEach(function(mid){
-      var mod=MODULOS.find(function(m){ return m.id===mid; });
-      if(!mod) return;
-      if(mod.tipo==='recreo'){
-        // R1c: botón de edición solo para directivos
-        var recInfo=RECREOS.find(function(r){ return r.modulo===mod.id; });
-        var recTitle=recInfo?recInfo.evento:'Recreo';
-        var editBtn=esDir
-          ? '<button class="at-recreo-edit" onclick="editarRecreo('+mod.id+')" title="'+recTitle+'">✏️</button>'
-          : '<span title="'+recTitle+'">'+mod.icon+'</span>';
-        html+='<th class="at-recreo-col-header at-recreo-hora"><span style="font-size:9px;display:block;">'+mod.inicio+'</span>'+editBtn+'</th>';
-      } else {
-        html+='<th class="at-hora-header"><span class="at-hora-ini">'+mod.inicio+'</span><span class="at-hora-num">'+mod.label.replace('° Mañana','°M').replace('° Tarde','°T').replace('° Vespert.','°V')+'</span></th>';
-      }
+  html+='</tr><tr>';
+  turnosFiltrados.forEach(function(tc){                                          // ← usa turnosFiltrados
+    var cols=tc.modulos.filter(function(mid){ return MODULOS_CLASE.find(function(m){ return m.id===mid; }); });
+    if(!cols.length) return;
+    cols.forEach(function(mid){
+      var mod=MODULOS_CLASE.find(function(m){ return m.id===mid; });
+      html+='<th class="at-hora-header"><span class="at-hora-ini">'+mod.inicio+'</span><span class="at-hora-num">'+mod.label.replace('° Mañana','°M').replace('° Tarde','°T').replace('° Vespert.','°V')+'</span></th>';
     });
+    var recreoMod=MODULOS.find(function(m){ return m.tipo==='recreo'&&m.turno===tc.label; });
+    if(recreoMod){
+      var recInfo=RECREOS.find(function(r){ return r.modulo===recreoMod.id; });
+      html+='<th class="at-recreo-col-header at-recreo-hora"><span style="font-size:9px;display:block;">'+recreoMod.inicio+'</span><button class="at-recreo-edit" onclick="editarRecreo('+recreoMod.id+')" title="'+(recInfo?recInfo.evento:'Recreo')+'">✏️</button></th>';
+    }
   });
   html+='</tr></thead><tbody>';
 
-  // ── Filas de laboratorios ──
   labsFiltrados.forEach(function(lab,labIdx){
     html+='<tr class="at-row'+(labIdx%2===1?' at-row-alt':'')+'">';
     html+='<td class="at-lab-cell"><div class="at-lab-name">'+lab.nombre+'</div><div class="at-lab-status '+(lab.ocupado?'at-status-ocup':'at-status-libre')+'">'+(lab.ocupado?'Mantenimiento':'Disponible')+'</div></td>';
-
-    TURNOS_CONFIG.forEach(function(tc){
-      tc.modulos.forEach(function(mid){
-        var mod=MODULOS.find(function(m){ return m.id===mid; });
-        if(!mod) return;
-
-        // ── Celda de recreo ──
-        if(mod.tipo==='recreo'){
-          var recInfo=RECREOS.find(function(r){ return r.modulo===mod.id; });
-          html+='<td class="at-recreo-cell" title="'+(recInfo?recInfo.evento:'Recreo')+'"></td>';
-          return;
-        }
-
-        // ── Celda de clase ──
+    turnosFiltrados.forEach(function(tc){                                        // ← usa turnosFiltrados
+      var cols=tc.modulos.filter(function(mid){ return MODULOS_CLASE.find(function(m){ return m.id===mid; }); });
+      if(!cols.length) return;
+      cols.forEach(function(mid){
         var r=reservasDia.find(function(x){ return x.modulo===mid&&x.lab===lab.id; });
         var s=solicDia.find(function(x){ return x.modulo===mid&&x.lab===lab.id; });
         html+='<td class="at-event-cell">';
-
         if(r){
           var oriOk=filtroOrient==='all'||r.orient===filtroOrient;
           if(!oriOk){
-            // Filtro de orientación activo y no coincide → mostrar como libre
             html+='<div class="at-event at-libre" role="button" tabindex="0" onclick="abrirModalReservaSlot('+diaActual+','+mid+',\''+lab.id+'\')" title="Disponible"><span class="at-ev-plus">+</span></div>';
-          } else if(!esDir && String(r.profeId)!==String(miProfId)){
-            // R2: Profesor viendo reserva ajena → celda opaca sin detalles ni acción
-            html+='<div class="at-event at-ocupado-otro" role="presentation" title="Turno ocupado por otro docente"><div class="at-ev-curso" style="color:var(--muted);">Ocupado</div></div>';
           } else {
-            // Directivo, o profesor viendo su propia reserva → mostrar completo
             var ori=ORIENTACIONES[r.orient]; var p=getProfe(r.profeId);
             html+='<div class="at-event '+ori.ev+'" role="button" tabindex="0" onclick="verDetalle('+r.id+')" title="'+r.curso+' — Prof. '+p.apellido+'"><div class="at-ev-curso">'+r.curso+' '+ori.emoji+'</div><div class="at-ev-prof">'+p.apellido+'</div></div>';
           }
         } else if(s){
-          var action=esDir?'verDetalleSolicitud('+s.id+')':'verDetalle_Pendiente('+s.id+')';
+          var action=modoUsuario==='admin'?'verDetalleSolicitud('+s.id+')':'verDetalle_Pendiente('+s.id+')';
           html+='<div class="at-event ev-pendiente" role="button" tabindex="0" onclick="'+action+'" title="Pendiente: '+s.curso+'"><div class="at-ev-curso">'+s.curso+' ⏳</div></div>';
         } else {
           html+='<div class="at-event at-libre" role="button" tabindex="0" onclick="abrirModalReservaSlot('+diaActual+','+mid+',\''+lab.id+'\')" title="Disponible — clic para reservar"><span class="at-ev-plus">+</span></div>';
         }
         html+='</td>';
       });
+      var recreoMod=MODULOS.find(function(m){ return m.tipo==='recreo'&&m.turno===tc.label; });
+      if(recreoMod){
+        var recInfo=RECREOS.find(function(r){ return r.modulo===recreoMod.id; });
+        html+='<td class="at-recreo-cell" title="'+(recInfo?recInfo.evento:'Recreo')+'"></td>';
+      }
     });
     html+='</tr>';
   });
-
   html+='</tbody></table></div>';
   grid.innerHTML=html;
   renderEsperaCalendario();
@@ -708,21 +687,44 @@ function poblarSelectsReserva(){
 
 function abrirModalReserva(){
   poblarSelectsReserva();
-  ['f-lab','f-dia','f-curso','f-secuencia'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['f-lab','f-dia','f-curso','f-secuencia'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
   var orient=document.getElementById('f-orient'); if(orient) orient.value='info';
   var fmod=document.getElementById('f-modulo'); if(fmod) fmod.value='';
   var fper=document.getElementById('f-periodo'); if(fper) fper.value='1';
   var cw=document.getElementById('conflict-warning'); if(cw) cw.classList.remove('show');
+
+  // FIX: window.ROLE es undefined en standalone → usar esDirectivo()
+  var anualWrap=document.getElementById('f-anual-wrap');
+  var anualChk=document.getElementById('f-anual');
+  if(anualWrap) anualWrap.style.display = esDirectivo() ? 'block' : 'none';
+  if(anualChk)  anualChk.checked = false;
+
   abrirModal('modal-reserva');
 }
-function abrirModalReservaSlot(dia,modulo,lab){
+
+function abrirModalReservaSlot(dia, modulo, lab){
   poblarSelectsReserva();
-  var fLab=document.getElementById('f-lab'); var fDia=document.getElementById('f-dia'); var fMod=document.getElementById('f-modulo');
-  if(fLab) fLab.value=lab; if(fDia) fDia.value=dia; if(fMod) fMod.value=modulo;
-  var fCurso=document.getElementById('f-curso'); var fSeq=document.getElementById('f-secuencia');
-  if(fCurso) fCurso.value=''; if(fSeq) fSeq.value='';
+  var fLab=document.getElementById('f-lab');
+  var fDia=document.getElementById('f-dia');
+  var fMod=document.getElementById('f-modulo');
+  if(fLab) fLab.value=lab;
+  if(fDia) fDia.value=dia;
+  if(fMod) fMod.value=modulo;
+  var fCurso=document.getElementById('f-curso');
+  var fSeq=document.getElementById('f-secuencia');
+  if(fCurso) fCurso.value='';
+  if(fSeq)   fSeq.value='';
   var orient=document.getElementById('f-orient'); if(orient) orient.value='info';
   checkConflict();
+  
+  // Checkbox anual: AGREGADO A ESTA FUNCIÓN TAMBIÉN
+  var anualWrap=document.getElementById('f-anual-wrap');
+  var anualChk=document.getElementById('f-anual');
+  if(anualWrap) anualWrap.style.display = esDirectivo() ? 'block' : 'none';
+  if(anualChk)  anualChk.checked = false;
+
   abrirModal('modal-reserva');
 }
 
@@ -757,22 +759,77 @@ function guardarReserva(){
   var orient=document.getElementById('f-orient').value;
   var periodoEl=document.getElementById('f-periodo');
   var periodo=periodoEl?periodoEl.value:'1';
+  var anualChk = document.querySelector('#modal-reserva #f-anual');
+  var esAnual  = esDirectivo() && anualChk !== null && anualChk.checked;
+  console.log("TEST FINAL ->", { esDirectivo: esDirectivo(), existeCheckbox: !!anualChk, estaMarcado: anualChk ? anualChk.checked : false, esAnualFinal: esAnual });
+
   if(!lab||dia===''||modulo===''||!curso||!secuencia){ toast('Por favor completá todos los campos.','err'); return; }
   var modulosAReservar=getModulosParaPeriodo(parseInt(modulo),periodo);
-  for(var mi=0;mi<modulosAReservar.length;mi++){
-    var m=modulosAReservar[mi];
-    var conflicto=RESERVAS.find(function(r){ return r.semanaOffset===semanaOffset&&r.dia===parseInt(dia)&&r.modulo===m&&r.lab===lab; });
-    if(conflicto){ toast('El módulo '+getModulo(m).label+' ya está reservado.','warn'); return; }
-    var solicPendiente=SOLICITUDES.find(function(s){ return s.semanaOffset===semanaOffset&&s.dia===parseInt(dia)&&s.modulo===m&&s.lab===lab&&s.estado==='pendiente'; });
-    if(solicPendiente){ toast('El módulo '+getModulo(m).label+' ya tiene solicitud pendiente.','warn'); return; }
+
+// CORREGIDO: parseInt fuerza tipo en ambos extremos del for y en los sem pusheados
+  var semanaBase = parseInt(semanaOffset, 10);
+  var semanasAReservar = [semanaBase];
+  if(esAnual){
+    semanasAReservar = [];
+    for(var sw = semanaBase; sw < semanaBase + 40; sw++) semanasAReservar.push(sw);
   }
-  cerrarModal('modal-reserva');
-  if(modoUsuario==='admin'){
-    modulosAReservar.forEach(function(m){ nextId++; RESERVAS.push({id:nextId,semanaOffset:semanaOffset,dia:parseInt(dia),modulo:m,lab:lab,curso:curso,orient:orient,profeId:getCurrentProfId(),secuencia:secuencia,cicloClases:1,renovaciones:0}); });
-    saveDB(); toast('Reserva creada ('+modulosAReservar.length+' módulo'+(modulosAReservar.length>1?'s':'')+').','ok');
+
+  // Error 1 corregido: validación estricta solo si NO es anual
+  // Si es anual, el forEach inferior maneja los conflictos silenciosamente
+  if(!esAnual){
+    for(var mi=0;mi<modulosAReservar.length;mi++){
+      var m=modulosAReservar[mi];
+      var conflicto=RESERVAS.find(function(r){ return r.semanaOffset===semanaOffset&&r.dia===parseInt(dia)&&r.modulo===m&&r.lab===lab; });
+      if(conflicto){ toast('El módulo '+getModulo(m).label+' ya está reservado en esta semana.','warn'); return; }
+      var solicPendiente=SOLICITUDES.find(function(s){ return s.semanaOffset===semanaOffset&&s.dia===parseInt(dia)&&s.modulo===m&&s.lab===lab&&s.estado==='pendiente'; });
+      if(solicPendiente){ toast('El módulo '+getModulo(m).label+' ya tiene solicitud pendiente.','warn'); return; }
+    }
+  }
+
+
+
+// Cambiamos modoUsuario==='admin' por tu helper esDirectivo()
+   if(esDirectivo()){ 
+    var totalCreadas=0;
+    semanasAReservar.forEach(function(sem){
+      modulosAReservar.forEach(function(m){
+        var yaExiste=RESERVAS.find(function(r){ return r.semanaOffset===sem&&r.dia===parseInt(dia)&&r.modulo===m&&r.lab===lab; });
+        if(yaExiste) return;
+        nextId++;
+        RESERVAS.push({
+          id:nextId, semanaOffset:parseInt(sem,10), dia:parseInt(dia,10), modulo:m, lab:lab,
+          curso:curso, orient:orient,
+          profeId: esAnual ? 'institucional' : getCurrentProfId(),
+          secuencia:secuencia, cicloClases:1, renovaciones:0,
+          anual: esAnual
+        });
+        totalCreadas++;
+      });
+    });
+    try {
+      saveDB();
+    } catch(e) {
+      toast('Error al guardar: almacenamiento lleno. Intentá exportar y limpiar la BD.','err');
+      console.error('[guardarReserva] saveDB falló:', e);
+      return; // no cerrar modal, no renderizar con datos inconsistentes
+    }
+
+    cerrarModal('modal-reserva'); // ← movido DESPUÉS de saveDB
+    if(esAnual){
+      toast('Reserva anual creada: '+totalCreadas+' entradas para ~40 semanas.','ok');
+    } else {
+      toast('Reserva creada ('+totalCreadas+' módulo'+(totalCreadas>1?'s':'')+').','ok');
+    }
+
   } else {
-    modulosAReservar.forEach(function(m){ nextId++; SOLICITUDES.push({id:nextId,semanaOffset:semanaOffset,dia:parseInt(dia),modulo:m,lab:lab,curso:curso,orient:orient,profeId:getCurrentProfId(),secuencia:secuencia,cicloClases:1,estado:'pendiente',esRenovacion:false,renovacionNum:0}); });
-    saveDB(); toast('Solicitud enviada ('+modulosAReservar.length+' módulo'+(modulosAReservar.length>1?'s':'')+').','info');
+    // Profesor: siempre solicitud, nunca anual
+    modulosAReservar.forEach(function(m){
+      nextId++;
+      SOLICITUDES.push({id:nextId,semanaOffset:semanaOffset,dia:parseInt(dia),modulo:m,lab:lab,curso:curso,orient:orient,profeId:getCurrentProfId(),secuencia:secuencia,cicloClases:1,estado:'pendiente',esRenovacion:false,renovacionNum:0,anual:false});
+    });
+    cerrarModal('modal-reserva'); // ← Asegúrate de que el modal también se cierre para el profesor
+    saveDB(); 
+    toast('Solicitud enviada ('+modulosAReservar.length+' módulo'+(modulosAReservar.length>1?'s':'')+').','info');
   }
   renderAll();
 }
@@ -1231,7 +1288,7 @@ document.addEventListener('DOMContentLoaded', function() {
   UIHelper.toggleClass('s-role', 'admin', session.role === 'admin');
 
   // Visibilidad de elementos exclusivos de admin
-  UIHelper.setDisplayAll('.admin-only', session.role === 'admin' ? '' : 'none');
+  UIHelper.setDisplayAll('.admin-only', esDirectivo() ? '' : 'none');
 
   // ── 5. DÍA INICIAL ───────────────────────────────────────
   var dow = new Date().getDay();
@@ -1258,6 +1315,14 @@ document.addEventListener('DOMContentLoaded', function() {
     var el = document.getElementById(id);
     if (el) el.addEventListener('change', checkConflict);
   });
+  // Listener filtro de turno → re-renderiza la grilla
+  var ftEl=document.getElementById('filtro-turno');
+  if(ftEl){
+    ftEl.addEventListener('change', function(){
+      filtroTurno=ftEl.value;
+      renderCalendario();
+    });
+  }
 
   // ── 7. CARGA DE DATOS ─────────────────────────────────────
   // Intento 1: localStorage (persiste entre recargas)
