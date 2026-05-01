@@ -131,49 +131,51 @@ function renderCalendario() {
     : TURNOS_CONFIG.filter(function(tc) { return tc.label === filtroTurno; });
 
   // ── Construcción del HTML de la tabla ──────────────────────
+  // Armamos la secuencia de columnas en orden cronológico:
+  // para cada turno intercalamos módulos de clase y el recreo en su lugar correcto.
+  var columnas = []; // { tipo:'clase'|'recreo', mod, turno }
+  turnosFiltrados.forEach(function(tc) {
+    // Todos los módulos del turno (clase + recreo) ordenados por id
+    var todosLosModulos = tc.modulos.map(function(mid) {
+      return MODULOS.find(function(m) { return m.id === mid; });
+    }).filter(Boolean).sort(function(a, b) { return a.id - b.id; });
+
+    todosLosModulos.forEach(function(mod) {
+      columnas.push({ tipo: mod.tipo, mod: mod, turno: tc.label, icon: tc.icon });
+    });
+  });
+
   var html = '<div class="at-wrap"><table class="at-table" role="grid"><thead>';
 
-  // Fila 1: nombres de turno con colspan
+  // Fila 1: spans de turno con colspan correcto (contando solo clases)
   html += '<tr><th class="at-corner" rowspan="2">Espacio</th>';
   turnosFiltrados.forEach(function(tc) {
-    var cols = tc.modulos.filter(function(mid) {
-      return MODULOS_CLASE.find(function(m) { return m.id === mid; });
-    });
-    if (!cols.length) return;
-    html += '<th class="at-turno-span" colspan="' + cols.length + '">' +
+    var claseCount = columnas.filter(function(c) { return c.turno === tc.label; }).length;
+    if (!claseCount) return;
+    html += '<th class="at-turno-span" colspan="' + claseCount + '">' +
       '<span class="at-turno-icon">' + tc.icon + '</span>' + tc.label + '</th>';
-    var recreoMod = MODULOS.find(function(m) { return m.tipo === 'recreo' && m.turno === tc.label; });
-    if (recreoMod) html += '<th class="at-recreo-col-header">☕</th>';
   });
   html += '</tr>';
 
-  // Fila 2: hora de cada módulo
+  // Fila 2: hora de cada columna (clase o recreo intercalados)
   html += '<tr>';
-  turnosFiltrados.forEach(function(tc) {
-    var cols = tc.modulos.filter(function(mid) {
-      return MODULOS_CLASE.find(function(m) { return m.id === mid; });
-    });
-    if (!cols.length) return;
-    cols.forEach(function(mid) {
-      var mod = MODULOS_CLASE.find(function(m) { return m.id === mid; });
-      var lbl = mod.label
+  columnas.forEach(function(col) {
+    if (col.tipo === 'recreo') {
+      var recInfo = RECREOS.find(function(r) { return r.modulo === col.mod.id; });
+      html +=
+        '<th class="at-recreo-col-header at-recreo-hora" title="' + (recInfo ? recInfo.evento : 'Recreo') + '">' +
+          '<span style="font-size:9px;display:block;line-height:1.3;">' + col.mod.inicio + '</span>' +
+          '<button class="at-recreo-edit" onclick="editarRecreo(' + col.mod.id + ')" title="Editar recreo">✏️</button>' +
+        '</th>';
+    } else {
+      var lbl = col.mod.label
         .replace('° Mañana',   '°M')
         .replace('° Tarde',    '°T')
         .replace('° Vespert.', '°V');
       html +=
         '<th class="at-hora-header">' +
-          '<span class="at-hora-ini">' + mod.inicio + '</span>' +
+          '<span class="at-hora-ini">' + col.mod.inicio + '</span>' +
           '<span class="at-hora-num">' + lbl + '</span>' +
-        '</th>';
-    });
-    var recreoMod = MODULOS.find(function(m) { return m.tipo === 'recreo' && m.turno === tc.label; });
-    if (recreoMod) {
-      var recInfo = RECREOS.find(function(r) { return r.modulo === recreoMod.id; });
-      html +=
-        '<th class="at-recreo-col-header at-recreo-hora">' +
-          '<span style="font-size:9px;display:block;">' + recreoMod.inicio + '</span>' +
-          '<button class="at-recreo-edit" onclick="editarRecreo(' + recreoMod.id + ')" ' +
-          'title="' + (recInfo ? recInfo.evento : 'Recreo') + '">✏️</button>' +
         '</th>';
     }
   });
@@ -190,54 +192,52 @@ function renderCalendario() {
         '</div>' +
       '</td>';
 
-    turnosFiltrados.forEach(function(tc) {
-      var cols = tc.modulos.filter(function(mid) {
-        return MODULOS_CLASE.find(function(m) { return m.id === mid; });
-      });
-      if (!cols.length) return;
+    columnas.forEach(function(col) {
+      var mid = col.mod.id;
 
-      cols.forEach(function(mid) {
-        var r = reservasDia.find(function(x) { return x.modulo === mid && x.lab === lab.id; });
-        var s = solicDia.find(function(x)    { return x.modulo === mid && x.lab === lab.id; });
-        html += '<td class="at-event-cell">';
-
-        if (r) {
-          var oriOk = filtroOrient === 'all' || r.orient === filtroOrient;
-          if (!oriOk) {
-            // Filtro activo pero esta reserva no coincide → mostrar como libre
-            html += _celdaLibre(diaActual, mid, lab.id);
-          } else {
-            var ori = ORIENTACIONES[r.orient];
-            var p   = getProfe(r.profeId);
-            html +=
-              '<div class="at-event ' + ori.ev + '" role="button" tabindex="0" ' +
-              'onclick="verDetalle(' + r.id + ')" title="' + r.curso + ' — Prof. ' + p.apellido + '">' +
-                '<div class="at-ev-curso">' + r.curso + ' ' + ori.emoji + '</div>' +
-                '<div class="at-ev-prof">'  + p.apellido + '</div>' +
-              '</div>';
-          }
-        } else if (s) {
-          var action = modoUsuario === 'admin'
-            ? 'verDetalleSolicitud(' + s.id + ')'
-            : 'verDetalle_Pendiente(' + s.id + ')';
-          html +=
-            '<div class="at-event ev-pendiente" role="button" tabindex="0" ' +
-            'onclick="' + action + '" title="Pendiente: ' + s.curso + '">' +
-              '<div class="at-ev-curso">' + s.curso + ' ⏳</div>' +
-            '</div>';
-        } else {
-          html += _celdaLibre(diaActual, mid, lab.id);
-        }
-
-        html += '</td>';
-      });
-
-      // Celda de recreo
-      var recreoMod = MODULOS.find(function(m) { return m.tipo === 'recreo' && m.turno === tc.label; });
-      if (recreoMod) {
-        var recInfo = RECREOS.find(function(r) { return r.modulo === recreoMod.id; });
+      if (col.tipo === 'recreo') {
+        var recInfo = RECREOS.find(function(r) { return r.modulo === mid; });
         html += '<td class="at-recreo-cell" title="' + (recInfo ? recInfo.evento : 'Recreo') + '"></td>';
+        return;
       }
+
+      // Celda de módulo de clase
+      var r = reservasDia.find(function(x) { return x.modulo === mid && x.lab === lab.id; });
+      var s = solicDia.find(function(x)    { return x.modulo === mid && x.lab === lab.id; });
+      html += '<td class="at-event-cell">';
+
+      if (r) {
+        var oriOk = filtroOrient === 'all' || r.orient === filtroOrient;
+        if (!oriOk) {
+          html += _celdaLibre(diaActual, mid, lab.id);
+        } else {
+          var ori = ORIENTACIONES[r.orient];
+          var p   = getProfe(r.profeId);
+          var puedeEditar = esDirectivo() || r.profeId === getCurrentProfId();
+          html +=
+            '<div class="at-event ' + ori.ev + '" role="button" tabindex="0" ' +
+            'onclick="verDetalle(' + r.id + ')" title="' + r.curso + ' — Prof. ' + p.apellido + '">' +
+              '<div class="at-ev-curso">' + r.curso + ' ' + ori.emoji + '</div>' +
+              '<div class="at-ev-prof">'  + p.apellido + '</div>' +
+              (puedeEditar
+                ? '<div class="at-ev-edit-hint" title="Clic para editar">✎</div>'
+                : '') +
+            '</div>';
+        }
+      } else if (s) {
+        var action = modoUsuario === 'admin'
+          ? 'verDetalleSolicitud(' + s.id + ')'
+          : 'verDetalle_Pendiente(' + s.id + ')';
+        html +=
+          '<div class="at-event ev-pendiente" role="button" tabindex="0" ' +
+          'onclick="' + action + '" title="Pendiente: ' + s.curso + '">' +
+            '<div class="at-ev-curso">' + s.curso + ' ⏳</div>' +
+          '</div>';
+      } else {
+        html += _celdaLibre(diaActual, mid, lab.id);
+      }
+
+      html += '</td>';
     });
 
     html += '</tr>';

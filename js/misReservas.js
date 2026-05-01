@@ -134,7 +134,8 @@ function renderMisReservas() {
               '</div>' +
             '</div>' +
             '<div class="reserva-card-footer">' +
-              '<button class="btn-action btn-detail" onclick="verDetalle(' + r.id + ')">Ver detalle</button>' +
+              '<button class="btn-action btn-detail" onclick="verDetalle(' + r.id + ')">Ver</button>' +
+              '<button class="btn-action btn-detail" style="background:var(--navy-faint);border-color:var(--navy-light);" onclick="editarReserva(' + r.id + ')">✎ Editar</button>' +
               (needsRenew && esDirectivo()
                 ? '<button class="btn-action btn-renew" onclick="renovarReserva(' + r.id + ')">↻ Renovar</button>'
                 : '') +

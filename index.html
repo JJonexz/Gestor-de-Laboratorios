@@ -381,6 +381,48 @@
   </div>
 </div>
 
+<!-- Editar reserva existente -->
+<div class="modal-overlay" id="modal-editar-reserva" role="dialog" aria-modal="true" aria-labelledby="modal-editar-reserva-title">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 id="modal-editar-reserva-title"><span aria-hidden="true">✎</span> Editar reserva</h3>
+      <button class="modal-close" onclick="cerrarModal('modal-editar-reserva')" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-reserva-id" value="">
+      <div class="modal-info-hint" id="edit-info-contexto" role="note" style="margin-bottom:.9rem;"></div>
+      <div class="form-group">
+        <label class="form-label" for="edit-curso">Curso</label>
+        <input class="form-control" id="edit-curso" type="text" placeholder="Ej: 4°B" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="edit-secuencia">Secuencia didáctica</label>
+        <input class="form-control" id="edit-secuencia" type="text" placeholder="Tema de la clase" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="edit-orient">Orientación</label>
+        <select class="form-control" id="edit-orient">
+          <option value="info">💻 Informática</option>
+          <option value="const">🏗️ Construcción</option>
+          <option value="tur">🌐 Turismo</option>
+          <option value="bas">📚 Básico</option>
+        </select>
+      </div>
+      <div class="form-group" id="edit-scope-wrap" style="display:none;">
+        <label class="form-label" for="edit-scope">¿Qué reservas modificar?</label>
+        <select class="form-control" id="edit-scope">
+          <option value="puntual">Solo esta reserva (semana actual)</option>
+          <option value="siguientes">Esta y todas las siguientes (mismo lab/día/módulo)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-editar-reserva')">Cancelar</button>
+      <button class="btn-ok" onclick="guardarEdicionReserva()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <!-- Agregar/editar docente -->
 <div class="modal-overlay" id="modal-docente" role="dialog" aria-modal="true" aria-labelledby="modal-docente-title">
   <div class="modal modal-sm">

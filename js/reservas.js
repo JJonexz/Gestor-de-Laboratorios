@@ -335,6 +335,7 @@ function verDetalle(reservaId) {
     footer.innerHTML =
       '<button class="btn-cancel" onclick="cerrarModal(\'modal-detalle\')">Cerrar</button>' +
       renovBtn +
+      (isOwn ? '<button class="btn-ok" style="background:var(--navy-light);" onclick="cerrarModal(\'modal-detalle\');editarReserva(' + r.id + ')">✎ Editar</button>' : '') +
       (isOwn ? '<button class="btn-danger" onclick="cerrarModal(\'modal-detalle\');cancelarReserva(' + r.id + ')">Cancelar reserva</button>' : '');
   }
 
@@ -438,4 +439,89 @@ function rechazarSolicitud(solId) {
     toast('Solicitud rechazada.', 'info');
     renderAll();
   });
+}
+
+// ── Editar reserva existente ─────────────────────────────────
+// Abre el modal de edición con los datos de la reserva pre-cargados.
+// El profe solo puede editar sus propias reservas; el admin puede editar cualquiera.
+function editarReserva(reservaId) {
+  var r = RESERVAS.find(function(x) { return x.id === reservaId; });
+  if (!r) return;
+
+  var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
+  if (!isOwn) { toast('No tenés permiso para editar esta reserva.', 'err'); return; }
+
+  // Llenar los campos del modal de edición
+  document.getElementById('edit-reserva-id').value     = reservaId;
+  document.getElementById('edit-curso').value          = r.curso;
+  document.getElementById('edit-secuencia').value      = r.secuencia;
+  document.getElementById('edit-orient').value         = r.orient;
+
+  // Info de contexto (solo lectura)
+  var mod   = getModulo(r.modulo);
+  var lab   = getLab(r.lab);
+  var p     = getProfe(r.profeId);
+  document.getElementById('edit-info-contexto').innerHTML =
+    '<strong>' + lab.nombre + '</strong> · ' + DIAS_LARGO[r.dia] + ' · ' + mod.label +
+    ' (' + mod.inicio + '–' + mod.fin + ')' +
+    (isAdmin ? ' · Prof. ' + p.apellido : '');
+
+  // Selector de scope: solo para directivos que editan reservas con ciclo > 1
+  var scopeWrap = document.getElementById('edit-scope-wrap');
+  if (scopeWrap) {
+    scopeWrap.style.display = (esDirectivo() && r.cicloClases > 1) ? 'block' : 'none';
+  }
+
+  abrirModal('modal-editar-reserva');
+}
+
+// Guarda los cambios del modal de edición.
+// El scope ('puntual' o 'siguientes') determina cuántas reservas se actualizan.
+function guardarEdicionReserva() {
+  var reservaId = parseInt(document.getElementById('edit-reserva-id').value);
+  var r = RESERVAS.find(function(x) { return x.id === reservaId; });
+  if (!r) return;
+
+  var nuevoCurso     = document.getElementById('edit-curso').value.trim();
+  var nuevaSecuencia = document.getElementById('edit-secuencia').value.trim();
+  var nuevaOrient    = document.getElementById('edit-orient').value;
+  var scopeSel       = document.getElementById('edit-scope');
+  var scope          = scopeSel ? scopeSel.value : 'puntual';
+
+  if (!nuevoCurso || !nuevaSecuencia) {
+    toast('Completá el curso y la secuencia.', 'err');
+    return;
+  }
+
+  if (scope === 'siguientes' && esDirectivo()) {
+    // Actualiza esta reserva y todas las futuras del mismo lab+dia+modulo+profe
+    var actualizadas = 0;
+    RESERVAS.forEach(function(x) {
+      if (
+        x.lab     === r.lab     &&
+        x.dia     === r.dia     &&
+        x.modulo  === r.modulo  &&
+        x.profeId === r.profeId &&
+        x.semanaOffset >= r.semanaOffset
+      ) {
+        x.curso     = nuevoCurso;
+        x.secuencia = nuevaSecuencia;
+        x.orient    = nuevaOrient;
+        actualizadas++;
+      }
+    });
+    saveDB();
+    cerrarModal('modal-editar-reserva');
+    toast('Reserva y ' + (actualizadas - 1) + ' siguiente(s) actualizadas.', 'ok');
+  } else {
+    // Solo esta reserva puntual
+    r.curso     = nuevoCurso;
+    r.secuencia = nuevaSecuencia;
+    r.orient    = nuevaOrient;
+    saveDB();
+    cerrarModal('modal-editar-reserva');
+    toast('Reserva actualizada.', 'ok');
+  }
+
+  renderAll();
 }

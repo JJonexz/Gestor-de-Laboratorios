@@ -1971,3 +1971,14 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   .event-sub  { display: none; }
   .at-event-cell { height: 44px; }
 }
+/* Hint de edición en celdas del calendario */
+.at-ev-edit-hint {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 9px;
+  opacity: 0;
+  transition: opacity .15s;
+  line-height: 1;
+}
+.at-event:hover .at-ev-edit-hint { opacity: 0.6; }
