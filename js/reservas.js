@@ -341,7 +341,7 @@ function verDetalle(reservaId) {
         '<div class="ciclo-bar-label">' +
           '<span style="font-size:12px;font-weight:700;">Ciclo didáctico</span>' +
           '<span style="font-size:11px;color:var(--muted);">Clase ' + r.cicloClases + ' de 3' +
-            (r.renovaciones ? '&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación ' + r.renovaciones + '/2</span>' : '') +
+            (r.renovaciones ? '&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación ' + r.renovaciones + '/1</span>' : '') +
           '</span>' +
         '</div>' +
         '<div class="ciclo-bar"><div class="ciclo-bar-fill ' + barClass + '" style="width:' + pct + '%"></div></div>' +
@@ -354,7 +354,7 @@ function verDetalle(reservaId) {
     var renovBtn = '';
     if (isOwn && r.cicloClases >= 3 && esDirectivo()) {
       var renov = r.renovaciones || 0;
-      renovBtn = renov >= 2
+      renovBtn = renov >= 1
         ? '<button class="btn-ok" onclick="cerrarModal(\'modal-detalle\');renovarReserva(' + r.id + ')">🔄 Nueva reserva</button>'
         : '<button class="btn-ok" onclick="renovarReserva(' + r.id + ');cerrarModal(\'modal-detalle\')">↻ Solicitar renovación</button>';
     }
@@ -383,7 +383,7 @@ function verDetalleSolicitud(solId) {
     body.innerHTML =
       '<div class="pending-alert" role="status">⏳ ' +
         (s.esRenovacion
-          ? 'Solicitud de <strong>renovación semana ' + s.renovacionNum + '/2</strong> — pendiente de aprobación.'
+          ? 'Solicitud de <strong>renovación semana ' + s.renovacionNum + '/1</strong> — pendiente de aprobación.'
           : 'Esta solicitud está <strong>pendiente de aprobación</strong>.') +
       '</div>' +
       '<div class="detail-row"><div class="detail-label">Docente</div><div class="detail-value">Prof. ' + p.apellido + ', ' + p.nombre + '</div></div>' +
@@ -433,7 +433,7 @@ function aceptarSolicitud(solId) {
     }
     SOLICITUDES = SOLICITUDES.filter(function(x) { return x.id !== solId; });
     saveDB();
-    toast('Renovación semana ' + s.renovacionNum + '/2 aprobada.', 'ok');
+    toast('Renovación semana ' + s.renovacionNum + '/1 aprobada.', 'ok');
     renderAll();
     return;
   }
@@ -499,10 +499,19 @@ function editarReserva(reservaId) {
   if (editProfeWrap) editProfeWrap.style.display = esDirectivo() ? 'block' : 'none';
   if (editProfeSel)  editProfeSel.value = r.profeId;
 
-  // Selector de scope: solo para directivos que editan reservas con ciclo > 1
+  // Selector de scope: solo para directivos que editan reservas con ciclo > 1 o anuales
   var scopeWrap = document.getElementById('edit-scope-wrap');
   if (scopeWrap) {
-    scopeWrap.style.display = (esDirectivo() && r.cicloClases > 1) ? 'block' : 'none';
+    var showScope = esDirectivo() && (r.anual || r.cicloClases > 1);
+    scopeWrap.style.display = showScope ? 'block' : 'none';
+    if (showScope) {
+      var optSiguientes = document.getElementById('opt-siguientes');
+      var optAnual      = document.getElementById('opt-anual');
+      if (optSiguientes) optSiguientes.style.display = r.anual ? 'none' : 'block';
+      if (optAnual)      optAnual.style.display      = r.anual ? 'block' : 'none';
+      var scopeSel = document.getElementById('edit-scope');
+      if (scopeSel) scopeSel.value = 'puntual'; // default
+    }
   }
 
   abrirModal('modal-editar-reserva');
@@ -538,7 +547,28 @@ function guardarEdicionReserva() {
   var cursoOriginal   = r.curso;
   var profeIdOriginal = r.profeId;
 
-  if (scope === 'siguientes' && esDirectivo()) {
+  if (scope === 'anual' && esDirectivo()) {
+    // Actualiza esta reserva, sus hermanas de bloque, y todas las anuales del año
+    var actualizadas = 0;
+    RESERVAS.forEach(function(x) {
+      if (
+        x.lab     === r.lab     &&
+        x.dia     === r.dia     &&
+        x.profeId === profeIdOriginal &&
+        x.curso   === cursoOriginal &&
+        x.anual   === true
+      ) {
+        x.curso     = nuevoCurso;
+        x.secuencia = nuevaSecuencia;
+        x.orient    = nuevaOrient;
+        if (nuevoProfeId) x.profeId = nuevoProfeId;
+        actualizadas++;
+      }
+    });
+    saveDB();
+    cerrarModal('modal-editar-reserva');
+    toast(actualizadas + ' reserva(s) anual(es) actualizada(s).', 'ok');
+  } else if (scope === 'siguientes' && esDirectivo()) {
     // Actualiza esta reserva, sus hermanas de bloque, y todas las futuras del mismo lab+dia+profe
     var actualizadas = 0;
     RESERVAS.forEach(function(x) {

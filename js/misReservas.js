@@ -109,7 +109,7 @@ function renderMisReservas() {
 
         var cicloTxt = 'Clase ' + r.cicloClases + '/3' +
           (needsRenew
-            ? ((r.renovaciones || 0) >= 2 ? ' · ¡Nueva reserva!' : ' · Renovar ' + ((r.renovaciones || 0) + 1) + '/2')
+            ? ((r.renovaciones || 0) >= 1 ? ' · ¡Nueva reserva!' : ' · Renovar ' + ((r.renovaciones || 0) + 1) + '/1')
             : '');
 
         return (
@@ -169,9 +169,9 @@ function renovarReserva(id) {
 
   if (modoUsuario === 'admin') {
     // Directivo: aprueba directamente
-    var puedeNueva = (r.renovaciones || 0) >= 2;
+    var puedeNueva = (r.renovaciones || 0) >= 1;
     if (puedeNueva) {
-      confirmar('Han pasado 2 semanas de renovaciones. ¿Iniciar nuevo ciclo completo de 3 clases?', function() {
+      confirmar('Han pasado 1 semana de renovaciones. ¿Iniciar nuevo ciclo completo de 3 clases?', function() {
         r.cicloClases  = 1;
         r.renovaciones = 0;
         saveDB();
@@ -183,7 +183,7 @@ function renovarReserva(id) {
         r.cicloClases  = 1;
         r.renovaciones = (r.renovaciones || 0) + 1;
         saveDB();
-        toast('Renovación aprobada (semana ' + r.renovaciones + '/2).', 'ok');
+        toast('Renovación aprobada (semana ' + r.renovaciones + '/1).', 'ok');
         renderAll();
       });
     }
@@ -191,13 +191,13 @@ function renovarReserva(id) {
   }
 
   // Profesor: envía solicitud de renovación
-  if ((r.renovaciones || 0) >= 2) {
-    toast('Ya cumpliste 2 semanas de renovación. Podés hacer una nueva reserva normalmente.', 'info');
+  if ((r.renovaciones || 0) >= 1) {
+    toast('Ya cumpliste 1 semana de renovación. Podés hacer una nueva reserva normalmente.', 'info');
     return;
   }
   var semLabel = (r.renovaciones || 0) + 1;
   confirmar(
-    '¿Solicitar renovación semanal ' + semLabel + '/2 para <strong>' + getLab(r.lab).nombre + ' — ' + r.curso + '</strong>?',
+    '¿Solicitar renovación semanal ' + semLabel + '/1 para <strong>' + getLab(r.lab).nombre + ' — ' + r.curso + '</strong>?',
     function() {
       nextId++;
       SOLICITUDES.push({
@@ -217,7 +217,7 @@ function renovarReserva(id) {
         renovacionNum:    semLabel,
       });
       saveDB();
-      toast('Solicitud de renovación semana ' + semLabel + '/2 enviada.', 'info');
+      toast('Solicitud de renovación semana ' + semLabel + '/1 enviada.', 'info');
       renderAll();
     }
   );

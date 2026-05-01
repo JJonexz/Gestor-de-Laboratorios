@@ -579,7 +579,7 @@ function verDetalle(reservaId){
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">'+r.curso+'</div></div>'+
       '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><span class="orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span></div></div>'+
       '<div class="detail-row"><div class="detail-label">Secuencia</div><div class="detail-value" style="font-style:italic;color:var(--muted);">"'+r.secuencia+'"</div></div>'+
-      '<div style="margin-top:14px;"><div class="ciclo-bar-label"><span style="font-size:12px;font-weight:700;">Ciclo didáctico</span><span style="font-size:11px;color:var(--muted);">Clase '+r.cicloClases+' de 3'+(r.renovaciones?'&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación '+r.renovaciones+'/2</span>':'')+'</span></div><div class="ciclo-bar"><div class="ciclo-bar-fill '+barClass+'" style="width:'+pct+'%"></div></div></div>';
+      '<div style="margin-top:14px;"><div class="ciclo-bar-label"><span style="font-size:12px;font-weight:700;">Ciclo didáctico</span><span style="font-size:11px;color:var(--muted);">Clase '+r.cicloClases+' de 3'+(r.renovaciones?'&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación '+r.renovaciones+'/1</span>':'')+'</span></div><div class="ciclo-bar"><div class="ciclo-bar-fill '+barClass+'" style="width:'+pct+'%"></div></div></div>';
   }
   var footer=document.getElementById('modal-detalle-footer');
   if(footer){
@@ -588,7 +588,7 @@ function verDetalle(reservaId){
     // R1b: botón renovar solo para directivos
     if(isOwn && r.cicloClases>=3 && esDirectivo()){
       var renov=r.renovaciones||0;
-      renovBtn=renov>=2
+      renovBtn=renov>=1
         ? '<button class="btn-ok" onclick="cerrarModal(\'modal-detalle\');renovarReserva('+r.id+')">🔄 Nueva reserva</button>'
         : '<button class="btn-ok" onclick="renovarReserva('+r.id+');cerrarModal(\'modal-detalle\')">↻ Solicitar renovación</button>';
     }
@@ -604,7 +604,7 @@ function verDetalleSolicitud(solId){
   var body=document.getElementById('modal-detalle-body');
   if(body){
     body.innerHTML=
-      '<div class="pending-alert" role="status">⏳ '+(s.esRenovacion?'Solicitud de <strong>renovación semana '+s.renovacionNum+'/2</strong> — pendiente de aprobación.':'Esta solicitud está <strong>pendiente de aprobación</strong>.')+'</div>'+
+      '<div class="pending-alert" role="status">⏳ '+(s.esRenovacion?'Solicitud de <strong>renovación semana '+s.renovacionNum+'/1</strong> — pendiente de aprobación.':'Esta solicitud está <strong>pendiente de aprobación</strong>.')+'</div>'+
       '<div class="detail-row"><div class="detail-label">Docente</div><div class="detail-value">Prof. '+p.apellido+', '+p.nombre+'</div></div>'+
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">'+getLab(s.lab).nombre+'</div></div>'+
       '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">'+DIAS_LARGO[s.dia]+' '+formatFecha(fecha)+' · '+mod.label+' ('+mod.inicio+'–'+mod.fin+')</div></div>'+
@@ -632,7 +632,7 @@ function aceptarSolicitud(solId){
     if(rOrig){ rOrig.cicloClases=1; rOrig.renovaciones=(rOrig.renovaciones||0)+1; }
     else { nextId++; RESERVAS.push({id:nextId,semanaOffset:s.semanaOffset,dia:s.dia,modulo:s.modulo,lab:s.lab,curso:s.curso,orient:s.orient,profeId:s.profeId,secuencia:s.secuencia,cicloClases:1,renovaciones:s.renovacionNum||1}); }
     SOLICITUDES=SOLICITUDES.filter(function(x){ return x.id!==solId; });
-    saveDB(); toast('Renovación semana '+s.renovacionNum+'/2 aprobada.','ok'); renderAll(); return;
+    saveDB(); toast('Renovación semana '+s.renovacionNum+'/1 aprobada.','ok'); renderAll(); return;
   }
   nextId++;
   RESERVAS.push({id:nextId,semanaOffset:s.semanaOffset,dia:s.dia,modulo:s.modulo,lab:s.lab,curso:s.curso,orient:s.orient,profeId:s.profeId,secuencia:s.secuencia,cicloClases:1,renovaciones:0});
@@ -911,7 +911,7 @@ function renderMisReservas(){
       var p=getProfe(r.profeId); var ori=ORIENTACIONES[r.orient]; var lab=getLab(r.lab); var mod=getModulo(r.modulo);
       var needsRenew=r.cicloClases>=3;
       var dots=[1,2,3].map(function(i){ var cls='empty'; if(i<r.cicloClases)cls='done'; else if(i===r.cicloClases)cls=needsRenew?'warn':'current'; return '<div class="ciclo-dot '+cls+'"></div>'; }).join('');
-      return '<div class="reserva-card"><div class="reserva-card-stripe '+r.orient+'"></div><div class="reserva-card-body"><div class="reserva-card-header"><div><div class="reserva-card-title">'+lab.nombre+'</div><div class="reserva-meta"><span class="meta-tag">'+DIAS_LARGO[r.dia]+' '+mod.inicio+'</span><span class="meta-tag orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span>'+(isAdmin?'<span class="meta-tag">Prof. '+p.apellido+'</span>':'')+'</div></div><div class="reserva-curso-badge">'+r.curso+'</div></div><div class="reserva-secuencia">"'+r.secuencia+'"</div><div class="ciclo-wrap"><div class="ciclo-dots">'+dots+'</div><span class="ciclo-text '+(needsRenew?'renew':'')+'">Clase '+r.cicloClases+'/3'+(needsRenew?((r.renovaciones||0)>=2?' · ¡Nueva reserva!':' · Renovar '+((r.renovaciones||0)+1)+'/2'):'')+'</span></div></div><div class="reserva-card-footer"><button class="btn-action btn-detail" onclick="verDetalle('+r.id+')">Ver detalle</button>'// DESPUÉS: botón Renovar solo visible para directivos
+      return '<div class="reserva-card"><div class="reserva-card-stripe '+r.orient+'"></div><div class="reserva-card-body"><div class="reserva-card-header"><div><div class="reserva-card-title">'+lab.nombre+'</div><div class="reserva-meta"><span class="meta-tag">'+DIAS_LARGO[r.dia]+' '+mod.inicio+'</span><span class="meta-tag orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span>'+(isAdmin?'<span class="meta-tag">Prof. '+p.apellido+'</span>':'')+'</div></div><div class="reserva-curso-badge">'+r.curso+'</div></div><div class="reserva-secuencia">"'+r.secuencia+'"</div><div class="ciclo-wrap"><div class="ciclo-dots">'+dots+'</div><span class="ciclo-text '+(needsRenew?'renew':'')+'">Clase '+r.cicloClases+'/3'+(needsRenew?((r.renovaciones||0)>=1?' · ¡Nueva reserva!':' · Renovar '+((r.renovaciones||0)+1)+'/1'):'')+'</span></div></div><div class="reserva-card-footer"><button class="btn-action btn-detail" onclick="verDetalle('+r.id+')">Ver detalle</button>'// DESPUÉS: botón Renovar solo visible para directivos
 +(needsRenew&&esDirectivo()?'<button class="btn-action btn-renew" onclick="renovarReserva('+r.id+')">↻ Renovar</button>':'')+'<button class="btn-action btn-cancel-r" onclick="cancelarReserva('+r.id+')">Cancelar</button></div></div>';
     }).join('')+'</div>';
   }
@@ -928,26 +928,26 @@ function cancelarSolicitud(solId){
 function renovarReserva(id){
   var r=RESERVAS.find(function(x){ return x.id===id; }); if(!r) return;
   if(modoUsuario==='admin'){
-    var puedeNueva=(r.renovaciones||0)>=2;
+    var puedeNueva=(r.renovaciones||0)>=1;
     if(puedeNueva){
-      confirmar('Han pasado 2 semanas de renovaciones. ¿Iniciar nuevo ciclo completo de 3 clases?',function(){
+      confirmar('Han pasado 1 semana de renovaciones. ¿Iniciar nuevo ciclo completo de 3 clases?',function(){
         r.cicloClases=1; r.renovaciones=0;
         saveDB(); toast('Nuevo ciclo completo iniciado.','ok'); renderAll();
       });
     } else {
       confirmar('¿Aprobar renovación por 1 día para '+getLab(r.lab).nombre+' — '+r.curso+'?',function(){
         r.cicloClases=1; r.renovaciones=(r.renovaciones||0)+1;
-        saveDB(); toast('Renovación aprobada (semana '+r.renovaciones+'/2).','ok'); renderAll();
+        saveDB(); toast('Renovación aprobada (semana '+r.renovaciones+'/1).','ok'); renderAll();
       });
     }
     return;
   }
-  if((r.renovaciones||0)>=2){ toast('Ya cumpliste 2 semanas de renovación. Podés hacer una nueva reserva normalmente.','info'); return; }
+  if((r.renovaciones||0)>=1){ toast('Ya cumpliste 1 semana de renovación. Podés hacer una nueva reserva normalmente.','info'); return; }
   var semLabel=(r.renovaciones||0)+1;
-  confirmar('¿Solicitar renovación semanal '+semLabel+'/2 para <strong>'+getLab(r.lab).nombre+' — '+r.curso+'</strong>?',function(){
+  confirmar('¿Solicitar renovación semanal '+semLabel+'/1 para <strong>'+getLab(r.lab).nombre+' — '+r.curso+'</strong>?',function(){
     nextId++;
     SOLICITUDES.push({id:nextId,semanaOffset:semanaOffset,dia:r.dia,modulo:r.modulo,lab:r.lab,curso:r.curso,orient:r.orient,profeId:r.profeId,secuencia:r.secuencia,cicloClases:1,estado:'pendiente',esRenovacion:true,reservaOriginalId:r.id,renovacionNum:semLabel});
-    saveDB(); toast('Solicitud de renovación semana '+semLabel+'/2 enviada.','info'); renderAll();
+    saveDB(); toast('Solicitud de renovación semana '+semLabel+'/1 enviada.','info'); renderAll();
   });
 }
 function cancelarReserva(id){
@@ -984,7 +984,7 @@ function renderSolicitudesAdmin(){
   if(!solic.length){ el.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">No hay solicitudes pendientes.</td></tr>'; return; }
   el.innerHTML=solic.map(function(s){
     var p=getProfe(s.profeId); var ori=ORIENTACIONES[s.orient]; var fecha=getDiaDate(s.semanaOffset,s.dia); var mod=getModulo(s.modulo);
-    return '<tr'+(s.esRenovacion?' style="background:#eff6ff"':'')+'><td>Prof. '+p.apellido+'</td><td>Lab.'+s.lab+(s.esRenovacion?'&nbsp;<span style="font-size:9px;font-weight:700;background:var(--navy);color:#fff;padding:1px 4px;border-radius:3px;">RENOV '+s.renovacionNum+'/2</span>':'')+'</td><td>'+DIAS_SEMANA[s.dia]+' '+formatFecha(fecha)+'</td><td>'+mod.label+' ('+mod.inicio+')</td><td>'+s.curso+'</td><td><span class="orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span></td><td><div class="table-actions"><button class="tbl-btn ok" onclick="aceptarSolicitud('+s.id+')">✓ Aprobar</button><button class="tbl-btn danger" onclick="rechazarSolicitud('+s.id+')">✕ Rechazar</button></div></td></tr>';
+    return '<tr'+(s.esRenovacion?' style="background:#eff6ff"':'')+'><td>Prof. '+p.apellido+'</td><td>Lab.'+s.lab+(s.esRenovacion?'&nbsp;<span style="font-size:9px;font-weight:700;background:var(--navy);color:#fff;padding:1px 4px;border-radius:3px;">RENOV '+s.renovacionNum+'/1</span>':'')+'</td><td>'+DIAS_SEMANA[s.dia]+' '+formatFecha(fecha)+'</td><td>'+mod.label+' ('+mod.inicio+')</td><td>'+s.curso+'</td><td><span class="orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span></td><td><div class="table-actions"><button class="tbl-btn ok" onclick="aceptarSolicitud('+s.id+')">✓ Aprobar</button><button class="tbl-btn danger" onclick="rechazarSolicitud('+s.id+')">✕ Rechazar</button></div></td></tr>';
   }).join('');
 }
 

@@ -174,7 +174,7 @@ function renderCalendario() {
         .replace('° Vespert.', '°V');
       html +=
         '<th class="at-hora-header">' +
-          '<span class="at-hora-ini">' + col.mod.inicio + '</span>' +
+          '<span class="at-hora-ini">' + col.mod.inicio + '–' + col.mod.fin + '</span>' +
           '<span class="at-hora-num">' + lbl + '</span>' +
         '</th>';
     }

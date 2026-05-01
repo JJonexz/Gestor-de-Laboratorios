@@ -56,7 +56,7 @@ function renderSolicitudesAdmin() {
     var fecha = getDiaDate(s.semanaOffset, s.dia);
     var mod   = getModulo(s.modulo);
     var renovBadge = s.esRenovacion
-      ? '&nbsp;<span style="font-size:9px;font-weight:700;background:var(--navy);color:#fff;padding:1px 4px;border-radius:3px;">RENOV ' + s.renovacionNum + '/2</span>'
+      ? '&nbsp;<span style="font-size:9px;font-weight:700;background:var(--navy);color:#fff;padding:1px 4px;border-radius:3px;">RENOV ' + s.renovacionNum + '/1</span>'
       : '';
     var rowStyle = s.esRenovacion ? ' style="background:#eff6ff"' : '';
     return (
