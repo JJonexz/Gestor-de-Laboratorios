@@ -34,7 +34,7 @@ var MODULOS = [
   { id:2,  label:'Recreo M',    inicio:'9:20',  fin:'9:50',  turno:'Mañana',     tipo:'recreo', icon:'☕' },
   { id:3,  label:'3° Mañana',   inicio:'9:50',  fin:'10:50', turno:'Mañana',     tipo:'clase',  icon:'🌅' },
   { id:4,  label:'4° Mañana',   inicio:'10:50', fin:'11:50', turno:'Mañana',     tipo:'clase',  icon:'🌅' },
-  { id:5,  label:'5° Mañana',   inicio:'11:50', fin:'12:50', turno:'Mañana',     tipo:'clase',  icon:'🌅' },
+
 
   { id:6,  label:'1° Tarde',    inicio:'13:00', fin:'14:00', turno:'Tarde',      tipo:'clase',  icon:'☀️' },
   { id:7,  label:'2° Tarde',    inicio:'14:00', fin:'15:00', turno:'Tarde',      tipo:'clase',  icon:'☀️' },
@@ -54,7 +54,7 @@ var MODULOS_CLASE = MODULOS.filter(function(m) { return m.tipo === 'clase'; });
 
 // ── Agrupación por turno ────────────────────────────────────
 var TURNOS_CONFIG = [
-  { label:'Mañana',     icon:'🌅', modulos:[0,1,2,3,4,5]    },
+  { label:'Mañana',     icon:'🌅', modulos:[0,1,2,3,4]    },
   { label:'Tarde',      icon:'☀️', modulos:[6,7,8,9,10]     },
   { label:'Vespertino', icon:'🌆', modulos:[11,12,13,14,15] },
 ];
