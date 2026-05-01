@@ -78,6 +78,20 @@ function poblarSelectsReserva() {
       return '<option value="' + k + '">' + o.emoji + ' ' + o.nombre + '</option>';
     }).join('');
   }
+
+  // Profesores (solo para directivos)
+  ['f-profe', 'edit-profe'].forEach(function(sid) {
+    var sel = document.getElementById(sid);
+    if (!sel) return;
+    var sorted = [].concat(PROFESORES).sort(function(a, b) {
+      return a.apellido.localeCompare(b.apellido);
+    });
+    sel.innerHTML =
+      '<option value="">Seleccionar docente…</option>' +
+      sorted.map(function(p) {
+        return '<option value="' + p.id + '">Prof. ' + p.apellido + ', ' + p.nombre + ' — ' + p.materia + '</option>';
+      }).join('');
+  });
 }
 
 // ── Abrir modal (botón "Nueva reserva") ──────────────────────
@@ -99,6 +113,12 @@ function abrirModalReserva() {
   var anualChk  = document.getElementById('f-anual');
   if (anualWrap) anualWrap.style.display = esDirectivo() ? 'block' : 'none';
   if (anualChk)  anualChk.checked = false;
+
+  // Selector de docente (solo para directivos)
+  var profeWrap = document.getElementById('f-profe-wrap');
+  var profeSel  = document.getElementById('f-profe');
+  if (profeWrap) profeWrap.style.display = esDirectivo() ? 'block' : 'none';
+  if (profeSel)  profeSel.value = '';
 
   abrirModal('modal-reserva');
 }
@@ -129,6 +149,12 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   var anualChk  = document.getElementById('f-anual');
   if (anualWrap) anualWrap.style.display = esDirectivo() ? 'block' : 'none';
   if (anualChk)  anualChk.checked = false;
+
+  // Selector de docente (solo para directivos)
+  var profeWrap = document.getElementById('f-profe-wrap');
+  var profeSel  = document.getElementById('f-profe');
+  if (profeWrap) profeWrap.style.display = esDirectivo() ? 'block' : 'none';
+  if (profeSel)  profeSel.value = '';
 
   abrirModal('modal-reserva');
 }
@@ -235,7 +261,7 @@ function guardarReserva() {
           lab:          lab,
           curso:        curso,
           orient:       orient,
-          profeId:      esAnual ? 'institucional' : getCurrentProfId(),
+          profeId:      esAnual ? 'institucional' : (esDirectivo() && document.getElementById('f-profe').value ? parseInt(document.getElementById('f-profe').value) : getCurrentProfId()),
           secuencia:    secuencia,
           cicloClases:  1,
           renovaciones: 0,
@@ -464,7 +490,14 @@ function editarReserva(reservaId) {
   document.getElementById('edit-info-contexto').innerHTML =
     '<strong>' + lab.nombre + '</strong> · ' + DIAS_LARGO[r.dia] + ' · ' + mod.label +
     ' (' + mod.inicio + '–' + mod.fin + ')' +
-    (isAdmin ? ' · Prof. ' + p.apellido : '');
+    (esDirectivo() ? ' · Prof. ' + p.apellido : '');
+
+  // Selector de docente (solo para directivos)
+  poblarSelectsReserva(); // poblar opciones del <select>
+  var editProfeWrap = document.getElementById('edit-profe-wrap');
+  var editProfeSel  = document.getElementById('edit-profe');
+  if (editProfeWrap) editProfeWrap.style.display = esDirectivo() ? 'block' : 'none';
+  if (editProfeSel)  editProfeSel.value = r.profeId;
 
   // Selector de scope: solo para directivos que editan reservas con ciclo > 1
   var scopeWrap = document.getElementById('edit-scope-wrap');
@@ -488,39 +521,65 @@ function guardarEdicionReserva() {
   var scopeSel       = document.getElementById('edit-scope');
   var scope          = scopeSel ? scopeSel.value : 'puntual';
 
+  // Docente asignado (solo directivos pueden cambiarlo)
+  var editProfeSel = document.getElementById('edit-profe');
+  var nuevoProfeId = (esDirectivo() && editProfeSel && editProfeSel.value)
+    ? parseInt(editProfeSel.value)
+    : null;
+
   if (!nuevoCurso || !nuevaSecuencia) {
     toast('Completá el curso y la secuencia.', 'err');
     return;
   }
 
+  // Buscar todas las reservas "hermanas" del mismo bloque horario
+  // (mismo día, lab, profe, semana y curso original → forman un bloque multi-hora)
+  // Guardar valores originales ANTES de mutar (r puede ser parte del array)
+  var cursoOriginal   = r.curso;
+  var profeIdOriginal = r.profeId;
+
   if (scope === 'siguientes' && esDirectivo()) {
-    // Actualiza esta reserva y todas las futuras del mismo lab+dia+modulo+profe
+    // Actualiza esta reserva, sus hermanas de bloque, y todas las futuras del mismo lab+dia+profe
     var actualizadas = 0;
     RESERVAS.forEach(function(x) {
       if (
         x.lab     === r.lab     &&
         x.dia     === r.dia     &&
-        x.modulo  === r.modulo  &&
-        x.profeId === r.profeId &&
+        x.profeId === profeIdOriginal &&
+        x.curso   === cursoOriginal &&
         x.semanaOffset >= r.semanaOffset
       ) {
         x.curso     = nuevoCurso;
         x.secuencia = nuevaSecuencia;
         x.orient    = nuevaOrient;
+        if (nuevoProfeId) x.profeId = nuevoProfeId;
         actualizadas++;
       }
     });
     saveDB();
     cerrarModal('modal-editar-reserva');
-    toast('Reserva y ' + (actualizadas - 1) + ' siguiente(s) actualizadas.', 'ok');
+    toast(actualizadas + ' reserva(s) actualizada(s).', 'ok');
   } else {
-    // Solo esta reserva puntual
-    r.curso     = nuevoCurso;
-    r.secuencia = nuevaSecuencia;
-    r.orient    = nuevaOrient;
+    // Puntual: actualiza todas las horas del mismo bloque en esta semana
+    var actualizadas = 0;
+    RESERVAS.forEach(function(x) {
+      if (
+        x.semanaOffset === r.semanaOffset &&
+        x.dia          === r.dia          &&
+        x.lab          === r.lab          &&
+        x.profeId      === profeIdOriginal &&
+        x.curso        === cursoOriginal
+      ) {
+        x.curso     = nuevoCurso;
+        x.secuencia = nuevaSecuencia;
+        x.orient    = nuevaOrient;
+        if (nuevoProfeId) x.profeId = nuevoProfeId;
+        actualizadas++;
+      }
+    });
     saveDB();
     cerrarModal('modal-editar-reserva');
-    toast('Reserva actualizada.', 'ok');
+    toast(actualizadas + ' módulo(s) actualizado(s).', 'ok');
   }
 
   renderAll();

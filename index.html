@@ -317,6 +317,11 @@
           </select>
         </div>
       </div>
+      <!-- Selector de docente — solo visible para directivos -->
+      <div class="form-group" id="f-profe-wrap" style="display:none;">
+        <label class="form-label" for="f-profe">👤 Asignar docente</label>
+        <select class="form-control" id="f-profe"></select>
+      </div>
       <div class="form-group">
         <label class="form-label" for="f-secuencia">Secuencia didáctica</label>
         <textarea class="form-control" id="f-secuencia" rows="3" placeholder="¿Qué harán en el laboratorio?" required></textarea>
@@ -407,6 +412,11 @@
           <option value="tur">🌐 Turismo</option>
           <option value="bas">📚 Básico</option>
         </select>
+      </div>
+      <!-- Selector de docente — solo visible para directivos en edición -->
+      <div class="form-group" id="edit-profe-wrap" style="display:none;">
+        <label class="form-label" for="edit-profe">👤 Docente asignado</label>
+        <select class="form-control" id="edit-profe"></select>
       </div>
       <div class="form-group" id="edit-scope-wrap" style="display:none;">
         <label class="form-label" for="edit-scope">¿Qué reservas modificar?</label>
