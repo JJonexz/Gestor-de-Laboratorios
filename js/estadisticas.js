@@ -52,8 +52,14 @@ function renderEstadisticas() {
 
       // Docentes más activos
       '<div class="admin-section est-card">' +
-        '<div class="admin-section-header"><div class="admin-section-title">Docentes más activos</div></div>' +
-        '<div id="est-docentes">' + renderDocentesTop(stats) + '</div>' +
+        '<div class="admin-section-header"><div class="admin-section-title">Docentes más activos (Turnos puntuales)</div></div>' +
+        '<div id="est-docentes">' + renderDocentesTop(stats.docentesRanking) + '</div>' +
+      '</div>' +
+
+      // Docentes con reservas anuales
+      '<div class="admin-section est-card">' +
+        '<div class="admin-section-header"><div class="admin-section-title">Docentes (Reservas anuales)</div></div>' +
+        '<div id="est-docentes-anual">' + renderDocentesTop(stats.docentesRankingAnual) + '</div>' +
       '</div>' +
 
       // Horas pico
@@ -90,11 +96,21 @@ function calcularStats() {
 
   // Por docente
   var porDocente = {};
+  var porDocenteAnual = {};
   reservas.forEach(function(r) {
-    porDocente[r.profeId] = (porDocente[r.profeId] || 0) + 1;
+    if (r.anual) {
+      porDocenteAnual[r.profeId] = (porDocenteAnual[r.profeId] || 0) + 1;
+    } else {
+      porDocente[r.profeId] = (porDocente[r.profeId] || 0) + 1;
+    }
   });
+  
   var docentesRanking = Object.keys(porDocente).map(function(id) {
     return { id: parseInt(id), count: porDocente[id] };
+  }).sort(function(a,b) { return b.count - a.count; }).slice(0,5);
+
+  var docentesRankingAnual = Object.keys(porDocenteAnual).map(function(id) {
+    return { id: parseInt(id), count: porDocenteAnual[id] };
   }).sort(function(a,b) { return b.count - a.count; }).slice(0,5);
 
   // Por módulo (horas pico)
@@ -131,6 +147,7 @@ function calcularStats() {
     porLab: porLab,
     porOrient: porOrient,
     docentesRanking: docentesRanking,
+    docentesRankingAnual: docentesRankingAnual,
     porModulo: porModulo,
     heatmap: heatmap
   };
@@ -183,11 +200,11 @@ function renderBarrasOrient(stats) {
   }).join('');
 }
 
-function renderDocentesTop(stats) {
-  if (!stats.docentesRanking.length) return '<div class="notif-empty">Sin datos</div>';
-  var max = stats.docentesRanking[0].count || 1;
+function renderDocentesTop(rankingArray) {
+  if (!rankingArray || !rankingArray.length) return '<div class="notif-empty">Sin datos</div>';
+  var max = rankingArray[0].count || 1;
   return '<div class="est-docentes-list">' +
-    stats.docentesRanking.map(function(d, i) {
+    rankingArray.map(function(d, i) {
       var p = getProfe(d.id);
       var nombre = p ? (p.apellido + ', ' + p.nombre) : 'Docente ' + d.id;
       var iniciales = p ? (p.apellido[0] + (p.nombre[0] || '')).toUpperCase() : '?';
@@ -256,9 +273,10 @@ function renderHeatmap(stats) {
       var intensity = v / maxVal;
       var alpha = Math.round(intensity * 100);
       var title = v + ' reserva' + (v !== 1 ? 's' : '') + ' — ' + DIAS_LARGO[d] + ' ' + mod.label;
+      var textStyle = intensity < 0.4 ? 'color:var(--navy);text-shadow:none' : 'color:#fff';
       html += '<td title="' + escStat(title) + '">' +
         '<div class="est-hm-cell" style="background:rgba(26,58,107,' + (intensity * 0.85).toFixed(2) + ');border-color:rgba(26,58,107,' + (intensity * 0.3 + 0.1).toFixed(2) + ')">' +
-          (v > 0 ? '<span class="est-hm-num">' + v + '</span>' : '') +
+          (v > 0 ? '<span class="est-hm-num" style="' + textStyle + '">' + v + '</span>' : '') +
         '</div></td>';
     }
     html += '</tr>';
