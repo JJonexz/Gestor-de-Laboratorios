@@ -117,7 +117,7 @@ function renderCalendarioEscolar() {
           '<td>' + fechaStr + '</td>' +
           '<td>' + (ev.labId ? 'Lab.' + ev.labId : 'Todos los labs') + '</td>' +
           '<td>' +
-            '<button class="tbl-btn danger" onclick="confirmarEliminarEvento(' + ev.id + ')">✕ Eliminar</button>' +
+            (esDirectivo() ? '<button class="tbl-btn danger" onclick="confirmarEliminarEvento(' + ev.id + ')">✕ Eliminar</button>' : '') +
           '</td>' +
         '</tr>'
       );

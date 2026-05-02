@@ -229,24 +229,69 @@ function cancelarReserva(id) {
   if (!r) return;
 
   var p = getProfe(r.profeId);
-  confirmar(
-    '¿Cancelar la reserva de <strong>Prof. ' + p.apellido + '</strong> — ' + r.curso + ' el ' + DIAS_LARGO[r.dia] + '?',
-    function() {
-      RESERVAS = RESERVAS.filter(function(x) { return x.id !== id; });
-      saveDB();
-      toast('Reserva cancelada.', 'info');
+  var msg = '¿Cancelar la reserva de <strong>Prof. ' + p.apellido + '</strong> — ' + r.curso + ' el ' + DIAS_LARGO[r.dia] + '?';
 
-      // Avisar si hay docentes en espera para ese turno
-      var waiting = LISTA_ESPERA.filter(function(e) {
-        return e.lab === r.lab && e.dia === r.dia && e.modulo === r.modulo;
-      });
-      if (waiting.length) {
-        setTimeout(function() {
-          toast('Hay ' + waiting.length + ' docente(s) en espera para ese turno.', 'warn');
-        }, 400);
+  // Si es anual y somos directivos, damos opción de borrar todo
+  if (r.anual && esDirectivo()) {
+    confirmarOpciones(
+      'Esta es una <strong>reserva anual</strong>. ¿Deseas eliminar solo esta fecha o toda la serie del año?',
+      {
+        ok: {
+          texto: 'Solo esta fecha',
+          callback: function() { ejecutarCancelacion(id); }
+        },
+        extra: {
+          texto: 'Toda la serie anual',
+          style: { background: 'var(--red)', borderColor: 'var(--red)' },
+          callback: function() { cancelarSerieAnual(r); }
+        }
       }
+    );
+  } else {
+    confirmar(msg, function() { ejecutarCancelacion(id); });
+  }
+}
 
-      renderAll();
-    }
-  );
+function ejecutarCancelacion(id) {
+  var r = RESERVAS.find(function(x) { return x.id === id; });
+  if (!r) return;
+
+  RESERVAS = RESERVAS.filter(function(x) { return x.id !== id; });
+  saveDB();
+  toast('Reserva cancelada.', 'info');
+
+  // Avisar si hay docentes en espera para ese turno
+  var waiting = LISTA_ESPERA.filter(function(e) {
+    return e.lab === r.lab && e.dia === r.dia && e.modulo === r.modulo;
+  });
+  if (waiting.length) {
+    setTimeout(function() {
+      toast('Hay ' + waiting.length + ' docente(s) en espera para ese turno.', 'warn');
+    }, 400);
+  }
+  renderAll();
+}
+
+function cancelarSerieAnual(reservaBase) {
+  var cursoOriginal   = reservaBase.curso;
+  var profeIdOriginal = reservaBase.profeId;
+  var labOriginal     = reservaBase.lab;
+  var diaOriginal     = reservaBase.dia;
+
+  var total = RESERVAS.length;
+  RESERVAS = RESERVAS.filter(function(x) {
+    var coincide = (
+      x.lab     === labOriginal &&
+      x.dia     === diaOriginal &&
+      x.profeId === profeIdOriginal &&
+      x.curso   === cursoOriginal &&
+      x.anual   === true
+    );
+    return !coincide;
+  });
+
+  var eliminadas = total - RESERVAS.length;
+  saveDB();
+  toast('Se eliminaron ' + eliminadas + ' reserva(s) de la serie anual.', 'ok');
+  renderAll();
 }

@@ -42,7 +42,7 @@
       <span class="nav-icon" aria-hidden="true">🔧</span> Incidencias
       <span class="admin-badge" id="incid-badge-nav" role="status" aria-live="polite" style="display:none;"></span>
     </button>
-    <button class="nav-btn admin-only" data-page="fechas-especiales" aria-current="false" onclick="irA('fechas-especiales')" style="display:none;">
+    <button class="nav-btn" data-page="fechas-especiales" aria-current="false" onclick="irA('fechas-especiales')">
       <span class="nav-icon" aria-hidden="true">📅</span> Fechas especiales
     </button>
 
@@ -88,7 +88,7 @@
   <button class="mobile-nav-btn admin-only" data-page="admin" aria-current="false" onclick="irA('admin')" style="display:none"><span aria-hidden="true">⚙️</span> Administración</button>
   <button class="mobile-nav-btn admin-only" data-page="estadisticas" aria-current="false" onclick="irA('estadisticas')" style="display:none"><span aria-hidden="true">📊</span> Estadísticas</button>
   <button class="mobile-nav-btn admin-only" data-page="incidencias" aria-current="false" onclick="irA('incidencias')" style="display:none"><span aria-hidden="true">🔧</span> Incidencias</button>
-  <button class="mobile-nav-btn admin-only" data-page="fechas-especiales" aria-current="false" onclick="irA('fechas-especiales')" style="display:none"><span aria-hidden="true">📅</span> Fechas especiales</button>
+  <button class="mobile-nav-btn" data-page="fechas-especiales" aria-current="false" onclick="irA('fechas-especiales')"><span aria-hidden="true">📅</span> Fechas especiales</button>
   <div class="mobile-nav-sep">
     <button class="mobile-nav-btn" onclick="cerrarSesion()"><span aria-hidden="true">🚪</span> Cerrar sesión</button>
   </div>
@@ -320,7 +320,7 @@
   <div class="admin-section">
     <div class="admin-section-header">
       <div class="admin-section-title">Fechas y eventos programados</div>
-      <button class="tbl-btn" onclick="abrirModalEventoEscolar()">+ Agregar fecha</button>
+      <button class="tbl-btn admin-only" onclick="abrirModalEventoEscolar()">+ Agregar fecha</button>
     </div>
     <div class="table-wrap">
       <table class="prof-table">
@@ -616,6 +616,7 @@
     <div class="modal-body"><div id="confirm-body"></div></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="cerrarModal('modal-confirm')">Cancelar</button>
+      <button class="btn-ok" id="confirm-extra-btn" style="display:none;"></button>
       <button class="btn-ok" id="confirm-ok-btn">Confirmar</button>
     </div>
   </div>

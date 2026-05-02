@@ -953,13 +953,37 @@ function renovarReserva(id){
 function cancelarReserva(id){
   var r=RESERVAS.find(function(x){ return x.id===id; }); if(!r) return;
   var p=getProfe(r.profeId);
-  confirmar('¿Cancelar la reserva de <strong>Prof. '+p.apellido+'</strong> — '+r.curso+' el '+DIAS_LARGO[r.dia]+'?',function(){
-    RESERVAS=RESERVAS.filter(function(x){ return x.id!==id; });
-    saveDB(); toast('Reserva cancelada.','info');
-    var waiting=LISTA_ESPERA.filter(function(e){ return e.lab===r.lab&&e.dia===r.dia&&e.modulo===r.modulo; });
-    if(waiting.length) setTimeout(function(){ toast('Hay '+waiting.length+' docente(s) en espera para ese turno.','warn'); },400);
-    renderAll();
+  var msg = '¿Cancelar la reserva de <strong>Prof. '+p.apellido+'</strong> — '+r.curso+' el '+DIAS_LARGO[r.dia]+'?';
+
+  if(r.anual && esDirectivo()){
+    confirmarOpciones('Esta es una <strong>reserva anual</strong>. ¿Deseas eliminar solo esta fecha o toda la serie del año?', {
+      ok: { texto: 'Solo esta fecha', callback: function(){ ejecutarCancelacionApp(id); } },
+      extra: {
+        texto: 'Toda la serie anual',
+        style: { background: 'var(--red)', borderColor: 'var(--red)' },
+        callback: function(){ cancelarSerieAnualApp(r); }
+      }
+    });
+  } else {
+    confirmar(msg, function(){ ejecutarCancelacionApp(id); });
+  }
+}
+function ejecutarCancelacionApp(id){
+  var r=RESERVAS.find(function(x){ return x.id===id; }); if(!r) return;
+  RESERVAS=RESERVAS.filter(function(x){ return x.id!==id; });
+  saveDB(); toast('Reserva cancelada.','info');
+  var waiting=LISTA_ESPERA.filter(function(e){ return e.lab===r.lab&&e.dia===r.dia&&e.modulo===r.modulo; });
+  if(waiting.length) setTimeout(function(){ toast('Hay '+waiting.length+' docente(s) en espera para ese turno.','warn'); },400);
+  renderAll();
+}
+function cancelarSerieAnualApp(rBase){
+  var cOrig=rBase.curso, pOrig=rBase.profeId, lOrig=rBase.lab, dOrig=rBase.dia;
+  var total=RESERVAS.length;
+  RESERVAS=RESERVAS.filter(function(x){
+    return !(x.lab===lOrig && x.dia===dOrig && x.profeId===pOrig && x.curso===cOrig && x.anual===true);
   });
+  saveDB(); toast('Se eliminaron '+(total-RESERVAS.length)+' reservas de la serie anual.','ok');
+  renderAll();
 }
 
 // ============================================================

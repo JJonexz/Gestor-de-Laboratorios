@@ -38,10 +38,44 @@ function toast(msg, tipo) {
 function confirmar(msg, callback) {
   var body = document.getElementById('confirm-body');
   var btn  = document.getElementById('confirm-ok-btn');
+  var extra = document.getElementById('confirm-extra-btn');
   if (!body || !btn) return;
 
+  if (extra) {
+    extra.style.display = 'none';
+    extra.textContent = '';
+  }
+
   body.innerHTML = '<p>' + msg + '</p>';
+  btn.textContent = 'Confirmar';
   btn.onclick = function() { cerrarModal('modal-confirm'); callback(); };
+  abrirModal('modal-confirm');
+}
+
+// ── Diálogo con múltiples opciones ───────────────────────────
+// Permite hasta dos botones de acción además de cancelar
+function confirmarOpciones(msg, opciones) {
+  var body = document.getElementById('confirm-body');
+  var btnOk = document.getElementById('confirm-ok-btn');
+  var btnEx = document.getElementById('confirm-extra-btn');
+  if (!body || !btnOk || !btnEx) return;
+
+  body.innerHTML = '<p>' + msg + '</p>';
+  
+  // Botón principal
+  btnOk.textContent = opciones.ok.texto;
+  btnOk.onclick = function() { cerrarModal('modal-confirm'); opciones.ok.callback(); };
+
+  // Botón extra
+  btnEx.style.display = 'inline-block';
+  btnEx.textContent = opciones.extra.texto;
+  if (opciones.extra.style) {
+    Object.keys(opciones.extra.style).forEach(function(k) {
+      btnEx.style[k] = opciones.extra.style[k];
+    });
+  }
+  btnEx.onclick = function() { cerrarModal('modal-confirm'); opciones.extra.callback(); };
+
   abrirModal('modal-confirm');
 }
 
