@@ -26,13 +26,26 @@ function renderSidebar() {
       var dotCls    = l.ocupado ? 'dot-ocup'    : 'dot-libre';
       var statusTxt = l.ocupado ? 'En mantenimiento' : 'Disponible';
       return (
-        '<div class="lab-card ' + sel + '" data-lab-id="' + l.id + '" ' +
-        'onclick="setLabFilter(\'' + l.id + '\')" role="button" tabindex="0">' +
-          '<div class="lab-card-name">' + l.nombre + '</div>' +
-          '<div class="lab-card-status ' + statusCls + '">' +
-            '<span class="dot ' + dotCls + '"></span>' + statusTxt +
-          '</div>' +
-        '</div>'
+        (function() {
+          var tieneIncid = (typeof labTieneIncidenciaActiva === 'function') && labTieneIncidenciaActiva(l.id);
+          var incidCls = tieneIncid ? ' incidencia-activa' : '';
+          return (
+            '<div class="lab-card ' + sel + incidCls + '" data-lab-id="' + l.id + '" ' +
+            'onclick="setLabFilter(\'' + l.id + '\')" role="button" tabindex="0">' +
+              '<div class="lab-card-name">' + l.nombre + '</div>' +
+              '<div class="lab-card-status ' + statusCls + '">' +
+                '<span class="dot ' + dotCls + '"></span>' + statusTxt +
+              '</div>' +
+              (tieneIncid ? '<div class="lab-incid-badge">⚠️ Incidencia activa</div>' : '') +
+              '<div style="margin-top:6px">' +
+                '<button class="tbl-btn" style="font-size:.7rem;padding:2px 7px" ' +
+                  'onclick="event.stopPropagation();abrirModalIncidencia(\'' + l.id + '\')">' +
+                  '+ Reportar problema' +
+                '</button>' +
+              '</div>' +
+            '</div>'
+          );
+        })()
       );
     }).join('');
   }
@@ -120,6 +133,35 @@ function renderCalendario() {
 
   var grid = document.getElementById('cal-body');
   if (!grid) return;
+
+  // Verificar si el día actual está bloqueado por el calendario escolar
+  var eventoDelDia = (typeof getEventoEnDia === 'function') ? getEventoEnDia(semanaOffset, diaActual) : null;
+  var diaEstaHabilitado = (typeof esDiaHabilitado === 'function') ? esDiaHabilitado(semanaOffset, diaActual) : true;
+
+  // Mostrar banner de día bloqueado si aplica
+  var bannerEl = document.getElementById('cal-dia-banner');
+  if (!bannerEl) {
+    bannerEl = document.createElement('div');
+    bannerEl.id = 'cal-dia-banner';
+    grid.parentNode.insertBefore(bannerEl, grid);
+  }
+  if (eventoDelDia && !diaEstaHabilitado) {
+    var evCfg = (typeof TIPOS_EVENTO !== 'undefined' && TIPOS_EVENTO[eventoDelDia.tipo]) || {};
+    bannerEl.innerHTML =
+      '<div style="background:' + (evCfg.color || '#e63946') + '20;border:1px solid ' + (evCfg.color || '#e63946') + ';border-radius:8px;padding:8px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:1.1rem">🚫</span>' +
+        '<div><strong style="color:' + (evCfg.color || '#e63946') + '">' + (evCfg.label || 'Día bloqueado') + '</strong>' +
+        ' — ' + eventoDelDia.titulo + '</div>' +
+      '</div>';
+  } else if (eventoDelDia) {
+    var evCfg2 = (typeof TIPOS_EVENTO !== 'undefined' && TIPOS_EVENTO[eventoDelDia.tipo]) || {};
+    bannerEl.innerHTML =
+      '<div style="background:#0891b220;border:1px solid #0891b2;border-radius:8px;padding:8px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">' +
+        '<span>📌</span><strong>' + eventoDelDia.titulo + '</strong>' +
+      '</div>';
+  } else {
+    bannerEl.innerHTML = '';
+  }
 
   var labsFiltrados = LABS.filter(function(l) {
     return filtroLab === 'todos' || filtroLab === l.id;

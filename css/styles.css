@@ -1982,3 +1982,310 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   line-height: 1;
 }
 .at-event:hover .at-ev-edit-hint { opacity: 0.6; }
+
+/* ============================================================
+   MÓDULOS NUEVOS: Notificaciones, Estadísticas, Incidencias,
+   Calendario Escolar, Conflictos
+   ============================================================ */
+
+/* ── Botón de notificaciones en el header ───────────────────── */
+.notif-btn {
+  position: relative;
+  background: rgba(255,255,255,.1);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background .15s;
+}
+.notif-btn:hover { background: rgba(255,255,255,.2); }
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  background: var(--red);
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 700;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid var(--navy);
+}
+
+/* ── Panel lateral de notificaciones ───────────────────────── */
+.notif-panel {
+  position: fixed;
+  top: var(--header-h);
+  right: -360px;
+  width: 340px;
+  max-height: calc(100vh - var(--header-h));
+  background: var(--fondo);
+  border-left: 1px solid var(--borde);
+  border-bottom: 1px solid var(--borde);
+  border-radius: 0 0 0 12px;
+  box-shadow: -4px 4px 20px rgba(0,0,0,.12);
+  transition: right .25s ease;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+}
+.notif-panel.open { right: 0; }
+
+.notif-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.2);
+  z-index: 1000;
+  display: none;
+}
+.notif-panel.open ~ .notif-overlay,
+.notif-panel.open + .notif-overlay { display: block; }
+
+.notif-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--borde);
+  background: var(--fondo);
+}
+
+.notif-limpiar-btn {
+  font-size: .72rem;
+  background: none;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  color: var(--texto-muted);
+  transition: all .15s;
+}
+.notif-limpiar-btn:hover { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+
+.notif-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--borde);
+  transition: background .12s;
+  position: relative;
+}
+.notif-item:hover { background: var(--azul-xlight); }
+.notif-item.leida { opacity: .7; }
+
+.notif-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.notif-content { flex: 1; min-width: 0; }
+.notif-titulo  { font-size: .82rem; font-weight: 600; color: var(--texto); margin-bottom: 2px; }
+.notif-cuerpo  { font-size: .78rem; color: var(--texto-muted); line-height: 1.4; }
+.notif-fecha   { font-size: .72rem; color: var(--texto-muted); margin-top: 3px; }
+
+.notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--navy);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.notif-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--texto-muted);
+  font-size: .85rem;
+}
+.notif-empty-icon { font-size: 2rem; margin-bottom: 8px; }
+.notif-empty-sub  { font-size: .75rem; margin-top: 4px; }
+
+/* ── Estadísticas ───────────────────────────────────────────── */
+.est-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+@media (max-width: 700px) { .est-grid { grid-template-columns: 1fr; } }
+
+.est-card { padding: 1rem 1.25rem; }
+
+.est-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.est-bar-label {
+  font-size: .8rem;
+  color: var(--texto);
+  min-width: 110px;
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.est-bar-track {
+  flex: 1;
+  height: 10px;
+  background: var(--azul-xlight);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.est-bar-fill {
+  height: 10px;
+  border-radius: 5px;
+  transition: width .4s ease;
+  min-width: 2px;
+}
+.est-bar-val {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--texto);
+  min-width: 26px;
+  text-align: right;
+}
+
+/* Docentes ranking */
+.est-docentes-list { display: flex; flex-direction: column; gap: 10px; }
+.est-docente-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.est-rank {
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--texto-muted);
+  min-width: 16px;
+  text-align: center;
+}
+.est-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.est-doc-info { flex: 1; min-width: 0; }
+.est-doc-nombre {
+  font-size: .8rem;
+  font-weight: 500;
+  color: var(--texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Heatmap */
+.est-heatmap-wrap { overflow-x: auto; }
+.est-heatmap {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .75rem;
+}
+.est-heatmap th {
+  padding: 4px 6px;
+  text-align: center;
+  color: var(--texto-muted);
+  font-weight: 600;
+  font-size: .72rem;
+}
+.est-hm-label {
+  padding: 3px 8px 3px 0;
+  color: var(--texto-muted);
+  font-size: .72rem;
+  white-space: nowrap;
+  text-align: right;
+}
+.est-hm-cell {
+  width: 34px;
+  height: 26px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2px;
+  transition: transform .1s;
+}
+.est-hm-cell:hover { transform: scale(1.15); }
+.est-hm-num {
+  font-size: .68rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+
+/* ── Indicador de día bloqueado en calendario ───────────────── */
+.cal-dia-bloqueado {
+  opacity: .45;
+  pointer-events: none;
+}
+.cal-dia-bloqueado-label {
+  font-size: .7rem;
+  color: var(--red);
+  font-weight: 600;
+  text-align: center;
+  padding: 2px 4px;
+  background: var(--red-dim);
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+/* ── Indicador de lab con incidencia activa ─────────────────── */
+.lab-card.incidencia-activa {
+  border-color: var(--red) !important;
+}
+.lab-incid-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: .68rem;
+  font-weight: 700;
+  background: var(--red-dim);
+  color: var(--red);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-top: 3px;
+}
+
+/* ── Página estadísticas: heredar estilos de admin ──────────── */
+#page-estadisticas .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}

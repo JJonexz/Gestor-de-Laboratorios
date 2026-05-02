@@ -34,6 +34,10 @@ function renderAdmin() {
   renderLabsConfig();
   renderAdminReservas();
   renderPautasAdmin();
+  // Nuevos módulos
+  if (typeof renderIncidencias      === 'function') renderIncidencias();
+  if (typeof renderCalendarioEscolar === 'function') renderCalendarioEscolar();
+  if (typeof actualizarBadgeIncidencias === 'function') actualizarBadgeIncidencias();
 }
 
 // ── Tabla de solicitudes pendientes ──────────────────────────

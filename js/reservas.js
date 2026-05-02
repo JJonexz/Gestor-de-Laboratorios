@@ -439,14 +439,28 @@ function aceptarSolicitud(solId) {
   }
 
   // Solicitud nueva → crear reserva
+  // Validar conflicto con nuevo módulo antes de aprobar
+  if (typeof validarConflicto === 'function') {
+    var conf = validarConflicto(s.lab, s.dia, s.modulo, s.semanaOffset, s.profeId, null);
+    if (conf) {
+      toast('Conflicto: ' + conf.mensaje, 'err');
+      if (typeof mostrarAlertaConflicto === 'function') mostrarAlertaConflicto(conf, s);
+      return;
+    }
+  }
   nextId++;
-  RESERVAS.push({
+  var nuevaReserva = {
     id: nextId, semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
     curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
     cicloClases: 1, renovaciones: 0,
-  });
+  };
+  RESERVAS.push(nuevaReserva);
   SOLICITUDES = SOLICITUDES.filter(function(x) { return x.id !== solId; });
   saveDB();
+  // Notificar al docente
+  if (typeof notifSolicitudAprobada === 'function') notifSolicitudAprobada(s);
+  // Emitir sync
+  if (typeof emitirSync === 'function') emitirSync('reserva_aprobada', { reservaId: nuevaReserva.id, lab: s.lab });
   toast('Solicitud aprobada. Reserva confirmada.', 'ok');
   renderAll();
 }
@@ -462,6 +476,8 @@ function rechazarSolicitud(solId) {
   confirmar('¿Rechazar la solicitud de <strong>Prof. ' + p.apellido + '</strong> — ' + s.curso + '?', function() {
     SOLICITUDES = SOLICITUDES.filter(function(x) { return x.id !== solId; });
     saveDB();
+    if (typeof notifSolicitudRechazada === 'function') notifSolicitudRechazada(s, '');
+    if (typeof emitirSync === 'function') emitirSync('solicitud_rechazada', { solicitudId: solId });
     toast('Solicitud rechazada.', 'info');
     renderAll();
   });

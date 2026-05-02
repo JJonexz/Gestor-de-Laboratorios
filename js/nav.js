@@ -44,6 +44,11 @@ function irA(pagina) {
   // Renderizados específicos por página
   if (pagina === 'admin')        renderAdmin();
   if (pagina === 'mis-reservas') renderMisReservas();
+  if (pagina === 'estadisticas') {
+    var contenedor = document.getElementById('estadisticas-contenido');
+    if (contenedor) contenedor.innerHTML = '';
+    renderEstadisticas();
+  }
 
   closeMobileNav();
 }

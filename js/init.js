@@ -132,4 +132,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // ── 8. Inicializar módulos nuevos ─────────────────────────
+  if (typeof iniciarPollingNotif === 'function') iniciarPollingNotif();
+  if (typeof iniciarSyncPestanas === 'function') iniciarSyncPestanas();
+  if (typeof iniciarIncidencias  === 'function') iniciarIncidencias();
+
 }); // fin DOMContentLoaded
