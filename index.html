@@ -274,6 +274,70 @@
       </div>
     </div>
 
+<!-- PÁGINA: INCIDENCIAS -->
+<div id="page-incidencias" class="page" role="region" aria-label="Incidencias">
+  <div class="page-header">
+    <div class="page-title-wrap">
+      <div class="page-title">Incidencias y mantenimiento</div>
+      <div class="page-sub">Gestión de problemas técnicos y bloqueos de laboratorios</div>
+    </div>
+  </div>
+  <div class="admin-section admin-section-highlight">
+    <div class="admin-section-header">
+      <div class="admin-section-title">
+        Incidencias reportadas
+        <span class="admin-badge" id="incid-badge" style="display:none;margin-left:6px;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.75rem"></span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <select class="form-control" id="incid-filtro-estado" style="font-size:.8rem;padding:4px 8px;min-width:0" onchange="renderIncidencias()">
+          <option value="activas">Solo activas</option>
+          <option value="todas">Todas</option>
+          <option value="resueltas">Resueltas</option>
+        </select>
+        <button class="tbl-btn" onclick="abrirModalIncidencia()" style="white-space:nowrap">+ Reportar</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="prof-table">
+        <thead><tr>
+          <th>Tipo</th><th>Laboratorio</th><th>Descripción</th>
+          <th>Reportado por</th><th>Estado</th><th>Cambiar estado</th><th></th>
+        </tr></thead>
+        <tbody id="incidencias-tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PÁGINA: FECHAS ESPECIALES -->
+<div id="page-fechas-especiales" class="page" role="region" aria-label="Fechas especiales">
+  <div class="page-header">
+    <div class="page-title-wrap">
+      <div class="page-title">Calendario escolar</div>
+      <div class="page-sub">Gestión de fechas especiales y eventos institucionales</div>
+    </div>
+  </div>
+  <div class="admin-section">
+    <div class="admin-section-header">
+      <div class="admin-section-title">Fechas y eventos programados</div>
+      <button class="tbl-btn" onclick="abrirModalEventoEscolar()">+ Agregar fecha</button>
+    </div>
+    <div class="table-wrap">
+      <table class="prof-table">
+        <thead><tr>
+          <th>Tipo</th><th>Descripción</th><th>Fecha / Período</th><th>Laboratorio</th><th></th>
+        </tr></thead>
+        <tbody id="cal-escolar-body"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PÁGINA: Estadísticas -->
+<div id="page-estadisticas" class="page" role="region" aria-label="Estadísticas">
+  <div id="estadisticas-contenido"></div>
+</div>
+
   </main>
 </div>
 
@@ -560,69 +624,7 @@
 
     </div>
 
-<!-- PÁGINA: INCIDENCIAS -->
-<div id="page-incidencias" class="page" role="region" aria-label="Incidencias">
-  <div class="page-header">
-    <div class="page-title-wrap">
-      <div class="page-title">Incidencias y mantenimiento</div>
-      <div class="page-sub">Gestión de problemas técnicos y bloqueos de laboratorios</div>
-    </div>
-  </div>
-  <div class="admin-section admin-section-highlight">
-    <div class="admin-section-header">
-      <div class="admin-section-title">
-        Incidencias reportadas
-        <span class="admin-badge" id="incid-badge" style="display:none;margin-left:6px;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.75rem"></span>
-      </div>
-      <div style="display:flex;gap:8px">
-        <select class="form-control" id="incid-filtro-estado" style="font-size:.8rem;padding:4px 8px;min-width:0" onchange="renderIncidencias()">
-          <option value="activas">Solo activas</option>
-          <option value="todas">Todas</option>
-          <option value="resueltas">Resueltas</option>
-        </select>
-        <button class="tbl-btn" onclick="abrirModalIncidencia()" style="white-space:nowrap">+ Reportar</button>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table class="prof-table">
-        <thead><tr>
-          <th>Tipo</th><th>Laboratorio</th><th>Descripción</th>
-          <th>Reportado por</th><th>Estado</th><th>Cambiar estado</th><th></th>
-        </tr></thead>
-        <tbody id="incidencias-tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">Cargando...</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-</div>
 
-<!-- PÁGINA: FECHAS ESPECIALES -->
-<div id="page-fechas-especiales" class="page" role="region" aria-label="Fechas especiales">
-  <div class="page-header">
-    <div class="page-title-wrap">
-      <div class="page-title">Calendario escolar</div>
-      <div class="page-sub">Gestión de fechas especiales y eventos institucionales</div>
-    </div>
-  </div>
-  <div class="admin-section">
-    <div class="admin-section-header">
-      <div class="admin-section-title">Fechas y eventos programados</div>
-      <button class="tbl-btn" onclick="abrirModalEventoEscolar()">+ Agregar fecha</button>
-    </div>
-    <div class="table-wrap">
-      <table class="prof-table">
-        <thead><tr>
-          <th>Tipo</th><th>Descripción</th><th>Fecha / Período</th><th>Laboratorio</th><th></th>
-        </tr></thead>
-        <tbody id="cal-escolar-body"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">Cargando...</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- PÁGINA: Estadísticas -->
-<div id="page-estadisticas" class="page" role="region" aria-label="Estadísticas">
-  <div id="estadisticas-contenido"></div>
-</div>
 
 <!-- PANEL DE NOTIFICACIONES -->
 <div id="notif-panel" class="notif-panel" role="dialog" aria-label="Notificaciones">
