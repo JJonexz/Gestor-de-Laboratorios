@@ -191,7 +191,11 @@ a { text-decoration: none; }
   align-self: stretch;
   margin-right: .85rem;
 }
-.header-logo-area img { display: none; }
+.header-logo-area img {
+  height: 32px;
+  width: auto;
+  object-fit: contain;
+}
 
 .header-logo-placeholder {
   width: 28px;
