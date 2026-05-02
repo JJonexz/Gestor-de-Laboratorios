@@ -210,9 +210,9 @@ function guardarIncidencia() {
 
   toast('Incidencia registrada. El equipo directivo fue notificado.', 'ok');
 
-  // Re-renderizar si estamos en admin
-  var pAdmin = document.getElementById('page-admin');
-  if (pAdmin && pAdmin.classList.contains('active')) {
+  // Re-renderizar si estamos en la página de incidencias
+  var pIncid = document.getElementById('page-incidencias');
+  if (pIncid && pIncid.classList.contains('active')) {
     renderIncidencias();
   }
 }

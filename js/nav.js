@@ -44,6 +44,8 @@ function irA(pagina) {
   // Renderizados específicos por página
   if (pagina === 'admin')        renderAdmin();
   if (pagina === 'mis-reservas') renderMisReservas();
+  if (pagina === 'incidencias')  { if (typeof renderIncidencias === 'function') renderIncidencias(); }
+  if (pagina === 'fechas-especiales') { if (typeof renderCalendarioEscolar === 'function') renderCalendarioEscolar(); }
   if (pagina === 'estadisticas') {
     var contenedor = document.getElementById('estadisticas-contenido');
     if (contenedor) contenedor.innerHTML = '';
