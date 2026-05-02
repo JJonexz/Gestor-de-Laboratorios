@@ -1274,7 +1274,7 @@ a { text-decoration: none; }
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 500;
+  z-index: 1100;
   align-items: center;
   justify-content: center;
   padding: 1rem;
@@ -2030,8 +2030,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   width: 340px;
   max-height: calc(100vh - var(--header-h));
   background: var(--fondo);
-  border-left: 1px solid var(--borde);
-  border-bottom: 1px solid var(--borde);
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   border-radius: 0 0 0 12px;
   box-shadow: -4px 4px 20px rgba(0,0,0,.12);
   transition: right .25s ease;
@@ -2048,22 +2048,21 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   z-index: 1000;
   display: none;
 }
-.notif-panel.open ~ .notif-overlay,
-.notif-panel.open + .notif-overlay { display: block; }
+.notif-overlay.open { display: block; }
 
 .notif-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--borde);
+  border-bottom: 1px solid var(--border);
   background: var(--fondo);
 }
 
 .notif-limpiar-btn {
   font-size: .72rem;
   background: none;
-  border: 1px solid var(--borde);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 3px 8px;
   cursor: pointer;
@@ -2082,7 +2081,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   align-items: flex-start;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--borde);
+  border-bottom: 1px solid var(--border);
   transition: background .12s;
   position: relative;
 }

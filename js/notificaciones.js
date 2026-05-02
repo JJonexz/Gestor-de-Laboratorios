@@ -80,19 +80,22 @@ function actualizarBadgeNotif() {
 
 // ── Panel de notificaciones ──────────────────────────────────
 function togglePanelNotif() {
-  var panel = document.getElementById('notif-panel');
+  var panel   = document.getElementById('notif-panel');
+  var overlay = document.getElementById('notif-overlay');
   if (!panel) return;
   var isOpen = panel.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('open', isOpen);
   if (isOpen) {
     renderNotifPanel();
-    // Marcar como leídas después de 2 segundos de visualización
     setTimeout(function() { marcarTodasLeidas(); }, 2000);
   }
 }
 
 function cerrarPanelNotif() {
-  var panel = document.getElementById('notif-panel');
-  if (panel) panel.classList.remove('open');
+  var panel   = document.getElementById('notif-panel');
+  var overlay = document.getElementById('notif-overlay');
+  if (panel)   panel.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
 }
 
 function marcarTodasLeidas() {

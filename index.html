@@ -637,6 +637,87 @@
 </div>
 <div id="notif-overlay" class="notif-overlay" onclick="cerrarPanelNotif()"></div>
 
+
+<!-- Modal: Reportar Incidencia (pre-definido para evitar bugs de posición) -->
+<div class="modal-overlay" id="modal-incidencia" role="dialog" aria-modal="true" aria-labelledby="modal-incid-title">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header" style="border-bottom:2px solid var(--red)">
+      <h3 id="modal-incid-title" style="color:var(--red)">⚠️ Reportar incidencia</h3>
+      <button class="modal-close" onclick="cerrarModal('modal-incidencia')" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Laboratorio</label>
+        <select class="form-control" id="incid-lab"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de problema</label>
+        <select class="form-control" id="incid-tipo"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción detallada</label>
+        <textarea class="form-control" id="incid-desc" rows="3" placeholder="Describí el problema: equipos afectados, síntomas, etc."></textarea>
+      </div>
+      <div class="form-group" id="incid-bloquear-wrap">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem">
+          <input type="checkbox" id="incid-bloquear" style="width:16px;height:16px"/>
+          Marcar el laboratorio como NO DISPONIBLE hasta resolver la incidencia
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-incidencia')">Cancelar</button>
+      <button class="btn-ok" style="background:var(--red);border-color:var(--red)" onclick="guardarIncidencia()">Reportar incidencia</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Agregar Evento Escolar (pre-definido para evitar bugs de posición) -->
+<div class="modal-overlay" id="modal-evento-escolar" role="dialog" aria-modal="true" aria-labelledby="modal-evento-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-evento-title">📌 Agregar fecha especial</h3>
+      <button class="modal-close" onclick="cerrarModal('modal-evento-escolar')" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Tipo de evento</label>
+        <select class="form-control" id="ev-tipo" onchange="toggleFechaEvento()">
+          <option value="feriado">Feriado</option>
+          <option value="examen">Semana de examen</option>
+          <option value="receso">Receso escolar</option>
+          <option value="acto">Acto escolar</option>
+          <option value="mantenimiento">Mantenimiento lab</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Título / descripción</label>
+        <input class="form-control" id="ev-titulo" type="text" placeholder="Ej: Feriado nacional 25 de mayo"/>
+      </div>
+      <div class="form-group" id="ev-fecha-simple">
+        <label class="form-label">Fecha</label>
+        <input class="form-control" id="ev-fecha" type="date"/>
+      </div>
+      <div class="form-group" id="ev-fecha-rango" style="display:none">
+        <label class="form-label">Fecha de inicio</label>
+        <input class="form-control" id="ev-fecha-ini" type="date"/>
+        <label class="form-label" style="margin-top:.5rem">Fecha de fin</label>
+        <input class="form-control" id="ev-fecha-fin" type="date"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Laboratorio afectado (opcional)</label>
+        <select class="form-control" id="ev-lab">
+          <option value="">Todos los laboratorios</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-evento-escolar')">Cancelar</button>
+      <button class="btn-ok" onclick="guardarEventoEscolar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container" role="region" aria-label="Notificaciones" aria-live="polite"></div>
 
 <!--
