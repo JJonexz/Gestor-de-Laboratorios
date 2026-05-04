@@ -111,18 +111,8 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
 </div>
 
 <script>
-// ── Clave canónica de sesión (debe coincidir exactamente con app.js) ──
+// ── Clave canónica de sesión ──
 var SESSION_KEY = 'SAEP_session_data';
-
-var USERS = {
-  'ces.roberto':       { pass:'ces123',   role:'prof',  id:1, display:'Prof. Ces'        },
-  'dimartino.claudia': { pass:'dim123',   role:'prof',  id:2, display:'Prof. Di Martino' },
-  'pieroni.marcelo':   { pass:'pie123',   role:'prof',  id:3, display:'Prof. Pieroni'    },
-  'reichert.sandra':   { pass:'rei123',   role:'prof',  id:4, display:'Prof. Reichert'   },
-  'arnaiz.gustavo':    { pass:'arn123',   role:'prof',  id:5, display:'Prof. Arnaiz'     },
-  'admin':             { pass:'admin123', role:'admin', id:0, display:'Administrador'    },
-};
-
 var selectedRole = 'prof';
 
 function selRole(r) {
@@ -146,31 +136,38 @@ function doLogin() {
   var username = document.getElementById('f-usuario').value.trim().toLowerCase();
   var password = document.getElementById('f-pass').value;
   var errEl    = document.getElementById('login-error');
+  var btn      = document.querySelector('.btn-login');
 
-  // Ocultar error previo antes de validar
   errEl.classList.remove('show');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verificando…'; }
 
-  var found = USERS[username];
+  fetch('./api.php/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: username, password: password })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(json) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Ingresar →'; }
+    if (!json.ok) { errEl.classList.add('show'); return; }
 
-  // Validación estricta: usuario existe + contraseña correcta + rol coincide
-  if (!found || found.pass !== password || found.role !== selectedRole) {
-    errEl.classList.add('show');
-    return;
-  }
+    var found = json.data;
+    // Validar rol seleccionado
+    var isAdmin = (found.role === 'admin' || found.id === 0);
+    if (selectedRole === 'admin' && !isAdmin) { errEl.classList.add('show'); return; }
+    if (selectedRole === 'prof' && isAdmin && found.id === 0) { errEl.classList.add('show'); return; }
 
-  // Construir payload con campos explícitos y tipados
-  var sessionPayload = {
-    user:    username,
-    role:    found.role,
-    id:      found.id,
-    display: found.display
-  };
+    var sessionPayload = {
+      user:    username,
+      role:    selectedRole === 'admin' && isAdmin ? 'admin' : 'prof',
+      id:      found.id,
+      display: found.display,
+      profeId: found.profeId || found.id
+    };
 
   try {
-    // Guardar bajo clave canónica estricta
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionPayload));
   } catch (e) {
-    // sessionStorage lleno o bloqueado — no redirigir
     errEl.textContent = 'No se pudo iniciar sesión. Verificá los permisos del navegador.';
     errEl.classList.add('show');
     return;

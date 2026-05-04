@@ -29,6 +29,8 @@ function getLab(id) {
 
 // Retorna el ID del profesor de la sesión actual
 function getCurrentProfId() {
+  // In SQL mode, session has profeId; fallback to id for backwards compat
+  if (window.SESSION && window.SESSION.profeId) return window.SESSION.profeId;
   return (window.SESSION && window.SESSION.id) ? window.SESSION.id : 1;
 }
 

@@ -1,198 +1,233 @@
 // ============================================================
-// db.js — Base de datos (localStorage + JSON)
+// db.js — Base de datos SQL (via api.php)
 //
-// ¿Qué hay acá?
-//   • saveDB / loadFromLocalStorage   → persistencia en localStorage
-//   • loadFromJSON                    → carga inicial desde archivos
-//   • exportarDB / importarDB         → backup/restore manual
-//   • resetearDB                      → vuelve a los JSON originales
+// Reemplaza el sistema anterior de localStorage + JSON.
+// Todos los datos se leen y escriben en SQLite a traves de api.php.
 //
-// Depende de: config.js (variables globales de datos)
+// API base: ./api.php/<recurso>[/<id>]
+// Batch load: ./api.php/all  (una sola request al iniciar)
 // ============================================================
 
-// ── Guardar todo el estado en localStorage ──────────────────
-function saveDB() {
-  try {
-    var db = {
-      labs:        LABS,
-      profesores:  PROFESORES,
-      reservas:    RESERVAS,
-      solicitudes: SOLICITUDES,
-      espera:      LISTA_ESPERA,
-      pautas:      PAUTAS,
-      recreos:     RECREOS,
-      nextId:      nextId,
-      savedAt:     new Date().toISOString(),
-    };
-    localStorage.setItem(LS_KEY, JSON.stringify(db));
-  } catch (e) {
-    console.warn('No se pudo guardar en localStorage:', e);
-  }
-}
+var API = './api.php';
 
-// ── Restaurar desde localStorage (retorna true si había datos) ──
-function loadFromLocalStorage() {
-  try {
-    var raw = localStorage.getItem(LS_KEY);
-    if (!raw) return false;
-    var db = JSON.parse(raw);
-    if (!db || !db.labs) return false;
-
-    LABS         = db.labs        || [];
-    PROFESORES   = db.profesores  || [];
-    RESERVAS     = db.reservas    || [];
-    SOLICITUDES  = db.solicitudes || [];
-    LISTA_ESPERA = db.espera      || [];
-    PAUTAS       = db.pautas      || [];
-    RECREOS      = db.recreos     || [];
-    nextId       = db.nextId      || 500;
-    return true;
-  } catch (e) {
-    console.warn('Error al leer localStorage:', e);
-    return false;
-  }
-}
-
-// ── Cargar desde archivos JSON (primer uso o después de reset) ──
-function loadFromJSON(callback) {
-  var archivos = [
-    { key:'labs',        url:'data/labs.json'        },
-    { key:'profesores',  url:'data/profesores.json'  },
-    { key:'reservas',    url:'data/reservas.json'    },
-    { key:'solicitudes', url:'data/solicitudes.json' },
-    { key:'espera',      url:'data/espera.json'      },
-    { key:'pautas',      url:'data/pautas.json'      },
-    { key:'recreos',     url:'data/recreos.json'     },
-  ];
-
-  var results = {};
-  var pending = archivos.length;
-
-  // Normaliza campos numéricos para evitar fallos con ===
-  function normalizar(r) {
-    return Object.assign({}, r, {
-      semanaOffset: parseInt(r.semanaOffset, 10) || 0,
-      dia:          parseInt(r.dia,          10) || 0,
-      modulo:       parseInt(r.modulo,       10) || 0,
-    });
-  }
-
-  function aplicar() {
-    LABS         = results.labs        || [];
-    PROFESORES   = results.profesores  || [];
-    RESERVAS     = (results.reservas    || []).map(normalizar);
-    SOLICITUDES  = (results.solicitudes || []).map(normalizar);
-    LISTA_ESPERA = (results.espera      || []).map(normalizar);
-    PAUTAS       = results.pautas      || [];
-    RECREOS      = results.recreos     || [];
-
-    // Calcular nextId a partir del ID más alto existente
-    var maxId = 0;
-    [RESERVAS, SOLICITUDES, LISTA_ESPERA].forEach(function(arr) {
-      arr.forEach(function(x) { if (x.id > maxId) maxId = x.id; });
-    });
-    nextId = Math.max(500, maxId + 1);
-  }
-
-  archivos.forEach(function(f) {
-    fetch(f.url)
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        results[f.key] = data;
-        pending--;
-        if (pending === 0) { aplicar(); saveDB(); if (callback) callback(); }
-      })
-      .catch(function(err) {
-        console.warn('Error cargando', f.url, err);
-        results[f.key] = [];
-        pending--;
-        if (pending === 0) { aplicar(); if (callback) callback(); }
-      });
+// -- Fetch helper --------------------------------------------
+function apiFetch(endpoint, options) {
+  return fetch(API + '/' + endpoint, Object.assign({
+    headers: { 'Content-Type': 'application/json' }
+  }, options || {}))
+  .then(function(r) {
+    if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || 'Error ' + r.status); });
+    return r.json();
+  })
+  .then(function(json) {
+    if (!json.ok) throw new Error(json.error || 'Error de API');
+    return json.data;
   });
 }
 
-// ── Exportar backup como archivo JSON ───────────────────────
+function apiGet(ep)          { return apiFetch(ep); }
+function apiPost(ep, data)   { return apiFetch(ep, { method: 'POST',   body: JSON.stringify(data) }); }
+function apiPut(ep, data)    { return apiFetch(ep, { method: 'PUT',    body: JSON.stringify(data) }); }
+function apiDelete(ep, data) { return apiFetch(ep, { method: 'DELETE', body: data ? JSON.stringify(data) : undefined }); }
+
+// -- Carga inicial (un solo request) -------------------------
+function loadFromJSON(callback) {
+  apiGet('all').then(function(data) {
+    LABS         = data.labs        || [];
+    PROFESORES   = data.profesores  || [];
+    RESERVAS     = data.reservas    || [];
+    SOLICITUDES  = data.solicitudes || [];
+    LISTA_ESPERA = data.espera      || [];
+    PAUTAS       = (data.pautas || []).map(function(p) { return p.texto; });
+    RECREOS      = [
+      { modulo: 2,  evento: 'Recreo de manana',    notas: '30 min - patio principal' },
+      { modulo: 8,  evento: 'Recreo de tarde',      notas: '30 min - patio y cantina' },
+      { modulo: 13, evento: 'Recreo vespertino',    notas: '20 min - patio' },
+    ];
+    nextId = 500;
+    if (callback) callback();
+  }).catch(function(err) {
+    console.error('[DB] Error cargando datos:', err);
+    if (typeof toast === 'function')
+      toast('Error al conectar con la base de datos. Verificar que api.php este activo.', 'err');
+  });
+}
+
+// localStorage ya no se usa
+function loadFromLocalStorage() { return false; }
+function saveDB() { /* persistencia manejada por la API */ }
+
+// -- RESERVAS CRUD -------------------------------------------
+function dbCrearReserva(datos, callback) {
+  apiPost('reservas', datos).then(function(nueva) {
+    RESERVAS.push(nueva);
+    if (callback) callback(nueva);
+  }).catch(function(e) { toast('Error al guardar reserva: ' + e.message, 'err'); });
+}
+
+function dbEditarReserva(id, datos, callback) {
+  apiPut('reservas/' + id, datos).then(function(actualizada) {
+    var idx = RESERVAS.findIndex(function(r) { return r.id === id; });
+    if (idx >= 0) RESERVAS[idx] = actualizada;
+    if (callback) callback(actualizada);
+  }).catch(function(e) { toast('Error al editar reserva: ' + e.message, 'err'); });
+}
+
+function dbEliminarReserva(id, callback) {
+  apiDelete('reservas/' + id).then(function() {
+    RESERVAS = RESERVAS.filter(function(r) { return r.id !== id; });
+    if (callback) callback();
+  }).catch(function(e) { toast('Error al eliminar reserva: ' + e.message, 'err'); });
+}
+
+function dbEliminarSerieAnual(datos, callback) {
+  apiDelete('reservas/0/serie', datos).then(function() {
+    RESERVAS = RESERVAS.filter(function(r) {
+      return !(r.lab === datos.lab && r.dia === datos.dia &&
+               r.profeId === datos.profeId && r.curso === datos.curso && r.anual);
+    });
+    if (callback) callback();
+  }).catch(function(e) { toast('Error al eliminar serie: ' + e.message, 'err'); });
+}
+
+// -- SOLICITUDES CRUD ----------------------------------------
+function dbCrearSolicitud(datos, callback) {
+  apiPost('solicitudes', datos).then(function(nueva) {
+    SOLICITUDES.push(nueva);
+    if (callback) callback(nueva);
+  }).catch(function(e) { toast('Error al enviar solicitud: ' + e.message, 'err'); });
+}
+
+function dbActualizarSolicitud(id, datos, callback) {
+  apiPut('solicitudes/' + id, datos).then(function(actualizada) {
+    var idx = SOLICITUDES.findIndex(function(s) { return s.id === id; });
+    if (idx >= 0) SOLICITUDES[idx] = actualizada;
+    if (callback) callback(actualizada);
+  }).catch(function(e) { toast('Error al actualizar solicitud: ' + e.message, 'err'); });
+}
+
+function dbEliminarSolicitud(id, callback) {
+  apiDelete('solicitudes/' + id).then(function() {
+    SOLICITUDES = SOLICITUDES.filter(function(s) { return s.id !== id; });
+    if (callback) callback();
+  }).catch(function(e) { toast('Error al eliminar solicitud: ' + e.message, 'err'); });
+}
+
+// -- PROFESORES CRUD -----------------------------------------
+function dbCrearProfesor(datos, callback) {
+  apiPost('profesores', datos).then(function(nuevo) {
+    PROFESORES.push(nuevo);
+    if (callback) callback(nuevo);
+  }).catch(function(e) { toast('Error al guardar docente: ' + e.message, 'err'); });
+}
+
+function dbEditarProfesor(id, datos, callback) {
+  apiPut('profesores/' + id, datos).then(function(actualizado) {
+    var idx = PROFESORES.findIndex(function(p) { return p.id === id; });
+    if (idx >= 0) PROFESORES[idx] = actualizado;
+    if (callback) callback(actualizado);
+  }).catch(function(e) { toast('Error al editar docente: ' + e.message, 'err'); });
+}
+
+function dbEliminarProfesor(id, callback) {
+  apiDelete('profesores/' + id).then(function() {
+    PROFESORES = PROFESORES.filter(function(p) { return p.id !== id; });
+    if (callback) callback();
+  }).catch(function(e) { toast('Error al eliminar docente: ' + e.message, 'err'); });
+}
+
+// -- LABS CRUD -----------------------------------------------
+function dbCrearLab(datos, callback) {
+  apiPost('labs', datos).then(function(nuevo) {
+    LABS.push(nuevo);
+    if (callback) callback(nuevo);
+  }).catch(function(e) { toast('Error al guardar laboratorio: ' + e.message, 'err'); });
+}
+
+function dbEditarLab(id, datos, callback) {
+  apiPut('labs/' + id, datos).then(function(actualizado) {
+    var idx = LABS.findIndex(function(l) { return l.id === id; });
+    if (idx >= 0) LABS[idx] = actualizado;
+    if (callback) callback(actualizado);
+  }).catch(function(e) { toast('Error al editar laboratorio: ' + e.message, 'err'); });
+}
+
+function dbEliminarLab(id, callback) {
+  apiDelete('labs/' + id).then(function() {
+    LABS = LABS.filter(function(l) { return l.id !== id; });
+    if (callback) callback();
+  }).catch(function(e) { toast('Error al eliminar laboratorio: ' + e.message, 'err'); });
+}
+
+// -- LISTA ESPERA CRUD ---------------------------------------
+function dbAgregarEspera(datos, callback) {
+  apiPost('espera', datos).then(function(nueva) {
+    LISTA_ESPERA.push(nueva);
+    if (callback) callback(nueva);
+  }).catch(function(e) { toast('Error al anotar en espera: ' + e.message, 'err'); });
+}
+
+function dbEliminarEspera(id, callback) {
+  apiDelete('espera/' + id).then(function() {
+    LISTA_ESPERA = LISTA_ESPERA.filter(function(e) { return e.id !== id; });
+    if (callback) callback();
+  }).catch(function(e) { toast('Error al quitar de espera: ' + e.message, 'err'); });
+}
+
+// -- PAUTAS CRUD ---------------------------------------------
+var _PAUTAS_CON_ID = [];  // cache de pautas con ID para poder borrar
+
+function dbCrearPauta(texto, callback) {
+  apiPost('pautas', { texto: texto }).then(function(nueva) {
+    _PAUTAS_CON_ID.push(nueva);
+    PAUTAS.push(nueva.texto);
+    if (callback) callback(nueva);
+  }).catch(function(e) { toast('Error al guardar pauta: ' + e.message, 'err'); });
+}
+
+function dbEliminarPauta(index, callback) {
+  apiGet('pautas').then(function(lista) {
+    _PAUTAS_CON_ID = lista;
+    var pauta = lista[index];
+    if (!pauta) throw new Error('Pauta no encontrada');
+    return apiDelete('pautas/' + pauta.id);
+  }).then(function() {
+    PAUTAS.splice(index, 1);
+    if (callback) callback();
+  }).catch(function(e) { toast('Error al eliminar pauta: ' + e.message, 'err'); });
+}
+
+// -- Exportar ------------------------------------------------
 function exportarDB() {
-  var db = {
-    version:     '5',
-    exportadoEn: new Date().toISOString(),
-    labs:        LABS,
-    profesores:  PROFESORES,
-    reservas:    RESERVAS,
-    solicitudes: SOLICITUDES,
-    espera:      LISTA_ESPERA,
-    pautas:      PAUTAS,
-    recreos:     RECREOS,
-  };
-  var blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
-  var url  = URL.createObjectURL(blob);
-  var a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'gestor-laboratorios-backup-' + new Date().toISOString().slice(0, 10) + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('Exportación descargada correctamente.', 'ok');
+  apiGet('all').then(function(data) {
+    var blob = new Blob([JSON.stringify(
+      Object.assign({ version: '6-sql', exportadoEn: new Date().toISOString() }, data),
+      null, 2
+    )], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a   = document.createElement('a');
+    a.href     = url;
+    a.download = 'gestor-laboratorios-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Exportacion descargada correctamente.', 'ok');
+  }).catch(function(e) { toast('Error al exportar: ' + e.message, 'err'); });
 }
 
-// ── Importar backup desde archivo JSON ──────────────────────
 function importarDB() {
-  var input    = document.createElement('input');
-  input.type   = 'file';
-  input.accept = 'application/json,.json';
-
-  input.onchange = function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-
-    var reader    = new FileReader();
-    reader.onload = function(ev) {
-      try {
-        var db = JSON.parse(ev.target.result);
-        if (!db.labs || !db.profesores) {
-          toast('Archivo inválido. Debe ser un backup del sistema.', 'err');
-          return;
-        }
-        confirmar('¿Importar este backup? Se reemplazarán TODOS los datos actuales.', function() {
-          LABS         = db.labs        || [];
-          PROFESORES   = db.profesores  || [];
-          RESERVAS     = db.reservas    || [];
-          SOLICITUDES  = db.solicitudes || [];
-          LISTA_ESPERA = db.espera      || [];
-          PAUTAS       = db.pautas      || [];
-          RECREOS      = db.recreos     || [];
-
-          var maxId = 0;
-          [RESERVAS, SOLICITUDES, LISTA_ESPERA].forEach(function(arr) {
-            arr.forEach(function(x) { if (x.id > maxId) maxId = x.id; });
-          });
-          nextId = Math.max(500, maxId + 1);
-
-          saveDB();
-          toast('Base de datos importada correctamente.', 'ok');
-          renderAll();
-          renderAdmin();
-        });
-      } catch (err) {
-        toast('Error al leer el archivo JSON.', 'err');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  input.click();
+  toast('La importacion directa no esta disponible en modo SQL.', 'warn');
 }
 
-// ── Resetear a los JSON originales ──────────────────────────
 function resetearDB() {
-  confirmar(
-    '<strong>¿Restaurar datos de fábrica?</strong><br><br>Se eliminarán TODOS los cambios y se cargarán los datos originales de los archivos JSON.',
-    function() {
-      localStorage.removeItem(LS_KEY);
-      loadFromJSON(function() {
-        toast('Base de datos restaurada al estado inicial.', 'ok');
-        renderAll();
-        renderAdmin();
-      });
-    }
-  );
+  if (typeof confirmar === 'function') {
+    confirmar('<strong>Recargar datos iniciales?</strong><br><br>Recargara los datos desde la base de datos.',
+      function() {
+        loadFromJSON(function() {
+          toast('Datos recargados.', 'ok');
+          if (typeof renderAll === 'function') renderAll();
+          if (typeof renderAdmin === 'function') renderAdmin();
+        });
+      }
+    );
+  }
 }

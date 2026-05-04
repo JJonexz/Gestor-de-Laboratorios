@@ -729,7 +729,7 @@
   Módulos de JavaScript — cargar EN ESTE ORDEN (cada uno depende del anterior)
   ┌─────────────────────────────────────────────────────────────────┐
   │  config.js      → constantes y estado global                   │
-  │  db.js          → base de datos (localStorage + JSON)          │
+  │  db.js          → base de datos SQL via api.php (SQLite)          │
   │  helpers.js     → utilidades puras (fechas, lookups, roles)    │
   │  ui.js          → toast, modales, UIHelper                     │
   │  nav.js         → navegación entre páginas y filtros           │
@@ -757,5 +757,6 @@
 <script src="js/calendario_escolar.js"></script>
 <script src="js/incidencias.js"></script>
 <script src="js/init.js"></script>
+<script src="js/db-override.js"></script>
 </body>
 </html>
