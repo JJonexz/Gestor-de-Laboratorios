@@ -242,10 +242,25 @@
       <div class="admin-section">
         <div class="admin-section-header">
           <div class="admin-section-title"><span aria-hidden="true">👥</span> Docentes</div>
-          <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;" onclick="abrirModalDocente()">+ Agregar</button>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <label for="admin-sim-repeat" style="font-size:11px;color:var(--muted);font-weight:600;">Simular volumen:</label>
+            <select class="search-input" style="width:auto;padding:4px 8px;font-size:11px;" id="admin-sim-repeat" onchange="cambiarSimulacionProfs(this.value)">
+              <option value="1" selected>Sin repetición (x1)</option>
+              <option value="5">Volumen bajo (x5)</option>
+              <option value="10">Volumen medio (x10)</option>
+              <option value="20">Volumen alto (x20)</option>
+              <option value="50">Stress Test (x50)</option>
+            </select>
+            <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;" onclick="abrirModalDocente()">+ Agregar</button>
+          </div>
         </div>
-        <div class="search-bar"><input class="search-input" type="search" placeholder="Buscar por nombre o materia…" id="search-prof" oninput="renderProfesores()"></div>
+        <div class="search-bar"><input class="search-input" type="search" placeholder="Buscar por nombre o materia…" id="search-prof" oninput="pagActualProfesores=1; renderProfesores()"></div>
         <div style="overflow-x:auto;"><table class="prof-table"><thead><tr><th scope="col">Apellido y nombre</th><th scope="col">Materia</th><th scope="col">Orientación</th><th scope="col">Reservas</th><th scope="col">Acciones</th></tr></thead><tbody id="prof-tbody"></tbody></table></div>
+        <div class="pagination-container" id="prof-pagination">
+          <button class="week-btn" onclick="cambiarPaginaProfesores(-1)">Anterior</button>
+          <span id="prof-pag-info" style="font-size: 12px; font-weight: 600; color: var(--muted);">Página 1 de 1</span>
+          <button class="week-btn" onclick="cambiarPaginaProfesores(1)">Siguiente</button>
+        </div>
       </div>
       <div class="admin-section">
         <div class="admin-section-header">
@@ -387,23 +402,24 @@
         <div class="form-group">
           <label class="form-label" for="f-curso">Curso</label>
           <select class="form-control" id="f-curso" required>
-            <option value="">Seleccionar…</option>
-            <option>1°A</option><option>1°B</option><option>1°C</option>
-            <option>2°A</option><option>2°B</option><option>2°C</option>
-            <option>3°A</option><option>3°B</option>
-            <option>4°A</option><option>4°B</option><option>4°C</option>
-            <option>5°A</option><option>5°B</option>
-            <option>6°A</option><option>6°B</option>
+            <option value="">Seleccionar curso…</option>
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label" for="f-orient">Orientación</label>
-          <select class="form-control" id="f-orient">
-            <option value="info">Informática</option>
-            <option value="const">Construcción</option>
-            <option value="tur">Turismo</option>
-            <option value="bas">Básico</option>
-          </select>
+          <label class="form-label" for="f-materia">Materia / Tema</label>
+          <input type="text" class="form-control" id="f-materia" list="materias-list" placeholder="Ej: Programación" required>
+          <datalist id="materias-list"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Orientación (podés elegir varias)</label>
+          <div class="orient-check-group" id="f-orient-group">
+            <label><input type="checkbox" value="info"> 💻 Info</label>
+            <label><input type="checkbox" value="const"> 🏗️ Const</label>
+            <label><input type="checkbox" value="tur"> 🌐 Tur</label>
+            <label><input type="checkbox" value="bas"> 📚 Bas</label>
+          </div>
         </div>
       </div>
       <!-- Selector de docente — solo visible para directivos -->
@@ -494,13 +510,13 @@
         <input class="form-control" id="edit-secuencia" type="text" placeholder="Tema de la clase" required>
       </div>
       <div class="form-group">
-        <label class="form-label" for="edit-orient">Orientación</label>
-        <select class="form-control" id="edit-orient">
-          <option value="info">💻 Informática</option>
-          <option value="const">🏗️ Construcción</option>
-          <option value="tur">🌐 Turismo</option>
-          <option value="bas">📚 Básico</option>
-        </select>
+        <label class="form-label">Orientación</label>
+        <div class="orient-check-group" id="edit-orient-group">
+          <label><input type="checkbox" value="info"> 💻 Info</label>
+          <label><input type="checkbox" value="const"> 🏗️ Const</label>
+          <label><input type="checkbox" value="tur"> 🌐 Tur</label>
+          <label><input type="checkbox" value="bas"> 📚 Bas</label>
+        </div>
       </div>
       <!-- Selector de docente — solo visible para directivos en edición -->
       <div class="form-group" id="edit-profe-wrap" style="display:none;">
@@ -537,7 +553,15 @@
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label" for="doc-materia">Materia</label><input class="form-control" id="doc-materia" type="text" placeholder="Ej: Programación" required></div>
-        <div class="form-group"><label class="form-label" for="doc-orient">Orientación</label><select class="form-control" id="doc-orient"><option value="info">Informática</option><option value="const">Construcción</option><option value="tur">Turismo</option><option value="bas">Básico</option></select></div>
+        <div class="form-group">
+          <label class="form-label">Orientación</label>
+          <div class="orient-check-group" id="doc-orient-group">
+            <label><input type="checkbox" value="info"> Info</label>
+            <label><input type="checkbox" value="const"> Const</label>
+            <label><input type="checkbox" value="tur"> Tur</label>
+            <label><input type="checkbox" value="bas"> Bas</label>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">

@@ -157,4 +157,25 @@ var UIHelper = {
     }
     el.textContent = initials;
   },
+
+  // Obtener valores de orientación (CSV) de un grupo de checkboxes
+  getOrientValues: function(groupId) {
+    var group = document.getElementById(groupId);
+    if (!group) return 'bas';
+    var vals = [];
+    group.querySelectorAll('input[type="checkbox"]:checked').forEach(function(chk) {
+      vals.push(chk.value);
+    });
+    return vals.length > 0 ? vals.join(',') : 'bas';
+  },
+
+  // Marcar checkboxes de orientación según un string CSV
+  setOrientValues: function(groupId, csv) {
+    var group = document.getElementById(groupId);
+    if (!group) return;
+    var vals = (csv || 'bas').split(',');
+    group.querySelectorAll('input[type="checkbox"]').forEach(function(chk) {
+      chk.checked = vals.indexOf(chk.value) !== -1;
+    });
+  }
 };

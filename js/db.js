@@ -31,14 +31,17 @@ function apiPut(ep, data)    { return apiFetch(ep, { method: 'PUT',    body: JSO
 function apiDelete(ep, data) { return apiFetch(ep, { method: 'DELETE', body: data ? JSON.stringify(data) : undefined }); }
 
 // -- Carga inicial (un solo request) -------------------------
-function loadFromJSON(callback) {
-  apiGet('all').then(function(data) {
+function loadFromJSON(callback, repeatFactor) {
+  var factor = repeatFactor || 1;
+  apiGet('all?repeat=' + factor).then(function(data) {
     LABS         = data.labs        || [];
     PROFESORES   = data.profesores  || [];
     RESERVAS     = data.reservas    || [];
     SOLICITUDES  = data.solicitudes || [];
     LISTA_ESPERA = data.espera      || [];
     PAUTAS       = (data.pautas || []).map(function(p) { return p.texto; });
+    CURSOS       = data.cursos      || [];
+    MATERIAS     = data.materias    || [];
     RECREOS      = [
       { modulo: 2,  evento: 'Recreo de manana',    notas: '30 min - patio principal' },
       { modulo: 8,  evento: 'Recreo de tarde',      notas: '30 min - patio y cantina' },

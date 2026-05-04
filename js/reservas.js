@@ -70,14 +70,8 @@ function poblarSelectsReserva() {
     fPeriodo.innerHTML = opts;
   }
 
-  // Orientaciones
-  var fOrient = document.getElementById('f-orient');
-  if (fOrient) {
-    fOrient.innerHTML = Object.keys(ORIENTACIONES).map(function (k) {
-      var o = ORIENTACIONES[k];
-      return '<option value="' + k + '">' + o.emoji + ' ' + o.nombre + '</option>';
-    }).join('');
-  }
+  // Orientaciones (reset)
+  UIHelper.setOrientValues('f-orient-group', 'bas');
 
   // Profesores (solo para directivos)
   ['f-profe', 'edit-profe'].forEach(function (sid) {
@@ -92,6 +86,24 @@ function poblarSelectsReserva() {
         return '<option value="' + p.id + '">Prof. ' + p.apellido + ', ' + p.nombre + ' — ' + p.materia + '</option>';
       }).join('');
   });
+
+  // Cursos (master table)
+  var fCurso = document.getElementById('f-curso');
+  if (fCurso && CURSOS.length > 0) {
+    fCurso.innerHTML = '<option value="">Seleccionar curso…</option>' +
+      CURSOS.map(function(c) {
+        var label = c.ano + '°' + c.division + (c.turno ? ' ('+c.turno+')' : '');
+        return '<option value="'+label+'">'+label+'</option>';
+      }).join('');
+  }
+
+  // Materias (datalist)
+  var matList = document.getElementById('materias-list');
+  if (matList && MATERIAS.length > 0) {
+    matList.innerHTML = MATERIAS.map(function(m) {
+      return '<option value="'+m.nombre+'">'+m.abreviatura+'</option>';
+    }).join('');
+  }
 }
 
 // ── Abrir modal (botón "Nueva reserva") ──────────────────────
@@ -99,11 +111,11 @@ function abrirModalReserva() {
   poblarSelectsReserva();
 
   // Limpiar campos
-  ['f-lab', 'f-dia', 'f-curso', 'f-secuencia'].forEach(function (id) {
+  ['f-lab', 'f-dia', 'f-curso', 'f-materia', 'f-secuencia'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
-  var orient = document.getElementById('f-orient'); if (orient) orient.value = 'info';
+  UIHelper.setOrientValues('f-orient-group', 'bas');
   var fmod = document.getElementById('f-modulo'); if (fmod) fmod.value = '';
   var fper = document.getElementById('f-periodo'); if (fper) fper.value = '1';
   var cw = document.getElementById('conflict-warning'); if (cw) cw.classList.remove('show');
@@ -139,8 +151,7 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   if (fCurso) fCurso.value = '';
   if (fSeq) fSeq.value = '';
 
-  var orient = document.getElementById('f-orient');
-  if (orient) orient.value = 'info';
+  if (orient) UIHelper.setOrientValues('f-orient-group', 'bas');
 
   checkConflict();
 
@@ -205,8 +216,11 @@ function guardarReserva() {
   var dia = document.getElementById('f-dia').value;
   var modulo = document.getElementById('f-modulo').value;
   var curso = document.getElementById('f-curso').value.trim();
+  var materia = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
   var secuencia = document.getElementById('f-secuencia').value.trim();
-  var orient = document.getElementById('f-orient').value;
+  var orient = UIHelper.getOrientValues('f-orient-group');
+
+  if (materia) secuencia = '[' + materia + '] ' + secuencia;
   var periodoEl = document.getElementById('f-periodo');
   var periodo = periodoEl ? periodoEl.value : '1';
 
@@ -322,11 +336,11 @@ function verDetalle(reservaId) {
   if (!r) return;
 
   var p = getProfe(r.profeId);
-  var ori = ORIENTACIONES[r.orient];
-  var fecha = getDiaDate(r.semanaOffset, r.dia);
-  var mod = getModulo(r.modulo);
-  var pct = (r.cicloClases / 3) * 100;
-  var barClass = r.cicloClases === 3 ? 'danger' : r.cicloClases === 2 ? 'warn' : 'ok';
+  var oris = (r.orient || 'bas').split(',');
+  var orientBadges = oris.map(function(o) {
+    var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+    return '<span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
+  }).join(' ');
 
   var body = document.getElementById('modal-detalle-body');
   if (body) {
@@ -335,7 +349,7 @@ function verDetalle(reservaId) {
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">' + getLab(r.lab).nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[r.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + r.curso + '</div></div>' +
-      '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span></div></div>' +
+      '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><div class="orient-badge-group">' + orientBadges + '</div></div></div>' +
       '<div class="detail-row"><div class="detail-label">Secuencia</div><div class="detail-value" style="font-style:italic;color:var(--muted);">"' + r.secuencia + '"</div></div>' +
       '<div style="margin-top:14px;">' +
       '<div class="ciclo-bar-label">' +
@@ -374,9 +388,11 @@ function verDetalleSolicitud(solId) {
   if (!s) return;
 
   var p = getProfe(s.profeId);
-  var ori = ORIENTACIONES[s.orient];
-  var fecha = getDiaDate(s.semanaOffset, s.dia);
-  var mod = getModulo(s.modulo);
+  var oris = (s.orient || 'bas').split(',');
+  var orientBadges = oris.map(function(o) {
+    var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+    return '<span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
+  }).join(' ');
 
   var body = document.getElementById('modal-detalle-body');
   if (body) {
@@ -390,7 +406,7 @@ function verDetalleSolicitud(solId) {
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">' + getLab(s.lab).nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[s.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + s.curso + '</div></div>' +
-      '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span></div></div>' +
+      '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><div class="orient-badge-group">' + orientBadges + '</div></div></div>' +
       '<div class="detail-row"><div class="detail-label">Secuencia</div><div class="detail-value" style="font-style:italic;color:var(--muted);">"' + s.secuencia + '"</div></div>';
   }
 
@@ -497,7 +513,7 @@ function editarReserva(reservaId) {
   document.getElementById('edit-reserva-id').value = reservaId;
   document.getElementById('edit-curso').value = r.curso;
   document.getElementById('edit-secuencia').value = r.secuencia;
-  document.getElementById('edit-orient').value = r.orient;
+  UIHelper.setOrientValues('edit-orient-group', r.orient);
 
   // Info de contexto (solo lectura)
   var mod = getModulo(r.modulo);
@@ -542,7 +558,7 @@ function guardarEdicionReserva() {
 
   var nuevoCurso = document.getElementById('edit-curso').value.trim();
   var nuevaSecuencia = document.getElementById('edit-secuencia').value.trim();
-  var nuevaOrient = document.getElementById('edit-orient').value;
+  var nuevaOrient = UIHelper.getOrientValues('edit-orient-group');
   var scopeSel = document.getElementById('edit-scope');
   var scope = scopeSel ? scopeSel.value : 'puntual';
 

@@ -84,17 +84,26 @@ function renderSolicitudesAdmin() {
 
 // ── Tabla de docentes con búsqueda ────────────────────────────
 function renderProfesores() {
-  var qEl     = document.getElementById('search-prof');
-  var q       = qEl ? qEl.value.toLowerCase() : '';
-  var tbody   = document.getElementById('prof-tbody');
+  var qEl   = document.getElementById('search-prof');
+  var q     = qEl ? qEl.value.toLowerCase() : '';
+  var tbody = document.getElementById('prof-tbody');
   if (!tbody) return;
 
   var filtered = PROFESORES.filter(function(p) {
     return (p.apellido + ' ' + p.nombre + ' ' + p.materia).toLowerCase().indexOf(q) >= 0;
   });
 
-  tbody.innerHTML = filtered.map(function(p) {
-    var ori     = ORIENTACIONES[p.orientacion] || ORIENTACIONES.bas;
+  // Paginación
+  var totalPags = Math.max(1, Math.ceil(filtered.length / PROFS_PER_PAGE));
+  if (pagActualProfesores > totalPags) pagActualProfesores = totalPags;
+  if (pagActualProfesores < 1) pagActualProfesores = 1;
+
+  var inicio = (pagActualProfesores - 1) * PROFS_PER_PAGE;
+  var fin    = inicio + PROFS_PER_PAGE;
+  var slice  = filtered.slice(inicio, fin);
+
+  tbody.innerHTML = slice.map(function(p) {
+    var ori      = ORIENTACIONES[p.orientacion] || ORIENTACIONES.bas;
     var reservas = RESERVAS.filter(function(r) { return r.profeId === p.id; }).length;
     return (
       '<tr>' +
@@ -115,6 +124,32 @@ function renderProfesores() {
   if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">No se encontraron docentes.</td></tr>';
   }
+
+  // Actualizar info de paginación
+  var info = document.getElementById('prof-pag-info');
+  if (info) info.textContent = 'Página ' + pagActualProfesores + ' de ' + totalPags + ' (' + filtered.length + ' total)';
+}
+
+function cambiarPaginaProfesores(dir) {
+  var qEl = document.getElementById('search-prof');
+  var q   = qEl ? qEl.value.toLowerCase() : '';
+
+  var filtered   = PROFESORES.filter(function(p) {
+    return (p.apellido + ' ' + p.nombre + ' ' + p.materia).toLowerCase().indexOf(q) >= 0;
+  });
+  var totalPags  = Math.max(1, Math.ceil(filtered.length / PROFS_PER_PAGE));
+  pagActualProfesores += dir;
+  if (pagActualProfesores < 1) pagActualProfesores = 1;
+  if (pagActualProfesores > totalPags) pagActualProfesores = totalPags;
+  renderProfesores();
+}
+
+function cambiarSimulacionProfs(valor) {
+  toast('Recargando datos con factor x' + valor + '...', 'info');
+  loadFromJSON(function() {
+    pagActualProfesores = 1;
+    renderAdmin();
+  }, parseInt(valor));
 }
 
 // ── Lista de laboratorios configurables ───────────────────────
@@ -321,6 +356,7 @@ function guardarLab() {
   renderAdmin();
   renderCalendario();
 }
+
 
 function toggleEstadoLab(id) {
   var l = LABS.find(function(x) { return x.id === id; });

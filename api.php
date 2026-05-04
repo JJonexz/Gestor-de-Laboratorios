@@ -58,10 +58,11 @@ function initSchema($pdo) {
             id          INT NOT NULL AUTO_INCREMENT,
             apellido    VARCHAR(50) NOT NULL,
             nombre      VARCHAR(50) NOT NULL,
-            orientacion VARCHAR(10) NOT NULL DEFAULT 'bas',
+            orientacion VARCHAR(50) NOT NULL DEFAULT 'bas',
             materia     VARCHAR(100) NOT NULL DEFAULT '',
             dni_personal INT DEFAULT NULL,
-            PRIMARY KEY (id)
+            PRIMARY KEY (id),
+            UNIQUE KEY (dni_personal)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
         CREATE TABLE IF NOT EXISTS gestor_reservas (
@@ -71,7 +72,7 @@ function initSchema($pdo) {
             modulo       TINYINT NOT NULL,
             lab          VARCHAR(10) NOT NULL,
             curso        VARCHAR(20) NOT NULL,
-            orient       VARCHAR(10) NOT NULL DEFAULT 'bas',
+            orient       VARCHAR(50) NOT NULL DEFAULT 'bas',
             profeId      INT NOT NULL,
             secuencia    VARCHAR(500) NOT NULL DEFAULT '',
             cicloClases  TINYINT NOT NULL DEFAULT 1,
@@ -89,7 +90,7 @@ function initSchema($pdo) {
             modulo            TINYINT NOT NULL,
             lab               VARCHAR(10) NOT NULL,
             curso             VARCHAR(20) NOT NULL,
-            orient            VARCHAR(10) NOT NULL DEFAULT 'bas',
+            orient            VARCHAR(50) NOT NULL DEFAULT 'bas',
             profeId           INT NOT NULL,
             secuencia         VARCHAR(500) NOT NULL DEFAULT '',
             cicloClases       TINYINT NOT NULL DEFAULT 1,
@@ -118,73 +119,62 @@ function initSchema($pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
-    $cnt = $pdo->query('SELECT COUNT(*) FROM gestor_labs')->fetchColumn();
-    if ($cnt == 0) seedInitialData($pdo);
+    syncFromMaster($pdo);
 }
 
-function seedInitialData($pdo) {
-    $pdo->exec("INSERT INTO gestor_labs VALUES
-        ('A','Lab. Informático A',0,20,'Windows 11, Packet Tracer, Visual Studio Code'),
-        ('B','Lab. Informático B',0,24,'Linux Mint, Arduino IDE, Python 3.11'),
-        ('C','Sala Multimedia',0,16,'Proyector 4K, Adobe Suite, cámaras digitales')
-    ");
-
-    $profs = [
-        ['Ces',        'Roberto', 'info', 'Programación'],
-        ['Di Martino', 'Claudia', 'const','Construcciones Civiles'],
-        ['Pieroni',    'Marcelo', 'tur',  'Turismo y Hotelería'],
-        ['Reichert',   'Sandra',  'info', 'Redes y Comunicaciones'],
-        ['Arnaiz',     'Gustavo', 'bas',  'Matemática'],
-        ['Fontana',    'Valeria', 'info', 'Sistemas Operativos'],
-        ['Romero',     'Diego',   'tur',  'Geografía Turística'],
-        ['Salinas',    'Patricia','bas',  'Lengua y Literatura'],
-    ];
-    $matchQ = $pdo->prepare("SELECT dni FROM personal WHERE UPPER(TRIM(apellido)) LIKE UPPER(?) LIMIT 1");
-    $insProf = $pdo->prepare(
-        'INSERT INTO gestor_profesores(apellido,nombre,orientacion,materia,dni_personal) VALUES(?,?,?,?,?)'
-    );
-    foreach ($profs as $p) {
-        $matchQ->execute([$p[0] . '%']);
-        $dni = $matchQ->fetchColumn() ?: null;
-        $insProf->execute([$p[0], $p[1], $p[2], $p[3], $dni]);
+function syncFromMaster($pdo) {
+    // 1. Sincronizar SALONES -> GESTOR_LABS
+    $hasSalones = $pdo->query("SHOW TABLES LIKE 'salones'")->fetch();
+    if ($hasSalones) {
+        // Eliminamos labs de ejemplo (A, B, C) si existen
+        $pdo->exec("DELETE FROM gestor_labs WHERE id IN ('A', 'B', 'C')");
+        // Eliminamos reservas y solicitudes que referencien a los labs viejos
+        $pdo->exec("DELETE FROM gestor_reservas WHERE lab IN ('A', 'B', 'C')");
+        $pdo->exec("DELETE FROM gestor_solicitudes WHERE lab IN ('A', 'B', 'C')");
+        
+        // Insertamos/Actualizamos desde salones
+        $pdo->exec("
+            INSERT IGNORE INTO gestor_labs (id, nombre, capacidad, notas)
+            SELECT 
+                CAST(id_salones AS CHAR), 
+                CONCAT(tipo, ' ', numero), 
+                capacidad, 
+                CONCAT('Ubicación: ', ubicacion)
+            FROM salones
+        ");
     }
 
-    $reservas = [
-        [0,0,0,'A','4°B','info',1,'Introducción a Python: variables y tipos de datos',1,0],
-        [0,0,1,'B','6°A','const',2,'Diseño asistido: planos en AutoCAD',2,0],
-        [0,0,3,'A','3°A','const',2,'Planos estructurales digitales con SketchUp',1,0],
-        [0,0,6,'C','2°C','bas',5,'Funciones cuadráticas con GeoGebra',3,0],
-        [0,0,9,'A','5°A','tur',3,'Diseño de página web turística — maquetado HTML',1,0],
-        [0,0,11,'B','1°B','bas',8,'Introducción a procesadores de texto',2,0],
-        [0,1,0,'B','2°A','bas',5,'Estadística descriptiva con planilla de cálculo',2,0],
-        [0,1,1,'A','5°A','tur',3,'Sistemas de reservas online: Opera PMS',2,0],
-        [0,1,4,'C','4°A','tur',7,'Cartografía digital y Google Earth',1,0],
-        [0,1,6,'A','6°B','info',4,'Configuración de routers Cisco — VLANs',3,1],
-        [0,1,11,'B','3°C','info',6,'Sistemas operativos: instalación de Linux',1,0],
-        [0,2,0,'A','3°B','const',2,'Maquetas 3D con SketchUp: modelado de fachadas',1,0],
-        [0,2,1,'B','6°B','info',4,'Subredes IPv4 y tablas de enrutamiento',2,0],
-        [0,2,3,'C','5°B','tur',3,'Presentaciones multimedia de destinos turísticos',3,0],
-        [0,2,9,'A','1°A','bas',5,'Introducción a la informática: hardware y software',1,0],
-        [0,3,0,'A','2°A','const',2,'Instalaciones eléctricas: simulación en ETAP',2,0],
-        [0,3,1,'B','4°C','info',1,'Algoritmia y estructuras de datos en Python',3,0],
-        [0,4,0,'B','5°A','info',1,'Proyecto final: app de gestión escolar',2,0],
-        [0,4,1,'A','6°A','info',4,'Seguridad en redes: configuración de VPN',1,0],
-    ];
-    $stmt = $pdo->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones) VALUES(?,?,?,?,?,?,?,?,?,?)');
-    foreach ($reservas as $r) $stmt->execute($r);
+    // 2. Sincronizar PERSONAL -> GESTOR_PROFESORES
+    $hasPersonal = $pdo->query("SHOW TABLES LIKE 'personal'")->fetch();
+    if ($hasPersonal) {
+        // Eliminamos profesores de ejemplo si no tienen DNI vinculado
+        $pdo->exec("DELETE FROM gestor_profesores WHERE dni_personal IS NULL");
+        
+        $pdo->exec("
+            INSERT IGNORE INTO gestor_profesores (apellido, nombre, dni_personal, materia)
+            SELECT apellido, nombre, dni, 'Docente'
+            FROM personal
+            WHERE dni > 0 AND apellido <> ''
+        ");
+    }
 
-    $pautas = [
-        'Dejar el aula limpia al salir',
-        'Apagar todos los equipos al finalizar la clase',
-        'Renovar el turno cada 3 clases (ciclo didáctico)',
-        'Registrar la secuencia didáctica al reservar',
-        'No consumir alimentos ni bebidas en el laboratorio',
-        'Reportar desperfectos al personal de mantenimiento',
-        'Respetar el horario asignado — no excederse',
-    ];
-    $s = $pdo->prepare('INSERT INTO gestor_pautas(texto) VALUES(?)');
-    foreach ($pautas as $p) $s->execute([$p]);
+    // Datos iniciales de ejemplo (solo si no hay nada en absoluto)
+    $cntPautas = $pdo->query('SELECT COUNT(*) FROM gestor_pautas')->fetchColumn();
+    if ($cntPautas == 0) {
+        $pautas = [
+            'Dejar el aula limpia al salir',
+            'Apagar todos los equipos al finalizar la clase',
+            'Renovar el turno cada 3 clases (ciclo didáctico)',
+            'Registrar la secuencia didáctica al reservar',
+            'No consumir alimentos ni bebidas en el laboratorio',
+            'Reportar desperfectos al personal de mantenimiento',
+            'Respetar el horario asignado — no excederse',
+        ];
+        $s = $pdo->prepare('INSERT INTO gestor_pautas(texto) VALUES(?)');
+        foreach ($pautas as $p) $s->execute([$p]);
+    }
 }
+
 
 // ── Helpers ──────────────────────────────────────────────────
 function ok($data)  { echo json_encode(['ok'=>true,'data'=>$data], JSON_UNESCAPED_UNICODE); exit; }
@@ -324,7 +314,14 @@ switch ($resource) {
     // ── PROFESORES ────────────────────────────────────────────
     case 'profesores':
         if ($method === 'GET') {
-            ok(castRows($db->query('SELECT id,apellido,nombre,orientacion,materia,dni_personal FROM gestor_profesores ORDER BY apellido')->fetchAll()));
+            $repeat = isset($_GET['repeat']) ? max(1, (int)$_GET['repeat']) : 1;
+            $data = castRows($db->query('SELECT id,apellido,nombre,orientacion,materia,dni_personal FROM gestor_profesores ORDER BY apellido')->fetchAll());
+            if ($repeat > 1) {
+                $expanded = [];
+                for ($i=0; $i<$repeat; $i++) $expanded = array_merge($expanded, $data);
+                $data = $expanded;
+            }
+            ok($data);
         }
         if ($method === 'POST') {
             $b = body();
@@ -452,17 +449,44 @@ switch ($resource) {
         }
         err('Not found',404);
 
+    // ── CURSOS ────────────────────────────────────────────────
+    case 'cursos':
+        if ($method !== 'GET') err('Method not allowed', 405);
+        ok(castRows($db->query('SELECT id, division, ano, turno FROM cursos ORDER BY ano, division')->fetchAll()));
+
+    // ── MATERIAS ──────────────────────────────────────────────
+    case 'materias':
+        if ($method !== 'GET') err('Method not allowed', 405);
+        ok(castRows($db->query('SELECT id, nombre, abreviatura FROM materias ORDER BY nombre')->fetchAll()));
+
     // ── ALL ───────────────────────────────────────────────────
     case 'all':
-        if ($method !== 'GET') err('Method not allowed',405);
-        ok([
+        if ($method !== 'GET') err('Method not allowed', 405);
+        $repeat = isset($_GET['repeat']) ? max(1, (int)$_GET['repeat']) : 1;
+        $profs = castRows($db->query('SELECT id,apellido,nombre,orientacion,materia,dni_personal FROM gestor_profesores ORDER BY apellido')->fetchAll());
+        if ($repeat > 1) {
+            $expanded = [];
+            for ($i=0; $i<$repeat; $i++) $expanded = array_merge($expanded, $profs);
+            $profs = $expanded;
+        }
+
+        $res = [
             'labs'        => $db->query('SELECT * FROM gestor_labs ORDER BY id')->fetchAll(),
-            'profesores'  => castRows($db->query('SELECT id,apellido,nombre,orientacion,materia,dni_personal FROM gestor_profesores ORDER BY apellido')->fetchAll()),
+            'profesores'  => $profs,
             'reservas'    => castRows($db->query('SELECT * FROM gestor_reservas ORDER BY semanaOffset,dia,modulo')->fetchAll()),
             'solicitudes' => castRows($db->query('SELECT * FROM gestor_solicitudes ORDER BY id')->fetchAll()),
             'espera'      => castRows($db->query('SELECT * FROM gestor_espera ORDER BY id')->fetchAll()),
             'pautas'      => castRows($db->query('SELECT * FROM gestor_pautas ORDER BY id')->fetchAll()),
-        ]);
+        ];
+        
+        // Tablas maestras opcionales
+        $hasCursos = $db->query("SHOW TABLES LIKE 'cursos'")->fetch();
+        if ($hasCursos) $res['cursos'] = castRows($db->query('SELECT id, division, ano, turno FROM cursos ORDER BY ano, division')->fetchAll());
+        
+        $hasMaterias = $db->query("SHOW TABLES LIKE 'materias'")->fetch();
+        if ($hasMaterias) $res['materias'] = castRows($db->query('SELECT id, nombre, abreviatura FROM materias ORDER BY nombre')->fetchAll());
+
+        ok($res);
 
     default:
         err('Endpoint not found',404);

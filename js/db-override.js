@@ -13,8 +13,11 @@ guardarReserva = function() {
   var dia      = document.getElementById('f-dia').value;
   var modulo   = document.getElementById('f-modulo').value;
   var curso    = document.getElementById('f-curso').value.trim();
+  var materia  = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
   var secuencia = document.getElementById('f-secuencia').value.trim();
   var orient   = document.getElementById('f-orient').value;
+
+  if (materia) secuencia = '[' + materia + '] ' + secuencia;
   var periodoEl = document.getElementById('f-periodo');
   var periodo  = periodoEl ? periodoEl.value : '1';
   var anualChk = document.querySelector('#modal-reserva #f-anual');

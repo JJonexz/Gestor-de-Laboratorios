@@ -107,13 +107,6 @@ function loadFromLocalStorage() {
   }
 }
 
-function loadFromJSON(callback){
-  var files=[
-    {key:'labs',        url:'data/labs.json'       },
-    {key:'profesores',  url:'data/profesores.json' },
-    {key:'reservas',    url:'data/reservas.json'   },
-    {key:'solicitudes', url:'data/solicitudes.json'},
-    {key:'espera',      url:'data/espera.json'     },
     {key:'pautas',      url:'data/pautas.json'     },
     {key:'recreos',     url:'data/recreos.json'    },
   ];
@@ -461,11 +454,15 @@ function renderCalendario(){
         var s=solicDia.find(function(x){ return x.modulo===mid&&x.lab===lab.id; });
         html+='<td class="at-event-cell">';
         if(r){
-          var oriOk=filtroOrient==='all'||r.orient===filtroOrient;
+          var oris = (r.orient || 'bas').split(',');
+          var oriOk = filtroOrient === 'all' || oris.indexOf(filtroOrient) !== -1;
           if(!oriOk){
             html+='<div class="at-event at-libre" role="button" tabindex="0" onclick="abrirModalReservaSlot('+diaActual+','+mid+',\''+lab.id+'\')" title="Disponible"><span class="at-ev-plus">+</span></div>';
           } else {
-            var ori=ORIENTACIONES[r.orient]; var p=getProfe(r.profeId);
+            // Usar la orientación del filtro para el color, o la primera si es 'all'
+            var colorOriId = (filtroOrient !== 'all') ? filtroOrient : oris[0];
+            var ori = ORIENTACIONES[colorOriId] || ORIENTACIONES.bas;
+            var p = getProfe(r.profeId);
             html+='<div class="at-event '+ori.ev+'" role="button" tabindex="0" onclick="verDetalle('+r.id+')" title="'+r.curso+' — Prof. '+p.apellido+'"><div class="at-ev-curso">'+r.curso+' '+ori.emoji+'</div><div class="at-ev-prof">'+p.apellido+'</div></div>';
           }
         } else if(s){
@@ -1007,21 +1004,55 @@ function renderSolicitudesAdmin(){
   if(count) count.textContent=solic.length?'('+solic.length+')':'';
   if(!solic.length){ el.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">No hay solicitudes pendientes.</td></tr>'; return; }
   el.innerHTML=solic.map(function(s){
-    var p=getProfe(s.profeId); var ori=ORIENTACIONES[s.orient]; var fecha=getDiaDate(s.semanaOffset,s.dia); var mod=getModulo(s.modulo);
-    return '<tr'+(s.esRenovacion?' style="background:#eff6ff"':'')+'><td>Prof. '+p.apellido+'</td><td>Lab.'+s.lab+(s.esRenovacion?'&nbsp;<span style="font-size:9px;font-weight:700;background:var(--navy);color:#fff;padding:1px 4px;border-radius:3px;">RENOV '+s.renovacionNum+'/1</span>':'')+'</td><td>'+DIAS_SEMANA[s.dia]+' '+formatFecha(fecha)+'</td><td>'+mod.label+' ('+mod.inicio+')</td><td>'+s.curso+'</td><td><span class="orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span></td><td><div class="table-actions"><button class="tbl-btn ok" onclick="aceptarSolicitud('+s.id+')">✓ Aprobar</button><button class="tbl-btn danger" onclick="rechazarSolicitud('+s.id+')">✕ Rechazar</button></div></td></tr>';
+    var oris = (s.orient || 'bas').split(',');
+    var orientBadges = oris.map(function(o) {
+      var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+      return '<span class="orient-badge mini ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
+    }).join('');
+    return '<tr'+(s.esRenovacion?' style="background:#eff6ff"':'')+'><td>Prof. '+p.apellido+'</td><td>Lab.'+s.lab+(s.esRenovacion?'&nbsp;<span style="font-size:9px;font-weight:700;background:var(--navy);color:#fff;padding:1px 4px;border-radius:3px;">RENOV '+s.renovacionNum+'/1</span>':'')+'</td><td>'+DIAS_SEMANA[s.dia]+' '+formatFecha(fecha)+'</td><td>'+mod.label+' ('+mod.inicio+')</td><td>'+s.curso+'</td><td><div class="orient-badge-group">'+orientBadges+'</div></td><td><div class="table-actions"><button class="tbl-btn ok" onclick="aceptarSolicitud('+s.id+')">✓ Aprobar</button><button class="tbl-btn danger" onclick="rechazarSolicitud('+s.id+')">✕ Rechazar</button></div></td></tr>';
   }).join('');
 }
 
 function renderProfesores(){
   var qEl=document.getElementById('search-prof'); var q=qEl?qEl.value.toLowerCase():'';
   var tbody=document.getElementById('prof-tbody'); if(!tbody) return;
+
   var filtered=PROFESORES.filter(function(p){ return (p.apellido+' '+p.nombre+' '+p.materia).toLowerCase().indexOf(q)>=0; });
-  tbody.innerHTML=filtered.map(function(p){
-    var ori=ORIENTACIONES[p.orientacion]||ORIENTACIONES.bas;
+  
+  // Paginación
+  var totalPags = Math.max(1, Math.ceil(filtered.length / PROFS_PER_PAGE));
+  if (pagActualProfesores > totalPags) pagActualProfesores = totalPags;
+  
+  var inicio = (pagActualProfesores - 1) * PROFS_PER_PAGE;
+  var fin    = inicio + PROFS_PER_PAGE;
+  var slice  = filtered.slice(inicio, fin);
+
+  tbody.innerHTML=slice.map(function(p){
+    var oris = (p.orientacion || 'bas').split(',');
+    var orientBadges = oris.map(function(o) {
+      var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+      return '<span class="orient-badge mini ' + ori.ob + '">' + ori.emoji + '</span>';
+    }).join('');
     var reservas=RESERVAS.filter(function(r){ return r.profeId===p.id; }).length;
-    return '<tr><td><strong>'+p.apellido+'</strong>, '+p.nombre+'</td><td>'+p.materia+'</td><td><span class="orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span></td><td><strong>'+reservas+'</strong></td><td><div class="table-actions"><button class="tbl-btn" onclick="editarDocente('+p.id+')">✏️ Editar</button><button class="tbl-btn danger" onclick="eliminarDocente('+p.id+')">🗑</button></div></td></tr>';
+    return '<tr><td><strong>'+p.apellido+'</strong>, '+p.nombre+'</td><td>'+p.materia+'</td><td><div class="orient-badge-group">'+orientBadges+'</div></td><td><strong>'+reservas+'</strong></td><td><div class="table-actions"><button class="tbl-btn" onclick="editarDocente('+p.id+')">✏️ Editar</button><button class="tbl-btn danger" onclick="eliminarDocente('+p.id+')">🗑</button></div></td></tr>';
   }).join('');
+  
   if(!filtered.length) tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">No se encontraron docentes.</td></tr>';
+
+  // Actualizar UI de paginación
+  var info = document.getElementById('prof-pag-info');
+  if (info) info.textContent = 'Página ' + pagActualProfesores + ' de ' + totalPags + ' (' + filtered.length + ' total)';
+}
+
+function cambiarPaginaProfesores(dir) {
+  var qEl=document.getElementById('search-prof'); var q=qEl?qEl.value.toLowerCase():'';
+  var filtered=PROFESORES.filter(function(p){ return (p.apellido+' '+p.nombre+' '+p.materia).toLowerCase().indexOf(q)>=0; });
+  
+  var totalPags = Math.max(1, Math.ceil(filtered.length / PROFS_PER_PAGE));
+  pagActualProfesores += dir;
+  if (pagActualProfesores < 1) pagActualProfesores = 1;
+  if (pagActualProfesores > totalPags) pagActualProfesores = totalPags;
+  renderProfesores();
 }
 
 function renderLabsConfig(){
@@ -1037,8 +1068,13 @@ function renderAdminReservas(){
   var filterEl=document.getElementById('admin-filter-orient'); var filterO=filterEl?filterEl.value:'all';
   var filtered=RESERVAS.filter(function(r){ return filterO==='all'||r.orient===filterO; });
   tbody.innerHTML=filtered.map(function(r){
-    var p=getProfe(r.profeId); var ori=ORIENTACIONES[r.orient]; var fecha=getDiaDate(r.semanaOffset,r.dia); var pct=(r.cicloClases/3)*100; var mod=getModulo(r.modulo);
-    return '<tr><td>Prof. '+p.apellido+'</td><td>Lab.'+r.lab+'</td><td>'+DIAS_SEMANA[r.dia]+' '+formatFecha(fecha)+'</td><td>'+mod.label+'</td><td>'+r.curso+'</td><td><span class="orient-badge '+ori.ob+'">'+ori.emoji+' '+ori.nombre+'</span></td><td><div style="display:flex;align-items:center;gap:6px;"><div style="width:40px;background:var(--border);border-radius:20px;height:5px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:var(--navy);border-radius:20px;"></div></div><span style="font-size:11px;color:var(--muted);">'+r.cicloClases+'/3</span></div></td><td><div class="table-actions"><button class="tbl-btn" onclick="verDetalle('+r.id+')">👁 Ver</button><button class="tbl-btn danger" onclick="cancelarReserva('+r.id+')">🗑</button></div></td></tr>';
+    var p=getProfe(r.profeId); var oris=(r.orient||'bas').split(',');
+    var orientBadges = oris.map(function(o) {
+      var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+      return '<span class="orient-badge mini ' + ori.ob + '">' + ori.emoji + '</span>';
+    }).join('');
+    var fecha=getDiaDate(r.semanaOffset,r.dia); var pct=(r.cicloClases/3)*100; var mod=getModulo(r.modulo);
+    return '<tr><td>Prof. '+p.apellido+'</td><td>Lab.'+r.lab+'</td><td>'+DIAS_SEMANA[r.dia]+' '+formatFecha(fecha)+'</td><td>'+mod.label+'</td><td>'+r.curso+'</td><td><div class="orient-badge-group">'+orientBadges+'</div></td><td><div style="display:flex;align-items:center;gap:6px;"><div style="width:40px;background:var(--border);border-radius:20px;height:5px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:var(--navy);border-radius:20px;"></div></div><span style="font-size:11px;color:var(--muted);">'+r.cicloClases+'/3</span></div></td><td><div class="table-actions"><button class="tbl-btn" onclick="verDetalle('+r.id+')">👁 Ver</button><button class="tbl-btn danger" onclick="cancelarReserva('+r.id+')">🗑</button></div></td></tr>';
   }).join('');
   if(!filtered.length) tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">No hay reservas.</td></tr>';
 }
@@ -1058,7 +1094,7 @@ function abrirModalDocente(){
   editDocenteId=null;
   document.getElementById('modal-docente-title').textContent='+ Agregar docente';
   ['doc-apellido','doc-nombre','doc-materia'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
-  var orient=document.getElementById('doc-orient'); if(orient) orient.value='info';
+  UIHelper.setOrientValues('doc-orient-group', 'bas');
   abrirModal('modal-docente');
 }
 function editarDocente(id){
@@ -1067,18 +1103,27 @@ function editarDocente(id){
   document.getElementById('doc-apellido').value=p.apellido;
   document.getElementById('doc-nombre').value=p.nombre;
   document.getElementById('doc-materia').value=p.materia;
-  document.getElementById('doc-orient').value=p.orientacion;
+  UIHelper.setOrientValues('doc-orient-group', p.orientacion);
   abrirModal('modal-docente');
 }
 function guardarDocente(){
   var apellido=document.getElementById('doc-apellido').value.trim();
   var nombre=document.getElementById('doc-nombre').value.trim();
   var materia=document.getElementById('doc-materia').value.trim();
-  var orient=document.getElementById('doc-orient').value;
+  var orient=UIHelper.getOrientValues('doc-orient-group');
   if(!apellido||!nombre||!materia){ toast('Completá todos los campos.','err'); return; }
-  if(editDocenteId){ var p=PROFESORES.find(function(x){ return x.id===editDocenteId; }); if(p){ p.apellido=apellido; p.nombre=nombre; p.materia=materia; p.orientacion=orient; } toast('Docente actualizado.','ok'); }
-  else { nextId++; PROFESORES.push({id:nextId,apellido:apellido,nombre:nombre,materia:materia,orientacion:orient}); toast('Docente agregado.','ok'); }
-  cerrarModal('modal-docente'); saveDB(); renderAdmin();
+  if(editDocenteId){ 
+    dbEditarProfesor(editDocenteId, { apellido: apellido, nombre: nombre, materia: materia, orientacion: orient }, function() {
+      toast('Docente actualizado.','ok');
+      cerrarModal('modal-docente'); renderAdmin();
+    });
+  }
+  else { 
+    dbCrearProfesor({ apellido: apellido, nombre: nombre, materia: materia, orientacion: orient }, function() {
+      toast('Docente agregado.','ok');
+      cerrarModal('modal-docente'); renderAdmin();
+    });
+  }
 }
 function eliminarDocente(id){
   var p=getProfe(id);

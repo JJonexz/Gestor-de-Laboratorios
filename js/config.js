@@ -21,6 +21,8 @@ var modoUsuario  = 'prof';  // 'prof' | 'admin'
 var editDocenteId = null;   // ID del docente que se está editando (null = nuevo)
 var editLabId     = null;   // ID del lab que se está editando (null = nuevo)
 var nextId        = 500;    // Autoincremental para IDs de reservas/solicitudes
+var pagActualProfesores = 1;
+var PROFS_PER_PAGE      = 30;
 
 // ── Nombres de días ─────────────────────────────────────────
 var DIAS_SEMANA = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE'];
@@ -77,6 +79,8 @@ var SOLICITUDES = [];
 var LISTA_ESPERA = [];
 var PAUTAS      = [];
 var RECREOS     = [];
+var CURSOS      = [];
+var MATERIAS    = [];
 
 // ── Clave de localStorage ───────────────────────────────────
 var LS_KEY = 'gestor_eest1_db';
