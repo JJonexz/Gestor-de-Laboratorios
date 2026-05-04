@@ -16,19 +16,16 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem;padding-top:60px;}
-/* Top bar estilo SAEP */
 .top-bar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;padding:0 1.5rem;gap:.85rem;}
 .logo-badge{width:28px;height:28px;background:linear-gradient(135deg,var(--red),#ff6b35);border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:.78rem;flex-shrink:0;}
 .brand-name{color:#fff;font-size:.95rem;font-weight:700;line-height:1.2;}
 .brand-sub{color:rgba(255,255,255,.5);font-size:.65rem;}
-/* Card central */
 .box{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:2rem 2.25rem;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(26,58,107,.08);animation:up .3s ease both;}
 @keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .box-header{text-align:center;margin-bottom:1.5rem;}
 .box-logo{width:44px;height:44px;background:var(--navy);border-radius:6px;display:flex;align-items:center;justify-content:center;margin:0 auto .9rem;font-weight:700;color:#fff;font-size:1.1rem;}
 .box-title{font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:.2rem;}
 .box-sub{font-size:.75rem;color:var(--muted);}
-/* Form */
 .form-group{margin-bottom:.9rem;}
 .form-label{display:block;font-size:.62rem;font-weight:600;color:var(--muted);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em;}
 .form-input{width:100%;padding:.52rem .7rem;border:1px solid var(--border);border-radius:4px;font-family:var(--font);font-size:.85rem;color:var(--text);background:var(--bg);transition:border-color .12s,background .12s;outline:none;}
@@ -37,7 +34,6 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
 .password-wrap{position:relative;}
 .toggle-pass{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:2px;transition:color .12s;}
 .toggle-pass:hover{color:var(--navy);}
-/* Role selector */
 .role-group{margin-bottom:1rem;}
 .role-selector{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:.35rem;}
 .role-btn{border:1px solid var(--border);border-radius:4px;padding:.6rem .5rem;cursor:pointer;background:var(--bg);transition:all .12s;text-align:center;}
@@ -46,18 +42,17 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
 .role-btn.sel{border-color:var(--navy);background:var(--navy-faint);}
 .role-btn.sel .role-btn-label{color:var(--navy);}
 .role-btn:hover:not(.sel){border-color:#b0bedc;}
-/* Button */
 .btn-login{width:100%;padding:.6rem;background:var(--navy);color:#fff;font-family:var(--font);font-size:.82rem;font-weight:600;border:none;border-radius:4px;cursor:pointer;transition:background .12s;margin-top:.25rem;}
 .btn-login:hover{background:var(--navy-dark);}
-/* Error */
+.btn-login:disabled{opacity:.6;cursor:not-allowed;}
 .login-error{background:rgba(230,57,70,.08);border:1px solid rgba(230,57,70,.3);border-radius:4px;padding:.5rem .75rem;font-size:.75rem;color:var(--red);font-weight:600;margin-bottom:.75rem;display:none;}
 .login-error.show{display:block;}
-/* Demo hint */
-.demo-hint{margin-top:1.1rem;padding:.75rem .9rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:.72rem;color:var(--muted);}
-.demo-hint strong{color:var(--navy);display:block;margin-bottom:.35rem;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;}
-.demo-user{display:flex;justify-content:space-between;align-items:center;padding:2px 0;}
-.demo-user span:last-child{background:var(--white);border:1px solid var(--border);border-radius:3px;padding:1px 7px;font-size:.65rem;color:var(--navy);cursor:pointer;font-weight:600;}
-.demo-user span:last-child:hover{background:var(--navy-faint);}
+/* Info de acceso */
+.info-box{margin-top:1.1rem;padding:.75rem .9rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:.72rem;color:var(--muted);}
+.info-box strong{color:var(--navy);display:block;margin-bottom:.35rem;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;}
+.info-row{display:flex;align-items:flex-start;gap:.4rem;padding:3px 0;line-height:1.4;}
+.info-row span:first-child{flex-shrink:0;margin-top:.05rem;}
+.info-sep{border:none;border-top:1px solid var(--border);margin:.5rem 0;}
 @media(max-width:480px){.box{padding:1.5rem 1.25rem;border-radius:8px;}}
 </style>
 </head>
@@ -76,18 +71,25 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
     <div class="box-title">Ingresá a tu cuenta</div>
     <div class="box-sub">Gestión de Laboratorios Informáticos</div>
   </div>
+
   <div class="login-error" id="login-error">Usuario o contraseña incorrectos.</div>
+
   <div class="form-group">
     <label class="form-label">Usuario</label>
-    <input class="form-input" type="text" id="f-usuario" placeholder="Ej: ces.roberto" autocomplete="username" spellcheck="false">
+    <input class="form-input" type="text" id="f-usuario"
+           placeholder="apellido.nombre, DNI o legajo"
+           autocomplete="username" spellcheck="false">
   </div>
+
   <div class="form-group">
     <label class="form-label">Contraseña</label>
     <div class="password-wrap">
-      <input class="form-input" type="password" id="f-pass" placeholder="••••••••" autocomplete="current-password">
+      <input class="form-input" type="password" id="f-pass"
+             placeholder="••••••••" autocomplete="current-password">
       <button class="toggle-pass" type="button" onclick="togglePass()">👁</button>
     </div>
   </div>
+
   <div class="role-group">
     <label class="form-label">Entrás como…</label>
     <div class="role-selector">
@@ -101,17 +103,19 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
       </label>
     </div>
   </div>
-  <button class="btn-login" onclick="doLogin()">Ingresar →</button>
-  <div class="demo-hint">
-    <strong>Accesos de demostración</strong>
-    <div class="demo-user"><span>🧑‍🏫 ces.roberto (docente)</span><span onclick="fillDemo('ces.roberto','ces123','prof')">usar</span></div>
-    <div class="demo-user"><span>👩‍🏫 dimartino.claudia</span><span onclick="fillDemo('dimartino.claudia','dim123','prof')">usar</span></div>
-    <div class="demo-user"><span>🔑 admin (directivo)</span><span onclick="fillDemo('admin','admin123','admin')">usar</span></div>
+
+  <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar →</button>
+
+  <div class="info-box">
+    <strong>¿Cómo ingresar?</strong>
+    <div class="info-row"><span>📋</span><span>Usuario: tu <b>apellido.primerNombre</b>, DNI o número de legajo SAEP</span></div>
+    <div class="info-row"><span>🔑</span><span>Contraseña: la misma que usás en el sistema escolar (por defecto <b>12345</b>)</span></div>
+    <hr class="info-sep">
+    <div class="info-row"><span>ℹ️</span><span>Ejemplos de usuario: <code>ces.leandro</code>, <code>32946869</code> o tu número de legajo</span></div>
   </div>
 </div>
 
 <script>
-// ── Clave canónica de sesión ──
 var SESSION_KEY = 'SAEP_session_data';
 var selectedRole = 'prof';
 
@@ -126,74 +130,88 @@ function togglePass() {
   f.type = (f.type === 'password') ? 'text' : 'password';
 }
 
-function fillDemo(u, p, r) {
-  document.getElementById('f-usuario').value = u;
-  document.getElementById('f-pass').value    = p;
-  selRole(r);
-}
-
 function doLogin() {
   var username = document.getElementById('f-usuario').value.trim().toLowerCase();
   var password = document.getElementById('f-pass').value;
   var errEl    = document.getElementById('login-error');
-  var btn      = document.querySelector('.btn-login');
+  var btn      = document.getElementById('btn-login');
 
   errEl.classList.remove('show');
-  if (btn) { btn.disabled = true; btn.textContent = 'Verificando…'; }
+  errEl.textContent = 'Usuario o contraseña incorrectos.';
 
-  fetch('./api.php/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: username, password: password })
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(json) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Ingresar →'; }
-    if (!json.ok) { errEl.classList.add('show'); return; }
-
-    var found = json.data;
-    // Validar rol seleccionado
-    var isAdmin = (found.role === 'admin' || found.id === 0);
-    if (selectedRole === 'admin' && !isAdmin) { errEl.classList.add('show'); return; }
-    if (selectedRole === 'prof' && isAdmin && found.id === 0) { errEl.classList.add('show'); return; }
-
-    var sessionPayload = {
-      user:    username,
-      role:    selectedRole === 'admin' && isAdmin ? 'admin' : 'prof',
-      id:      found.id,
-      display: found.display,
-      profeId: found.profeId || found.id
-    };
-
-  try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionPayload));
-  } catch (e) {
-    errEl.textContent = 'No se pudo iniciar sesión. Verificá los permisos del navegador.';
+  if (!username || !password) {
+    errEl.textContent = 'Completá usuario y contraseña.';
     errEl.classList.add('show');
     return;
   }
 
-  // replace() en lugar de href: elimina login.html del historial
-  // → el botón "Atrás" del navegador no regresa al formulario
-  window.location.replace('index.html');
+  btn.disabled = true;
+  btn.textContent = 'Verificando…';
+
+  fetch('./api.php/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: username, password: password, role: selectedRole })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(json) {
+    btn.disabled = false;
+    btn.textContent = 'Ingresar →';
+
+    if (!json.ok) {
+      errEl.textContent = json.error || 'Usuario o contraseña incorrectos.';
+      errEl.classList.add('show');
+      return;
+    }
+
+    var found = json.data;
+    var isAdmin = (found.role === 'admin' || found.id === 0);
+
+    // Validar coherencia rol seleccionado / rol devuelto
+    if (selectedRole === 'admin' && !isAdmin) {
+      errEl.textContent = 'No tenés permisos de directivo.';
+      errEl.classList.add('show');
+      return;
+    }
+
+    var sessionPayload = {
+      user:    username,
+      role:    (selectedRole === 'admin' && isAdmin) ? 'admin' : 'prof',
+      id:      found.id,
+      display: found.display,
+      profeId: found.profeId != null ? found.profeId : found.id
+    };
+
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionPayload));
+    } catch(e) {
+      errEl.textContent = 'No se pudo iniciar sesión. Verificá los permisos del navegador.';
+      errEl.classList.add('show');
+      return;
+    }
+
+    window.location.replace('index.html');
+  })
+  .catch(function(e) {
+    btn.disabled = false;
+    btn.textContent = 'Ingresar →';
+    errEl.textContent = 'Error de conexión con el servidor. Verificá que api.php esté disponible.';
+    errEl.classList.add('show');
+  });
 }
 
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') doLogin();
 });
 
-// Auto-redirect si ya existe una sesión válida: misma clave canónica
-(function checkExistingSession() {
+// Auto-redirect si ya hay sesión válida
+(function() {
   try {
     var raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return;
     var parsed = JSON.parse(raw);
-    // Solo redirigir si el payload tiene los campos mínimos esperados
-    if (parsed && parsed.role && parsed.display) {
-      window.location.replace('index.html');
-    }
-  } catch (e) {
-    // JSON corrupto: limpiar silenciosamente y permanecer en login
+    if (parsed && parsed.role && parsed.display) window.location.replace('index.html');
+  } catch(e) {
     sessionStorage.removeItem(SESSION_KEY);
   }
 })();
