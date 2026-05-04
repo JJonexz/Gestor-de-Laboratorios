@@ -1,786 +1,957 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Gestión de Laboratorios · EEST N°1</title>
-<!-- Developed by @Julian_Jonexz -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css"/>
-<link rel="icon" type="image/webp" href="img/logo.webp">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Laboratorios · EEST N°1</title>
+  <!-- Developed by @Julian_Jonexz -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" type="image/webp" href="img/logo.webp">
 </head>
+
 <body>
 
-<a class="skip-link" href="#main-content">Saltar al contenido</a>
+  <a class="skip-link" href="#main-content">Saltar al contenido</a>
 
-<!-- HEADER -->
-<header class="header" role="banner">
-  <div class="header-logo-area">
-    <img src="img/logo.webp" alt="Logo EEST N°1"
-         onerror="this.outerHTML='<div class=\'header-logo-placeholder\' aria-hidden=\'true\'>E1</div>'"/>
-  </div>
-  <div class="header-info">
-    <div class="escuela-nombre">EEST N°1 "Raúl Scalabrini Ortiz"</div>
-    <div class="sistema-nombre">Sistema de Gestión de Laboratorios · MiTécnica</div>
-  </div>
+  <!-- HEADER -->
+  <header class="header" role="banner">
+    <div class="header-logo-area">
+      <img src="img/logo.webp" alt="Logo EEST N°1"
+        onerror="this.outerHTML='<div class=\'header-logo-placeholder\' aria-hidden=\'true\'>E1</div>'" />
+    </div>
+    <div class="header-info">
+      <div class="escuela-nombre">EEST N°1 "Raúl Scalabrini Ortiz"</div>
+      <div class="sistema-nombre">Sistema de Gestión de Laboratorios · MiTécnica</div>
+    </div>
 
-  <nav class="header-nav" role="navigation" aria-label="Navegación principal">
-    <button class="nav-btn active" data-page="calendario" aria-current="page" onclick="irA('calendario')">
-      <span class="nav-icon" aria-hidden="true">📅</span> Calendario
-    </button>
-    <button class="nav-btn" data-page="mis-reservas" aria-current="false" onclick="irA('mis-reservas')">
-      <span class="nav-icon" aria-hidden="true">📋</span> Mis reservas
-    </button>
-    <button class="nav-btn admin-only" data-page="admin" aria-current="false" onclick="irA('admin')" style="display:none;position:relative;">
-      <span class="nav-icon" aria-hidden="true">⚙️</span> Administración
-      <span class="admin-badge" id="admin-badge" role="status" aria-live="polite" style="display:none;"></span>
-    </button>
-    <button class="nav-btn admin-only" data-page="estadisticas" aria-current="false" onclick="irA('estadisticas')" style="display:none;">
-      <span class="nav-icon" aria-hidden="true">📊</span> Estadísticas
-    </button>
-    <button class="nav-btn admin-only" data-page="incidencias" aria-current="false" onclick="irA('incidencias')" style="display:none;position:relative;">
-      <span class="nav-icon" aria-hidden="true">🔧</span> Incidencias
-      <span class="admin-badge" id="incid-badge-nav" role="status" aria-live="polite" style="display:none;"></span>
-    </button>
-    <button class="nav-btn" data-page="fechas-especiales" aria-current="false" onclick="irA('fechas-especiales')">
-      <span class="nav-icon" aria-hidden="true">📅</span> Fechas especiales
-    </button>
-
-    <!-- Botón de notificaciones -->
-    <button class="notif-btn" id="notif-btn" onclick="togglePanelNotif()" aria-label="Notificaciones" aria-haspopup="true">
-      <span style="font-size:16px">🔔</span>
-      <span class="notif-badge" id="notif-badge" style="display:none">0</span>
-    </button>
-
-    <!-- Indicador de sincronización -->
-    <span id="sync-indicator" style="font-size:.72rem;color:rgba(255,255,255,.6);opacity:0;transition:opacity .5s;white-space:nowrap"></span>
-
-    <div class="session-widget" role="navigation" aria-label="Sesión de usuario">
-      <button class="session-trigger" id="session-trigger" onclick="toggleSessionMenu()"
-              aria-haspopup="true" aria-expanded="false" aria-controls="session-menu">
-        <div class="s-avatar" id="s-avatar" aria-hidden="true">?</div>
-        <span class="s-name" id="s-name">Cargando...</span>
-        <span class="s-role" id="s-role">docente</span>
-        <span class="s-caret" aria-hidden="true">▾</span>
+    <nav class="header-nav" role="navigation" aria-label="Navegación principal">
+      <button class="nav-btn active" data-page="calendario" aria-current="page" onclick="irA('calendario')">
+        <span class="nav-icon" aria-hidden="true">📅</span> Calendario
       </button>
-      <div class="session-menu" id="session-menu" role="menu" aria-labelledby="session-trigger">
-        <div class="sm-header">
-          <div class="sm-name" id="sm-name">—</div>
-          <div class="sm-role" id="sm-role">—</div>
+      <button class="nav-btn" data-page="mis-reservas" aria-current="false" onclick="irA('mis-reservas')">
+        <span class="nav-icon" aria-hidden="true">📋</span> Mis reservas
+      </button>
+      <button class="nav-btn admin-only" data-page="admin" aria-current="false" onclick="irA('admin')"
+        style="display:none;position:relative;">
+        <span class="nav-icon" aria-hidden="true">⚙️</span> Administración
+        <span class="admin-badge" id="admin-badge" role="status" aria-live="polite" style="display:none;"></span>
+      </button>
+      <button class="nav-btn admin-only" data-page="estadisticas" aria-current="false" onclick="irA('estadisticas')"
+        style="display:none;">
+        <span class="nav-icon" aria-hidden="true">📊</span> Estadísticas
+      </button>
+      <button class="nav-btn admin-only" data-page="incidencias" aria-current="false" onclick="irA('incidencias')"
+        style="display:none;position:relative;">
+        <span class="nav-icon" aria-hidden="true">🔧</span> Incidencias
+        <span class="admin-badge" id="incid-badge-nav" role="status" aria-live="polite" style="display:none;"></span>
+      </button>
+      <button class="nav-btn" data-page="fechas-especiales" aria-current="false" onclick="irA('fechas-especiales')">
+        <span class="nav-icon" aria-hidden="true">📅</span> Fechas especiales
+      </button>
+
+      <!-- Botón de notificaciones -->
+      <button class="notif-btn" id="notif-btn" onclick="togglePanelNotif()" aria-label="Notificaciones"
+        aria-haspopup="true">
+        <span style="font-size:16px">🔔</span>
+        <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+      </button>
+
+      <!-- Indicador de sincronización -->
+      <span id="sync-indicator"
+        style="font-size:.72rem;color:rgba(255,255,255,.6);opacity:0;transition:opacity .5s;white-space:nowrap"></span>
+
+      <div class="session-widget" role="navigation" aria-label="Sesión de usuario">
+        <button class="session-trigger" id="session-trigger" onclick="toggleSessionMenu()" aria-haspopup="true"
+          aria-expanded="false" aria-controls="session-menu">
+          <div class="s-avatar" id="s-avatar" aria-hidden="true">?</div>
+          <span class="s-name" id="s-name">Cargando...</span>
+          <span class="s-role" id="s-role">docente</span>
+          <span class="s-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="session-menu" id="session-menu" role="menu" aria-labelledby="session-trigger">
+          <div class="sm-header">
+            <div class="sm-name" id="sm-name">—</div>
+            <div class="sm-role" id="sm-role">—</div>
+          </div>
+          <button class="sm-item" role="menuitem" onclick="irA('mis-reservas');closeSessionMenu()"><span
+              aria-hidden="true">📋</span> Mis reservas</button>
+          <div class="sm-sep" role="separator"></div>
+          <button class="sm-item danger" role="menuitem" onclick="cerrarSesion()"><span aria-hidden="true">🚪</span>
+            Cerrar sesión</button>
         </div>
-        <button class="sm-item" role="menuitem" onclick="irA('mis-reservas');closeSessionMenu()"><span aria-hidden="true">📋</span> Mis reservas</button>
-        <div class="sm-sep" role="separator"></div>
-        <button class="sm-item danger" role="menuitem" onclick="cerrarSesion()"><span aria-hidden="true">🚪</span> Cerrar sesión</button>
       </div>
+    </nav>
+
+    <button class="hamburger" id="hamburger" onclick="toggleMobileNav()" aria-label="Menú de navegación"
+      aria-expanded="false" aria-controls="mobile-nav">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <!-- Nav móvil -->
+  <nav class="mobile-nav" id="mobile-nav" role="navigation" aria-label="Menú móvil">
+    <button class="mobile-nav-btn active" data-page="calendario" aria-current="page" onclick="irA('calendario')"><span
+        aria-hidden="true">📅</span> Calendario</button>
+    <button class="mobile-nav-btn" data-page="mis-reservas" aria-current="false" onclick="irA('mis-reservas')"><span
+        aria-hidden="true">📋</span> Mis reservas</button>
+    <button class="mobile-nav-btn admin-only" data-page="admin" aria-current="false" onclick="irA('admin')"
+      style="display:none"><span aria-hidden="true">⚙️</span> Administración</button>
+    <button class="mobile-nav-btn admin-only" data-page="estadisticas" aria-current="false"
+      onclick="irA('estadisticas')" style="display:none"><span aria-hidden="true">📊</span> Estadísticas</button>
+    <button class="mobile-nav-btn admin-only" data-page="incidencias" aria-current="false" onclick="irA('incidencias')"
+      style="display:none"><span aria-hidden="true">🔧</span> Incidencias</button>
+    <button class="mobile-nav-btn" data-page="fechas-especiales" aria-current="false"
+      onclick="irA('fechas-especiales')"><span aria-hidden="true">📅</span> Fechas especiales</button>
+    <div class="mobile-nav-sep">
+      <button class="mobile-nav-btn" onclick="cerrarSesion()"><span aria-hidden="true">🚪</span> Cerrar sesión</button>
     </div>
   </nav>
 
-  <button class="hamburger" id="hamburger" onclick="toggleMobileNav()"
-          aria-label="Menú de navegación" aria-expanded="false" aria-controls="mobile-nav">
-    <span></span><span></span><span></span>
-  </button>
-</header>
-
-<!-- Nav móvil -->
-<nav class="mobile-nav" id="mobile-nav" role="navigation" aria-label="Menú móvil">
-  <button class="mobile-nav-btn active" data-page="calendario" aria-current="page" onclick="irA('calendario')"><span aria-hidden="true">📅</span> Calendario</button>
-  <button class="mobile-nav-btn" data-page="mis-reservas" aria-current="false" onclick="irA('mis-reservas')"><span aria-hidden="true">📋</span> Mis reservas</button>
-  <button class="mobile-nav-btn admin-only" data-page="admin" aria-current="false" onclick="irA('admin')" style="display:none"><span aria-hidden="true">⚙️</span> Administración</button>
-  <button class="mobile-nav-btn admin-only" data-page="estadisticas" aria-current="false" onclick="irA('estadisticas')" style="display:none"><span aria-hidden="true">📊</span> Estadísticas</button>
-  <button class="mobile-nav-btn admin-only" data-page="incidencias" aria-current="false" onclick="irA('incidencias')" style="display:none"><span aria-hidden="true">🔧</span> Incidencias</button>
-  <button class="mobile-nav-btn" data-page="fechas-especiales" aria-current="false" onclick="irA('fechas-especiales')"><span aria-hidden="true">📅</span> Fechas especiales</button>
-  <div class="mobile-nav-sep">
-    <button class="mobile-nav-btn" onclick="cerrarSesion()"><span aria-hidden="true">🚪</span> Cerrar sesión</button>
-  </div>
-</nav>
-
-<!-- ORIENT BAR -->
-<div class="orient-bar" role="tablist" aria-label="Filtrar por orientación">
-  <div class="orient-tab all sel" role="tab" aria-selected="true" tabindex="0" onclick="selOrient(this,'all')" onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'all')">
-    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="8" height="8" rx="1"/><rect x="11" y="1" width="8" height="8" rx="1"/><rect x="1" y="11" width="8" height="8" rx="1"/><rect x="11" y="11" width="8" height="8" rx="1"/></svg>
-    Todas
-  </div>
-  <div class="orient-tab info" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'info')" onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'info')">
-    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="1" y="3" width="18" height="12" rx="2"/><rect x="5" y="17" width="10" height="2" rx="1"/></svg>
-    Informática
-  </div>
-  <div class="orient-tab const" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'const')" onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'const')">
-    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2L3 8v10h5v-5h4v5h5V8L10 2z"/></svg>
-    Construcción
-  </div>
-  <div class="orient-tab tur" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'tur')" onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'tur')">
-    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 2v8l5 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-    Turismo
-  </div>
-  <div class="orient-tab bas" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'bas')" onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'bas')">
-    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="3" y="2" width="11" height="14" rx="1"/><rect x="5" y="4" width="14" height="14" rx="1"/></svg>
-    Básico
-  </div>
-</div>
-
-<!-- APP BODY -->
-<div class="app-body">
-
-  <!-- SIDEBAR -->
-  <aside class="sidebar" aria-label="Panel lateral">
-    <div>
-      <div class="sec-label" id="labs-heading">Laboratorios</div>
-      <div id="sidebar-labs" role="group" aria-labelledby="labs-heading"></div>
+  <!-- ORIENT BAR -->
+  <div class="orient-bar" role="tablist" aria-label="Filtrar por orientación">
+    <div class="orient-tab all sel" role="tab" aria-selected="true" tabindex="0" onclick="selOrient(this,'all')"
+      onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'all')">
+      <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <rect x="1" y="1" width="8" height="8" rx="1" />
+        <rect x="11" y="1" width="8" height="8" rx="1" />
+        <rect x="1" y="11" width="8" height="8" rx="1" />
+        <rect x="11" y="11" width="8" height="8" rx="1" />
+      </svg>
+      Todas
     </div>
-    <div>
-      <div class="sec-label">Esta semana</div>
-      <div class="mini-stats" id="mini-stats" aria-label="Estadísticas de la semana"></div>
+    <div class="orient-tab info" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'info')"
+      onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'info')">
+      <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <rect x="1" y="3" width="18" height="12" rx="2" />
+        <rect x="5" y="17" width="10" height="2" rx="1" />
+      </svg>
+      Informática
     </div>
-    <div>
-      <div class="sec-label">Acciones</div>
-      <button class="cta-btn" onclick="abrirModalReserva()" aria-label="Solicitar nuevo turno de laboratorio">+ Solicitar turno</button>
+    <div class="orient-tab const" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'const')"
+      onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'const')">
+      <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path d="M10 2L3 8v10h5v-5h4v5h5V8L10 2z" />
+      </svg>
+      Construcción
     </div>
-    <div>
-      <div class="sec-label">Pautas del aula</div>
-      <div id="pautas-list" aria-label="Pautas del aula"></div>
+    <div class="orient-tab tur" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'tur')"
+      onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'tur')">
+      <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2" />
+        <path d="M10 2v8l5 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
+      </svg>
+      Turismo
     </div>
-  </aside>
+    <div class="orient-tab bas" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'bas')"
+      onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'bas')">
+      <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <rect x="3" y="2" width="11" height="14" rx="1" />
+        <rect x="5" y="4" width="14" height="14" rx="1" />
+      </svg>
+      Básico
+    </div>
+  </div>
 
-  <!-- CONTENIDO PRINCIPAL -->
-  <main class="content" id="main-content" tabindex="-1">
+  <!-- APP BODY -->
+  <div class="app-body">
 
-    <!-- PÁGINA: CALENDARIO -->
-    <div id="page-calendario" class="page active" role="region" aria-label="Calendario diario">
-      <div class="cal-header">
-        <div class="cal-title" id="cal-title-text" aria-live="polite">Cargando…</div>
-        <div class="cal-controls">
-          <div class="lab-filter-bar" role="group" aria-label="Filtrar por laboratorio">
-            <button class="lab-filter-btn active" id="filt-todos" aria-pressed="true" onclick="setLabFilter('todos')">Todos</button>
-            <span id="lab-filter-btns"></span>
-            <div class="turno-filter-bar" role="group" aria-label="Filtrar por turno horario" style="display:flex;align-items:center;gap:6px;">
-            <select id="filtro-turno"
-                    aria-label="Turno horario"
-                    style="font-family:var(--font,Inter,sans-serif);font-size:.75rem;font-weight:600;padding:.3rem .55rem;border:1px solid var(--border,#dde1e7);border-radius:4px;color:var(--text2,#374151);background:#fff;cursor:pointer;">
-              <option value="todos">🕐 Todos</option>
-              <option value="Mañana">🌅 Mañana</option>
-              <option value="Tarde">☀️ Tarde</option>
-              <option value="Vespertino">🌆 Vespertino</option>
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar" aria-label="Panel lateral">
+      <button class="toggle-btn" id="toggleBtn" aria-label="Ocultar panel lateral" title="Ocultar panel">
+        <svg class="toggle-icon" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="sidebar-inner">
+        <div>
+          <div class="sec-label" id="labs-heading">Laboratorios</div>
+          <div id="sidebar-labs" role="group" aria-labelledby="labs-heading"></div>
+        </div>
+        <div>
+          <div class="sec-label">Esta semana</div>
+          <div class="mini-stats" id="mini-stats" aria-label="Estadísticas de la semana"></div>
+        </div>
+        <div>
+          <div class="sec-label">Acciones</div>
+          <button class="cta-btn" onclick="abrirModalReserva()" aria-label="Solicitar nuevo turno de laboratorio">+
+            Solicitar turno</button>
+        </div>
+        <div>
+          <div class="sec-label">Pautas del aula</div>
+          <div id="pautas-list" aria-label="Pautas del aula"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="content" id="main-content" tabindex="-1">
+
+      <!-- PÁGINA: CALENDARIO -->
+      <div id="page-calendario" class="page active" role="region" aria-label="Calendario diario">
+        <div class="cal-header">
+          <div class="cal-title" id="cal-title-text" aria-live="polite">Cargando…</div>
+          <div class="cal-controls">
+            <div class="lab-filter-bar" role="group" aria-label="Filtrar por laboratorio">
+              <button class="lab-filter-btn active" id="filt-todos" aria-pressed="true"
+                onclick="setLabFilter('todos')">Todos</button>
+              <span id="lab-filter-btns"></span>
+              <div class="turno-filter-bar" role="group" aria-label="Filtrar por turno horario"
+                style="display:flex;align-items:center;gap:6px;">
+                <select id="filtro-turno" aria-label="Turno horario"
+                  style="font-family:var(--font,Inter,sans-serif);font-size:.75rem;font-weight:600;padding:.3rem .55rem;border:1px solid var(--border,#dde1e7);border-radius:4px;color:var(--text2,#374151);background:#fff;cursor:pointer;">
+                  <option value="todos">🕐 Todos</option>
+                  <option value="Mañana">🌅 Mañana</option>
+                  <option value="Tarde">☀️ Tarde</option>
+                  <option value="Vespertino">🌆 Vespertino</option>
+                </select>
+              </div>
+            </div>
+            <div class="week-nav" role="group" aria-label="Navegar semanas">
+              <button class="week-btn" onclick="navSemana(-1)" aria-label="Semana anterior">‹ Semana ant.</button>
+              <button class="week-btn hoy" onclick="irHoy()" aria-label="Ir a hoy">Hoy</button>
+              <button class="week-btn" onclick="navSemana(1)" aria-label="Semana siguiente">Semana sig. ›</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de navegación de días -->
+        <div class="day-nav-container">
+          <button class="day-nav-arrow" onclick="navDia(-1)" aria-label="Día anterior">‹</button>
+          <div class="day-nav-bar" id="day-nav-bar" role="group" aria-label="Seleccionar día"></div>
+          <button class="day-nav-arrow" onclick="navDia(1)" aria-label="Día siguiente">›</button>
+        </div>
+
+        <div class="cal-wrap">
+          <div id="cal-body"></div>
+        </div>
+
+        <div class="bottom-cards">
+          <div class="info-card" role="region" aria-label="Lista de espera">
+            <div class="info-card-title"><span aria-hidden="true">📋</span> Lista de espera</div>
+            <div id="espera-lista"></div>
+          </div>
+          <div class="info-card" role="region" aria-label="Próximos vencimientos">
+            <div class="info-card-title"><span aria-hidden="true">⏰</span> Próximos vencimientos</div>
+            <div id="venc-lista"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PÁGINA: MIS RESERVAS -->
+      <div id="page-mis-reservas" class="page" role="region" aria-label="Mis reservas">
+        <div class="page-header">
+          <div class="page-title-wrap">
+            <div class="page-title" id="mis-reservas-title">Mis reservas</div>
+            <div class="page-sub" id="mis-reservas-sub"></div>
+          </div>
+          <button class="cta-btn" style="width:auto;padding:9px 20px;" onclick="abrirModalReserva()"
+            aria-label="Crear nueva reserva">+ Nueva solicitud</button>
+        </div>
+        <div class="stats-strip" id="mis-stats-strip" aria-label="Estadísticas de mis reservas"></div>
+        <div id="mis-reservas-list" aria-live="polite"></div>
+        <div id="mis-reservas-empty" style="display:none;text-align:center;padding:60px 20px;color:var(--texto-muted);"
+          role="status">
+          <div style="font-size:48px;margin-bottom:12px;" aria-hidden="true">📭</div>
+          <div style="font-weight:800;font-size:16px;color:var(--texto);margin-bottom:6px;">No tenés reservas activas
+          </div>
+          <div style="font-size:13px;">Hacé clic en "+ Nueva solicitud" para comenzar.</div>
+        </div>
+      </div>
+
+      <!-- PÁGINA: ADMINISTRACIÓN -->
+      <div id="page-admin" class="page" role="region" aria-label="Administración">
+        <div class="page-header">
+          <div class="page-title-wrap">
+            <div class="page-title">Administración</div>
+            <div class="page-sub">Panel directivo · EEST N°1</div>
+          </div>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
+            <button onclick="exportarDB()"
+              style="font-family:var(--font);font-size:.72rem;font-weight:600;padding:.35rem .75rem;border-radius:4px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;">⬇
+              Exportar BD</button>
+            <button onclick="importarDB()"
+              style="font-family:var(--font);font-size:.72rem;font-weight:600;padding:.35rem .75rem;border-radius:4px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;">⬆
+              Importar BD</button>
+            <button onclick="resetearDB()"
+              style="font-family:var(--font);font-size:.72rem;font-weight:600;padding:.35rem .75rem;border-radius:4px;border:1px solid var(--red);background:#fff;color:var(--red);cursor:pointer;">↺
+              Resetear</button>
+          </div>
+        </div>
+        <div class="stats-strip" aria-label="Estadísticas generales">
+          <div class="stat-card az">
+            <div class="stat-card-n" id="s-semana">—</div>
+            <div class="stat-card-l">Reservas activas</div>
+          </div>
+          <div class="stat-card am">
+            <div class="stat-card-n" id="s-pendientes">—</div>
+            <div class="stat-card-l">Solicitudes pendientes</div>
+          </div>
+          <div class="stat-card vd">
+            <div class="stat-card-n" id="s-docs">—</div>
+            <div class="stat-card-l">Docentes activos</div>
+          </div>
+          <div class="stat-card rj">
+            <div class="stat-card-n" id="s-labs">—</div>
+            <div class="stat-card-l">Laboratorios</div>
+          </div>
+        </div>
+        <div class="admin-section admin-section-highlight">
+          <div class="admin-section-header">
+            <div class="admin-section-title"><span aria-hidden="true">⏳</span> Solicitudes pendientes <span
+                id="solicitudes-count" class="pending-count-badge" aria-live="polite"></span></div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="prof-table" aria-label="Solicitudes pendientes">
+              <thead>
+                <tr>
+                  <th scope="col">Docente</th>
+                  <th scope="col">Lab</th>
+                  <th scope="col">Día</th>
+                  <th scope="col">Módulo</th>
+                  <th scope="col">Curso</th>
+                  <th scope="col">Orientación</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="solicitudes-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <div class="admin-section-title"><span aria-hidden="true">👥</span> Docentes</div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <label for="admin-sim-repeat" style="font-size:11px;color:var(--muted);font-weight:600;">Simular
+                volumen:</label>
+              <select class="search-input" style="width:auto;padding:4px 8px;font-size:11px;" id="admin-sim-repeat"
+                onchange="cambiarSimulacionProfs(this.value)">
+                <option value="1" selected>Sin repetición (x1)</option>
+                <option value="5">Volumen bajo (x5)</option>
+                <option value="10">Volumen medio (x10)</option>
+                <option value="20">Volumen alto (x20)</option>
+                <option value="50">Stress Test (x50)</option>
+              </select>
+              <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;"
+                onclick="abrirModalDocente()">+ Agregar</button>
+            </div>
+          </div>
+          <div class="search-bar"><input class="search-input" type="search" placeholder="Buscar por nombre o materia…"
+              id="search-prof" oninput="pagActualProfesores=1; renderProfesores()"></div>
+          <div style="overflow-x:auto;">
+            <table class="prof-table">
+              <thead>
+                <tr>
+                  <th scope="col">Apellido y nombre</th>
+                  <th scope="col">Materia</th>
+                  <th scope="col">Orientación</th>
+                  <th scope="col">Reservas</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="prof-tbody"></tbody>
+            </table>
+          </div>
+          <div class="pagination-container" id="prof-pagination">
+            <button class="week-btn" onclick="cambiarPaginaProfesores(-1)">Anterior</button>
+            <span id="prof-pag-info" style="font-size: 12px; font-weight: 600; color: var(--muted);">Página 1 de
+              1</span>
+            <button class="week-btn" onclick="cambiarPaginaProfesores(1)">Siguiente</button>
+          </div>
+        </div>
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <div class="admin-section-title"><span aria-hidden="true">🏫</span> Espacios / Laboratorios</div>
+            <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;" onclick="abrirModalLab()">+
+              Agregar</button>
+          </div>
+          <div id="labs-config-list" role="list"></div>
+        </div>
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <div class="admin-section-title"><span aria-hidden="true">📅</span> Todas las reservas</div>
+            <select class="search-input" style="max-width:200px;padding:7px 10px;font-size:12px;"
+              id="admin-filter-orient" onchange="renderAdminReservas()">
+              <option value="all">Todas las orientaciones</option>
+              <option value="info">Informática</option>
+              <option value="const">Construcción</option>
+              <option value="tur">Turismo</option>
+              <option value="bas">Básico</option>
             </select>
           </div>
+          <div style="overflow-x:auto;">
+            <table class="prof-table">
+              <thead>
+                <tr>
+                  <th scope="col">Docente</th>
+                  <th scope="col">Lab</th>
+                  <th scope="col">Día</th>
+                  <th scope="col">Módulo</th>
+                  <th scope="col">Curso</th>
+                  <th scope="col">Orientación</th>
+                  <th scope="col">Ciclo</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="admin-reservas-tbody"></tbody>
+            </table>
           </div>
-          <div class="week-nav" role="group" aria-label="Navegar semanas">
-            <button class="week-btn" onclick="navSemana(-1)" aria-label="Semana anterior">‹ Semana ant.</button>
-            <button class="week-btn hoy" onclick="irHoy()" aria-label="Ir a hoy">Hoy</button>
-            <button class="week-btn" onclick="navSemana(1)" aria-label="Semana siguiente">Semana sig. ›</button>
+        </div>
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <div class="admin-section-title"><span aria-hidden="true">📌</span> Pautas del aula</div>
+            <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;" onclick="abrirModalPauta()">+
+              Agregar</button>
+          </div>
+          <div id="pautas-admin-list" role="list"></div>
+        </div>
+      </div>
+
+      <!-- PÁGINA: INCIDENCIAS -->
+      <div id="page-incidencias" class="page" role="region" aria-label="Incidencias">
+        <div class="page-header">
+          <div class="page-title-wrap">
+            <div class="page-title">Incidencias y mantenimiento</div>
+            <div class="page-sub">Gestión de problemas técnicos y bloqueos de laboratorios</div>
+          </div>
+        </div>
+        <div class="admin-section admin-section-highlight">
+          <div class="admin-section-header">
+            <div class="admin-section-title">
+              Incidencias reportadas
+              <span class="admin-badge" id="incid-badge"
+                style="display:none;margin-left:6px;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.75rem"></span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <select class="form-control" id="incid-filtro-estado" style="font-size:.8rem;padding:4px 8px;min-width:0"
+                onchange="renderIncidencias()">
+                <option value="activas">Solo activas</option>
+                <option value="todas">Todas</option>
+                <option value="resueltas">Resueltas</option>
+              </select>
+              <button class="tbl-btn" onclick="abrirModalIncidencia()" style="white-space:nowrap">+ Reportar</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="prof-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Laboratorio</th>
+                  <th>Descripción</th>
+                  <th>Reportado por</th>
+                  <th>Estado</th>
+                  <th>Cambiar estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="incidencias-tbody">
+                <tr>
+                  <td colspan="7" style="text-align:center;color:var(--muted);padding:16px">Cargando...</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <!-- Barra de navegación de días -->
-      <div class="day-nav-container">
-        <button class="day-nav-arrow" onclick="navDia(-1)" aria-label="Día anterior">‹</button>
-        <div class="day-nav-bar" id="day-nav-bar" role="group" aria-label="Seleccionar día"></div>
-        <button class="day-nav-arrow" onclick="navDia(1)" aria-label="Día siguiente">›</button>
+      <!-- PÁGINA: FECHAS ESPECIALES -->
+      <div id="page-fechas-especiales" class="page" role="region" aria-label="Fechas especiales">
+        <div class="page-header">
+          <div class="page-title-wrap">
+            <div class="page-title">Calendario escolar</div>
+            <div class="page-sub">Gestión de fechas especiales y eventos institucionales</div>
+          </div>
+        </div>
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <div class="admin-section-title">Fechas y eventos programados</div>
+            <button class="tbl-btn admin-only" onclick="abrirModalEventoEscolar()">+ Agregar fecha</button>
+          </div>
+          <div class="table-wrap">
+            <table class="prof-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Descripción</th>
+                  <th>Fecha / Período</th>
+                  <th>Laboratorio</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="cal-escolar-body">
+                <tr>
+                  <td colspan="5" style="text-align:center;color:var(--muted);padding:16px">Cargando...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      <div class="cal-wrap">
-        <div id="cal-body"></div>
+      <!-- PÁGINA: Estadísticas -->
+      <div id="page-estadisticas" class="page" role="region" aria-label="Estadísticas">
+        <div id="estadisticas-contenido"></div>
       </div>
 
-      <div class="bottom-cards">
-        <div class="info-card" role="region" aria-label="Lista de espera">
-          <div class="info-card-title"><span aria-hidden="true">📋</span> Lista de espera</div>
-          <div id="espera-lista"></div>
-        </div>
-        <div class="info-card" role="region" aria-label="Próximos vencimientos">
-          <div class="info-card-title"><span aria-hidden="true">⏰</span> Próximos vencimientos</div>
-          <div id="venc-lista"></div>
-        </div>
-      </div>
-    </div>
+    </main>
+  </div>
 
-    <!-- PÁGINA: MIS RESERVAS -->
-    <div id="page-mis-reservas" class="page" role="region" aria-label="Mis reservas">
-      <div class="page-header">
-        <div class="page-title-wrap">
-          <div class="page-title" id="mis-reservas-title">Mis reservas</div>
-          <div class="page-sub" id="mis-reservas-sub"></div>
-        </div>
-        <button class="cta-btn" style="width:auto;padding:9px 20px;" onclick="abrirModalReserva()" aria-label="Crear nueva reserva">+ Nueva solicitud</button>
-      </div>
-      <div class="stats-strip" id="mis-stats-strip" aria-label="Estadísticas de mis reservas"></div>
-      <div id="mis-reservas-list" aria-live="polite"></div>
-      <div id="mis-reservas-empty" style="display:none;text-align:center;padding:60px 20px;color:var(--texto-muted);" role="status">
-        <div style="font-size:48px;margin-bottom:12px;" aria-hidden="true">📭</div>
-        <div style="font-weight:800;font-size:16px;color:var(--texto);margin-bottom:6px;">No tenés reservas activas</div>
-        <div style="font-size:13px;">Hacé clic en "+ Nueva solicitud" para comenzar.</div>
-      </div>
-    </div>
+  <!-- MODALES -->
 
-    <!-- PÁGINA: ADMINISTRACIÓN -->
-    <div id="page-admin" class="page" role="region" aria-label="Administración">
-      <div class="page-header">
-        <div class="page-title-wrap">
-          <div class="page-title">Administración</div>
-          <div class="page-sub">Panel directivo · EEST N°1</div>
-        </div>
-        <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
-          <button onclick="exportarDB()" style="font-family:var(--font);font-size:.72rem;font-weight:600;padding:.35rem .75rem;border-radius:4px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;">⬇ Exportar BD</button>
-          <button onclick="importarDB()" style="font-family:var(--font);font-size:.72rem;font-weight:600;padding:.35rem .75rem;border-radius:4px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;">⬆ Importar BD</button>
-          <button onclick="resetearDB()" style="font-family:var(--font);font-size:.72rem;font-weight:600;padding:.35rem .75rem;border-radius:4px;border:1px solid var(--red);background:#fff;color:var(--red);cursor:pointer;">↺ Resetear</button>
-        </div>
+  <!-- Solicitar turno (con selector de período) -->
+  <div class="modal-overlay" id="modal-reserva" role="dialog" aria-modal="true" aria-labelledby="modal-reserva-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-reserva-title"><span aria-hidden="true">📅</span> Solicitar turno</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-reserva')" aria-label="Cerrar modal">✕</button>
       </div>
-      <div class="stats-strip" aria-label="Estadísticas generales">
-        <div class="stat-card az"><div class="stat-card-n" id="s-semana">—</div><div class="stat-card-l">Reservas activas</div></div>
-        <div class="stat-card am"><div class="stat-card-n" id="s-pendientes">—</div><div class="stat-card-l">Solicitudes pendientes</div></div>
-        <div class="stat-card vd"><div class="stat-card-n" id="s-docs">—</div><div class="stat-card-l">Docentes activos</div></div>
-        <div class="stat-card rj"><div class="stat-card-n" id="s-labs">—</div><div class="stat-card-l">Laboratorios</div></div>
-      </div>
-      <div class="admin-section admin-section-highlight">
-        <div class="admin-section-header">
-          <div class="admin-section-title"><span aria-hidden="true">⏳</span> Solicitudes pendientes <span id="solicitudes-count" class="pending-count-badge" aria-live="polite"></span></div>
+      <div class="modal-body">
+        <div class="modal-info-hint" id="reserva-hint" role="note">
+          <span aria-hidden="true">ℹ️</span> Tu solicitud será enviada al directivo para aprobación.
         </div>
-        <div style="overflow-x:auto;"><table class="prof-table" aria-label="Solicitudes pendientes"><thead><tr><th scope="col">Docente</th><th scope="col">Lab</th><th scope="col">Día</th><th scope="col">Módulo</th><th scope="col">Curso</th><th scope="col">Orientación</th><th scope="col">Acciones</th></tr></thead><tbody id="solicitudes-tbody"></tbody></table></div>
-      </div>
-      <div class="admin-section">
-        <div class="admin-section-header">
-          <div class="admin-section-title"><span aria-hidden="true">👥</span> Docentes</div>
-          <div style="display:flex;gap:10px;align-items:center;">
-            <label for="admin-sim-repeat" style="font-size:11px;color:var(--muted);font-weight:600;">Simular volumen:</label>
-            <select class="search-input" style="width:auto;padding:4px 8px;font-size:11px;" id="admin-sim-repeat" onchange="cambiarSimulacionProfs(this.value)">
-              <option value="1" selected>Sin repetición (x1)</option>
-              <option value="5">Volumen bajo (x5)</option>
-              <option value="10">Volumen medio (x10)</option>
-              <option value="20">Volumen alto (x20)</option>
-              <option value="50">Stress Test (x50)</option>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="f-lab">Laboratorio</label>
+            <select class="form-control" id="f-lab" required></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="f-dia">Día</label>
+            <select class="form-control" id="f-dia" required></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="f-modulo">Módulo de inicio</label>
+            <select class="form-control" id="f-modulo" required></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="f-periodo">⏱ Duración / Período</label>
+            <select class="form-control" id="f-periodo">
+              <option value="1">1 hora (módulo individual)</option>
+              <option value="2">2 horas consecutivas</option>
+              <option value="4">4 horas consecutivas</option>
+              <option value="turno_Mañana">🌅 Turno completo Mañana</option>
+              <option value="turno_Tarde">☀️ Turno completo Tarde</option>
+              <option value="turno_Vespertino">🌆 Turno completo Vespertino</option>
             </select>
-            <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;" onclick="abrirModalDocente()">+ Agregar</button>
           </div>
         </div>
-        <div class="search-bar"><input class="search-input" type="search" placeholder="Buscar por nombre o materia…" id="search-prof" oninput="pagActualProfesores=1; renderProfesores()"></div>
-        <div style="overflow-x:auto;"><table class="prof-table"><thead><tr><th scope="col">Apellido y nombre</th><th scope="col">Materia</th><th scope="col">Orientación</th><th scope="col">Reservas</th><th scope="col">Acciones</th></tr></thead><tbody id="prof-tbody"></tbody></table></div>
-        <div class="pagination-container" id="prof-pagination">
-          <button class="week-btn" onclick="cambiarPaginaProfesores(-1)">Anterior</button>
-          <span id="prof-pag-info" style="font-size: 12px; font-weight: 600; color: var(--muted);">Página 1 de 1</span>
-          <button class="week-btn" onclick="cambiarPaginaProfesores(1)">Siguiente</button>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="f-curso">Curso</label>
+            <select class="form-control" id="f-curso" required>
+              <option value="">Seleccionar curso…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="f-materia">Materia / Tema</label>
+            <input type="text" class="form-control" id="f-materia" list="materias-list" placeholder="Ej: Programación"
+              required>
+            <datalist id="materias-list"></datalist>
+          </div>
         </div>
-      </div>
-      <div class="admin-section">
-        <div class="admin-section-header">
-          <div class="admin-section-title"><span aria-hidden="true">🏫</span> Espacios / Laboratorios</div>
-          <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;" onclick="abrirModalLab()">+ Agregar</button>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Orientación (podés elegir varias)</label>
+            <div class="orient-check-group" id="f-orient-group">
+              <label><input type="checkbox" value="info"> 💻 Info</label>
+              <label><input type="checkbox" value="const"> 🏗️ Const</label>
+              <label><input type="checkbox" value="tur"> 🌐 Tur</label>
+              <label><input type="checkbox" value="bas"> 📚 Bas</label>
+            </div>
+          </div>
         </div>
-        <div id="labs-config-list" role="list"></div>
-      </div>
-      <div class="admin-section">
-        <div class="admin-section-header">
-          <div class="admin-section-title"><span aria-hidden="true">📅</span> Todas las reservas</div>
-          <select class="search-input" style="max-width:200px;padding:7px 10px;font-size:12px;" id="admin-filter-orient" onchange="renderAdminReservas()">
-            <option value="all">Todas las orientaciones</option>
-            <option value="info">Informática</option>
-            <option value="const">Construcción</option>
-            <option value="tur">Turismo</option>
-            <option value="bas">Básico</option>
-          </select>
+        <!-- Selector de docente — solo visible para directivos -->
+        <div class="form-group" id="f-profe-wrap" style="display:none;">
+          <label class="form-label" for="f-profe">👤 Asignar docente</label>
+          <select class="form-control" id="f-profe"></select>
         </div>
-        <div style="overflow-x:auto;"><table class="prof-table"><thead><tr><th scope="col">Docente</th><th scope="col">Lab</th><th scope="col">Día</th><th scope="col">Módulo</th><th scope="col">Curso</th><th scope="col">Orientación</th><th scope="col">Ciclo</th><th scope="col">Acciones</th></tr></thead><tbody id="admin-reservas-tbody"></tbody></table></div>
-      </div>
-      <div class="admin-section">
-        <div class="admin-section-header">
-          <div class="admin-section-title"><span aria-hidden="true">📌</span> Pautas del aula</div>
-          <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;" onclick="abrirModalPauta()">+ Agregar</button>
+        <div class="form-group">
+          <label class="form-label" for="f-secuencia">Secuencia didáctica</label>
+          <textarea class="form-control" id="f-secuencia" rows="3" placeholder="¿Qué harán en el laboratorio?"
+            required></textarea>
         </div>
-        <div id="pautas-admin-list" role="list"></div>
-      </div>
-    </div>
+        <div class="conflict-warning" id="conflict-warning" role="alert">
+          ⚠️ Ese horario ya está ocupado o tiene una solicitud pendiente.
+        </div>
 
-<!-- PÁGINA: INCIDENCIAS -->
-<div id="page-incidencias" class="page" role="region" aria-label="Incidencias">
-  <div class="page-header">
-    <div class="page-title-wrap">
-      <div class="page-title">Incidencias y mantenimiento</div>
-      <div class="page-sub">Gestión de problemas técnicos y bloqueos de laboratorios</div>
+        <!-- RESERVA ANUAL — solo visible para directivos (app.js controla display) -->
+        <div id="f-anual-wrap" class="admin-only"
+          style="display:none;margin-top:10px;padding:10px 14px;background:var(--navy-faint,#eef2f9);border-radius:6px;border:1px solid #c7d4ee;">
+          <label
+            style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy,#1a3a6b);">
+            <input type="checkbox" id="f-anual"
+              style="width:15px;height:15px;cursor:pointer;accent-color:var(--navy,#1a3a6b);">
+            📆 Asignar para todo el año lectivo
+          </label>
+          <div style="font-size:11px;color:var(--muted,#6b7280);margin-top:4px;padding-left:25px;">
+            Se generarán entradas semana a semana para el resto del ciclo lectivo (~40 semanas).
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-reserva')">Cancelar</button>
+        <button class="btn-ok" onclick="guardarReserva()">Enviar solicitud</button>
+      </div>
     </div>
   </div>
-  <div class="admin-section admin-section-highlight">
-    <div class="admin-section-header">
-      <div class="admin-section-title">
-        Incidencias reportadas
-        <span class="admin-badge" id="incid-badge" style="display:none;margin-left:6px;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.75rem"></span>
+
+  <!-- Ver detalle -->
+  <div class="modal-overlay" id="modal-detalle" role="dialog" aria-modal="true" aria-labelledby="modal-detalle-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-detalle-title"><span aria-hidden="true">📋</span> Detalle del turno</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-detalle')" aria-label="Cerrar detalle">✕</button>
       </div>
-      <div style="display:flex;gap:8px">
-        <select class="form-control" id="incid-filtro-estado" style="font-size:.8rem;padding:4px 8px;min-width:0" onchange="renderIncidencias()">
-          <option value="activas">Solo activas</option>
-          <option value="todas">Todas</option>
-          <option value="resueltas">Resueltas</option>
-        </select>
-        <button class="tbl-btn" onclick="abrirModalIncidencia()" style="white-space:nowrap">+ Reportar</button>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table class="prof-table">
-        <thead><tr>
-          <th>Tipo</th><th>Laboratorio</th><th>Descripción</th>
-          <th>Reportado por</th><th>Estado</th><th>Cambiar estado</th><th></th>
-        </tr></thead>
-        <tbody id="incidencias-tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">Cargando...</td></tr></tbody>
-      </table>
+      <div class="modal-body" id="modal-detalle-body"></div>
+      <div class="modal-footer" id="modal-detalle-footer"></div>
     </div>
   </div>
-</div>
 
-<!-- PÁGINA: FECHAS ESPECIALES -->
-<div id="page-fechas-especiales" class="page" role="region" aria-label="Fechas especiales">
-  <div class="page-header">
-    <div class="page-title-wrap">
-      <div class="page-title">Calendario escolar</div>
-      <div class="page-sub">Gestión de fechas especiales y eventos institucionales</div>
+  <!-- Editar recreo -->
+  <div class="modal-overlay" id="modal-recreo" role="dialog" aria-modal="true" aria-labelledby="modal-recreo-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-recreo-title">☕ Recreo</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-recreo')" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="recreo-modulo-id" value="">
+        <div class="form-group">
+          <label class="form-label" for="recreo-evento">Nombre del evento</label>
+          <input class="form-control" id="recreo-evento" type="text" placeholder="Ej: Recreo de mañana" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="recreo-notas">Notas (lugar, duración, etc.)</label>
+          <input class="form-control" id="recreo-notas" type="text" placeholder="Ej: 30 min · patio">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-recreo')">Cancelar</button>
+        <button class="btn-ok" onclick="guardarRecreo()">Guardar</button>
+      </div>
     </div>
   </div>
-  <div class="admin-section">
-    <div class="admin-section-header">
-      <div class="admin-section-title">Fechas y eventos programados</div>
-      <button class="tbl-btn admin-only" onclick="abrirModalEventoEscolar()">+ Agregar fecha</button>
-    </div>
-    <div class="table-wrap">
-      <table class="prof-table">
-        <thead><tr>
-          <th>Tipo</th><th>Descripción</th><th>Fecha / Período</th><th>Laboratorio</th><th></th>
-        </tr></thead>
-        <tbody id="cal-escolar-body"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">Cargando...</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-</div>
 
-<!-- PÁGINA: Estadísticas -->
-<div id="page-estadisticas" class="page" role="region" aria-label="Estadísticas">
-  <div id="estadisticas-contenido"></div>
-</div>
-
-  </main>
-</div>
-
-<!-- MODALES -->
-
-<!-- Solicitar turno (con selector de período) -->
-<div class="modal-overlay" id="modal-reserva" role="dialog" aria-modal="true" aria-labelledby="modal-reserva-title">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="modal-reserva-title"><span aria-hidden="true">📅</span> Solicitar turno</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-reserva')" aria-label="Cerrar modal">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-info-hint" id="reserva-hint" role="note">
-        <span aria-hidden="true">ℹ️</span> Tu solicitud será enviada al directivo para aprobación.
+  <!-- Editar reserva existente -->
+  <div class="modal-overlay" id="modal-editar-reserva" role="dialog" aria-modal="true"
+    aria-labelledby="modal-editar-reserva-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-editar-reserva-title"><span aria-hidden="true">✎</span> Editar reserva</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-editar-reserva')" aria-label="Cerrar">✕</button>
       </div>
-      <div class="form-row">
+      <div class="modal-body">
+        <input type="hidden" id="edit-reserva-id" value="">
+        <div class="modal-info-hint" id="edit-info-contexto" role="note" style="margin-bottom:.9rem;"></div>
         <div class="form-group">
-          <label class="form-label" for="f-lab">Laboratorio</label>
-          <select class="form-control" id="f-lab" required></select>
+          <label class="form-label" for="edit-curso">Curso</label>
+          <input class="form-control" id="edit-curso" type="text" placeholder="Ej: 4°B" required>
         </div>
         <div class="form-group">
-          <label class="form-label" for="f-dia">Día</label>
-          <select class="form-control" id="f-dia" required></select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="f-modulo">Módulo de inicio</label>
-          <select class="form-control" id="f-modulo" required></select>
+          <label class="form-label" for="edit-secuencia">Secuencia didáctica</label>
+          <input class="form-control" id="edit-secuencia" type="text" placeholder="Tema de la clase" required>
         </div>
         <div class="form-group">
-          <label class="form-label" for="f-periodo">⏱ Duración / Período</label>
-          <select class="form-control" id="f-periodo">
-            <option value="1">1 hora (módulo individual)</option>
-            <option value="2">2 horas consecutivas</option>
-            <option value="4">4 horas consecutivas</option>
-            <option value="turno_Mañana">🌅 Turno completo Mañana</option>
-            <option value="turno_Tarde">☀️ Turno completo Tarde</option>
-            <option value="turno_Vespertino">🌆 Turno completo Vespertino</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="f-curso">Curso</label>
-          <select class="form-control" id="f-curso" required>
-            <option value="">Seleccionar curso…</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="f-materia">Materia / Tema</label>
-          <input type="text" class="form-control" id="f-materia" list="materias-list" placeholder="Ej: Programación" required>
-          <datalist id="materias-list"></datalist>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Orientación (podés elegir varias)</label>
-          <div class="orient-check-group" id="f-orient-group">
+          <label class="form-label">Orientación</label>
+          <div class="orient-check-group" id="edit-orient-group">
             <label><input type="checkbox" value="info"> 💻 Info</label>
             <label><input type="checkbox" value="const"> 🏗️ Const</label>
             <label><input type="checkbox" value="tur"> 🌐 Tur</label>
             <label><input type="checkbox" value="bas"> 📚 Bas</label>
           </div>
         </div>
-      </div>
-      <!-- Selector de docente — solo visible para directivos -->
-      <div class="form-group" id="f-profe-wrap" style="display:none;">
-        <label class="form-label" for="f-profe">👤 Asignar docente</label>
-        <select class="form-control" id="f-profe"></select>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="f-secuencia">Secuencia didáctica</label>
-        <textarea class="form-control" id="f-secuencia" rows="3" placeholder="¿Qué harán en el laboratorio?" required></textarea>
-      </div>
-      <div class="conflict-warning" id="conflict-warning" role="alert">
-        ⚠️ Ese horario ya está ocupado o tiene una solicitud pendiente.
-      </div>
-
-      <!-- RESERVA ANUAL — solo visible para directivos (app.js controla display) -->
-  <div id="f-anual-wrap" class="admin-only" style="display:none;margin-top:10px;padding:10px 14px;background:var(--navy-faint,#eef2f9);border-radius:6px;border:1px solid #c7d4ee;">
-    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy,#1a3a6b);">
-      <input type="checkbox" id="f-anual" style="width:15px;height:15px;cursor:pointer;accent-color:var(--navy,#1a3a6b);">
-      📆 Asignar para todo el año lectivo
-    </label>
-    <div style="font-size:11px;color:var(--muted,#6b7280);margin-top:4px;padding-left:25px;">
-     Se generarán entradas semana a semana para el resto del ciclo lectivo (~40 semanas).
-    </div>
-  </div>
-
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-reserva')">Cancelar</button>
-      <button class="btn-ok" onclick="guardarReserva()">Enviar solicitud</button>
-    </div>
-  </div>
-</div>
-
-<!-- Ver detalle -->
-<div class="modal-overlay" id="modal-detalle" role="dialog" aria-modal="true" aria-labelledby="modal-detalle-title">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3 id="modal-detalle-title"><span aria-hidden="true">📋</span> Detalle del turno</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-detalle')" aria-label="Cerrar detalle">✕</button>
-    </div>
-    <div class="modal-body" id="modal-detalle-body"></div>
-    <div class="modal-footer" id="modal-detalle-footer"></div>
-  </div>
-</div>
-
-<!-- Editar recreo -->
-<div class="modal-overlay" id="modal-recreo" role="dialog" aria-modal="true" aria-labelledby="modal-recreo-title">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3 id="modal-recreo-title">☕ Recreo</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-recreo')" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="recreo-modulo-id" value="">
-      <div class="form-group">
-        <label class="form-label" for="recreo-evento">Nombre del evento</label>
-        <input class="form-control" id="recreo-evento" type="text" placeholder="Ej: Recreo de mañana" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="recreo-notas">Notas (lugar, duración, etc.)</label>
-        <input class="form-control" id="recreo-notas" type="text" placeholder="Ej: 30 min · patio">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-recreo')">Cancelar</button>
-      <button class="btn-ok" onclick="guardarRecreo()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Editar reserva existente -->
-<div class="modal-overlay" id="modal-editar-reserva" role="dialog" aria-modal="true" aria-labelledby="modal-editar-reserva-title">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3 id="modal-editar-reserva-title"><span aria-hidden="true">✎</span> Editar reserva</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-editar-reserva')" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="edit-reserva-id" value="">
-      <div class="modal-info-hint" id="edit-info-contexto" role="note" style="margin-bottom:.9rem;"></div>
-      <div class="form-group">
-        <label class="form-label" for="edit-curso">Curso</label>
-        <input class="form-control" id="edit-curso" type="text" placeholder="Ej: 4°B" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="edit-secuencia">Secuencia didáctica</label>
-        <input class="form-control" id="edit-secuencia" type="text" placeholder="Tema de la clase" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Orientación</label>
-        <div class="orient-check-group" id="edit-orient-group">
-          <label><input type="checkbox" value="info"> 💻 Info</label>
-          <label><input type="checkbox" value="const"> 🏗️ Const</label>
-          <label><input type="checkbox" value="tur"> 🌐 Tur</label>
-          <label><input type="checkbox" value="bas"> 📚 Bas</label>
+        <!-- Selector de docente — solo visible para directivos en edición -->
+        <div class="form-group" id="edit-profe-wrap" style="display:none;">
+          <label class="form-label" for="edit-profe">👤 Docente asignado</label>
+          <select class="form-control" id="edit-profe"></select>
+        </div>
+        <div class="form-group" id="edit-scope-wrap" style="display:none;">
+          <label class="form-label" for="edit-scope">¿Qué reservas modificar?</label>
+          <select class="form-control" id="edit-scope">
+            <option value="puntual">Solo esta reserva (semana actual)</option>
+            <option value="siguientes" id="opt-siguientes">Esta y todas las siguientes</option>
+            <option value="anual" id="opt-anual" style="display:none;">Anual (todo el año lectivo)</option>
+          </select>
         </div>
       </div>
-      <!-- Selector de docente — solo visible para directivos en edición -->
-      <div class="form-group" id="edit-profe-wrap" style="display:none;">
-        <label class="form-label" for="edit-profe">👤 Docente asignado</label>
-        <select class="form-control" id="edit-profe"></select>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-editar-reserva')">Cancelar</button>
+        <button class="btn-ok" onclick="guardarEdicionReserva()">Guardar cambios</button>
       </div>
-      <div class="form-group" id="edit-scope-wrap" style="display:none;">
-        <label class="form-label" for="edit-scope">¿Qué reservas modificar?</label>
-        <select class="form-control" id="edit-scope">
-          <option value="puntual">Solo esta reserva (semana actual)</option>
-          <option value="siguientes" id="opt-siguientes">Esta y todas las siguientes</option>
-          <option value="anual" id="opt-anual" style="display:none;">Anual (todo el año lectivo)</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-editar-reserva')">Cancelar</button>
-      <button class="btn-ok" onclick="guardarEdicionReserva()">Guardar cambios</button>
     </div>
   </div>
-</div>
 
-<!-- Agregar/editar docente -->
-<div class="modal-overlay" id="modal-docente" role="dialog" aria-modal="true" aria-labelledby="modal-docente-title">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3 id="modal-docente-title"><span aria-hidden="true">👤</span> Agregar docente</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-docente')" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="form-group"><label class="form-label" for="doc-apellido">Apellido</label><input class="form-control" id="doc-apellido" type="text" placeholder="Ej: González" required></div>
-        <div class="form-group"><label class="form-label" for="doc-nombre">Nombre</label><input class="form-control" id="doc-nombre" type="text" placeholder="Ej: María" required></div>
+  <!-- Agregar/editar docente -->
+  <div class="modal-overlay" id="modal-docente" role="dialog" aria-modal="true" aria-labelledby="modal-docente-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-docente-title"><span aria-hidden="true">👤</span> Agregar docente</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-docente')" aria-label="Cerrar">✕</button>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label" for="doc-materia">Materia</label><input class="form-control" id="doc-materia" type="text" placeholder="Ej: Programación" required></div>
-        <div class="form-group">
-          <label class="form-label">Orientación</label>
-          <div class="orient-check-group" id="doc-orient-group">
-            <label><input type="checkbox" value="info"> Info</label>
-            <label><input type="checkbox" value="const"> Const</label>
-            <label><input type="checkbox" value="tur"> Tur</label>
-            <label><input type="checkbox" value="bas"> Bas</label>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="doc-apellido">Apellido</label><input
+              class="form-control" id="doc-apellido" type="text" placeholder="Ej: González" required></div>
+          <div class="form-group"><label class="form-label" for="doc-nombre">Nombre</label><input class="form-control"
+              id="doc-nombre" type="text" placeholder="Ej: María" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="doc-materia">Materia</label><input class="form-control"
+              id="doc-materia" type="text" placeholder="Ej: Programación" required></div>
+          <div class="form-group">
+            <label class="form-label">Orientación</label>
+            <div class="orient-check-group" id="doc-orient-group">
+              <label><input type="checkbox" value="info"> Info</label>
+              <label><input type="checkbox" value="const"> Const</label>
+              <label><input type="checkbox" value="tur"> Tur</label>
+              <label><input type="checkbox" value="bas"> Bas</label>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-docente')">Cancelar</button>
-      <button class="btn-ok" onclick="guardarDocente()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Agregar/editar espacio -->
-<div class="modal-overlay" id="modal-lab" role="dialog" aria-modal="true" aria-labelledby="modal-lab-title">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3 id="modal-lab-title"><span aria-hidden="true">🏫</span> Agregar espacio</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-lab')" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label" for="lab-nombre">Nombre del espacio</label><input class="form-control" id="lab-nombre" type="text" placeholder="Ej: Lab. Informático C" required></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label" for="lab-capacidad">Capacidad</label><input class="form-control" id="lab-capacidad" type="number" min="1" placeholder="Ej: 20"></div>
-        <div class="form-group"><label class="form-label" for="lab-estado">Estado</label><select class="form-control" id="lab-estado"><option value="libre">Disponible</option><option value="ocupado">En mantenimiento</option></select></div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-docente')">Cancelar</button>
+        <button class="btn-ok" onclick="guardarDocente()">Guardar</button>
       </div>
-      <div class="form-group"><label class="form-label" for="lab-notas">Equipamiento / notas</label><input class="form-control" id="lab-notas" type="text" placeholder="Ej: Windows 11, Packet Tracer"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-lab')">Cancelar</button>
-      <button class="btn-ok" onclick="guardarLab()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Lista de espera -->
-<div class="modal-overlay" id="modal-espera" role="dialog" aria-modal="true" aria-labelledby="modal-espera-title">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3 id="modal-espera-title"><span aria-hidden="true">📋</span> Anotarme en espera</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-espera')" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Te avisaremos cuando el turno quede disponible.</p>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label" for="espera-lab">Laboratorio</label><select class="form-control" id="espera-lab" required></select></div>
-        <div class="form-group"><label class="form-label" for="espera-dia">Día</label><select class="form-control" id="espera-dia" required></select></div>
-      </div>
-      <div class="form-group"><label class="form-label" for="espera-modulo">Módulo horario</label><select class="form-control" id="espera-modulo" required></select></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-espera')">Cancelar</button>
-      <button class="btn-ok" onclick="guardarEspera()">Anotarme</button>
-    </div>
-  </div>
-</div>
-
-<!-- Pauta -->
-<div class="modal-overlay" id="modal-pauta" role="dialog" aria-modal="true" aria-labelledby="modal-pauta-title">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3 id="modal-pauta-title"><span aria-hidden="true">📌</span> Agregar pauta</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-pauta')" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label" for="pauta-texto">Texto de la pauta</label><textarea class="form-control" id="pauta-texto" rows="2" placeholder="Ej: Apagar equipos al finalizar" required></textarea></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-pauta')">Cancelar</button>
-      <button class="btn-ok" onclick="guardarPauta()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Confirmar -->
-<div class="modal-overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="modal-confirm-title">
-  <div class="modal modal-sm">
-    <div class="modal-header">
-      <h3 id="modal-confirm-title">Confirmar acción</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-confirm')" aria-label="Cancelar">✕</button>
-    </div>
-    <div class="modal-body"><div id="confirm-body"></div></div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-confirm')">Cancelar</button>
-      <button class="btn-ok" id="confirm-extra-btn" style="display:none;"></button>
-      <button class="btn-ok" id="confirm-ok-btn">Confirmar</button>
     </div>
   </div>
 
-
-
-    </div>
-
-
-
-<!-- PANEL DE NOTIFICACIONES -->
-<div id="notif-panel" class="notif-panel" role="dialog" aria-label="Notificaciones">
-  <div class="notif-panel-header">
-    <span style="font-weight:600;font-size:.95rem">Notificaciones</span>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="notif-limpiar-btn" onclick="limpiarNotificaciones()">✕ Limpiar</button>
-      <button onclick="cerrarPanelNotif()" style="background:none;border:none;cursor:pointer;color:var(--texto-muted);font-size:1.2rem;line-height:1">✕</button>
+  <!-- Agregar/editar espacio -->
+  <div class="modal-overlay" id="modal-lab" role="dialog" aria-modal="true" aria-labelledby="modal-lab-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-lab-title"><span aria-hidden="true">🏫</span> Agregar espacio</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-lab')" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label" for="lab-nombre">Nombre del espacio</label><input
+            class="form-control" id="lab-nombre" type="text" placeholder="Ej: Lab. Informático C" required></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="lab-capacidad">Capacidad</label><input
+              class="form-control" id="lab-capacidad" type="number" min="1" placeholder="Ej: 20"></div>
+          <div class="form-group"><label class="form-label" for="lab-estado">Estado</label><select class="form-control"
+              id="lab-estado">
+              <option value="libre">Disponible</option>
+              <option value="ocupado">En mantenimiento</option>
+            </select></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="lab-notas">Equipamiento / notas</label><input
+            class="form-control" id="lab-notas" type="text" placeholder="Ej: Windows 11, Packet Tracer"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-lab')">Cancelar</button>
+        <button class="btn-ok" onclick="guardarLab()">Guardar</button>
+      </div>
     </div>
   </div>
-  <div id="notif-list" class="notif-list"></div>
-</div>
-<div id="notif-overlay" class="notif-overlay" onclick="cerrarPanelNotif()"></div>
 
-
-<!-- Modal: Reportar Incidencia (pre-definido para evitar bugs de posición) -->
-<div class="modal-overlay" id="modal-incidencia" role="dialog" aria-modal="true" aria-labelledby="modal-incid-title">
-  <div class="modal" style="max-width:480px">
-    <div class="modal-header" style="border-bottom:2px solid var(--red)">
-      <h3 id="modal-incid-title" style="color:var(--red)">⚠️ Reportar incidencia</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-incidencia')" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Laboratorio</label>
-        <select class="form-control" id="incid-lab"></select>
+  <!-- Lista de espera -->
+  <div class="modal-overlay" id="modal-espera" role="dialog" aria-modal="true" aria-labelledby="modal-espera-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-espera-title"><span aria-hidden="true">📋</span> Anotarme en espera</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-espera')" aria-label="Cerrar">✕</button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Tipo de problema</label>
-        <select class="form-control" id="incid-tipo"></select>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Te avisaremos cuando el turno quede
+          disponible.</p>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="espera-lab">Laboratorio</label><select
+              class="form-control" id="espera-lab" required></select></div>
+          <div class="form-group"><label class="form-label" for="espera-dia">Día</label><select class="form-control"
+              id="espera-dia" required></select></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="espera-modulo">Módulo horario</label><select
+            class="form-control" id="espera-modulo" required></select></div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Descripción detallada</label>
-        <textarea class="form-control" id="incid-desc" rows="3" placeholder="Describí el problema: equipos afectados, síntomas, etc."></textarea>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-espera')">Cancelar</button>
+        <button class="btn-ok" onclick="guardarEspera()">Anotarme</button>
       </div>
-      <div class="form-group" id="incid-bloquear-wrap">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem">
-          <input type="checkbox" id="incid-bloquear" style="width:16px;height:16px"/>
-          Marcar el laboratorio como NO DISPONIBLE hasta resolver la incidencia
-        </label>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-incidencia')">Cancelar</button>
-      <button class="btn-ok" style="background:var(--red);border-color:var(--red)" onclick="guardarIncidencia()">Reportar incidencia</button>
     </div>
   </div>
-</div>
 
-<!-- Modal: Agregar Evento Escolar (pre-definido para evitar bugs de posición) -->
-<div class="modal-overlay" id="modal-evento-escolar" role="dialog" aria-modal="true" aria-labelledby="modal-evento-title">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="modal-evento-title">📌 Agregar fecha especial</h3>
-      <button class="modal-close" onclick="cerrarModal('modal-evento-escolar')" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Tipo de evento</label>
-        <select class="form-control" id="ev-tipo" onchange="toggleFechaEvento()">
-          <option value="feriado">Feriado</option>
-          <option value="examen">Semana de examen</option>
-          <option value="receso">Receso escolar</option>
-          <option value="acto">Acto escolar</option>
-          <option value="mantenimiento">Mantenimiento lab</option>
-        </select>
+  <!-- Pauta -->
+  <div class="modal-overlay" id="modal-pauta" role="dialog" aria-modal="true" aria-labelledby="modal-pauta-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-pauta-title"><span aria-hidden="true">📌</span> Agregar pauta</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-pauta')" aria-label="Cerrar">✕</button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Título / descripción</label>
-        <input class="form-control" id="ev-titulo" type="text" placeholder="Ej: Feriado nacional 25 de mayo"/>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label" for="pauta-texto">Texto de la pauta</label><textarea
+            class="form-control" id="pauta-texto" rows="2" placeholder="Ej: Apagar equipos al finalizar"
+            required></textarea></div>
       </div>
-      <div class="form-group" id="ev-fecha-simple">
-        <label class="form-label">Fecha</label>
-        <input class="form-control" id="ev-fecha" type="date"/>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-pauta')">Cancelar</button>
+        <button class="btn-ok" onclick="guardarPauta()">Guardar</button>
       </div>
-      <div class="form-group" id="ev-fecha-rango" style="display:none">
-        <label class="form-label">Fecha de inicio</label>
-        <input class="form-control" id="ev-fecha-ini" type="date"/>
-        <label class="form-label" style="margin-top:.5rem">Fecha de fin</label>
-        <input class="form-control" id="ev-fecha-fin" type="date"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Laboratorio afectado (opcional)</label>
-        <select class="form-control" id="ev-lab">
-          <option value="">Todos los laboratorios</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="cerrarModal('modal-evento-escolar')">Cancelar</button>
-      <button class="btn-ok" onclick="guardarEventoEscolar()">Guardar</button>
     </div>
   </div>
-</div>
 
-<div id="toast-container" role="region" aria-label="Notificaciones" aria-live="polite"></div>
+  <!-- Confirmar -->
+  <div class="modal-overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="modal-confirm-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-confirm-title">Confirmar acción</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-confirm')" aria-label="Cancelar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="confirm-body"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-confirm')">Cancelar</button>
+        <button class="btn-ok" id="confirm-extra-btn" style="display:none;"></button>
+        <button class="btn-ok" id="confirm-ok-btn">Confirmar</button>
+      </div>
+    </div>
 
-<!--
+
+
+  </div>
+
+
+
+  <!-- PANEL DE NOTIFICACIONES -->
+  <div id="notif-panel" class="notif-panel" role="dialog" aria-label="Notificaciones">
+    <div class="notif-panel-header">
+      <span style="font-weight:600;font-size:.95rem">Notificaciones</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="notif-limpiar-btn" onclick="limpiarNotificaciones()">✕ Limpiar</button>
+        <button onclick="cerrarPanelNotif()"
+          style="background:none;border:none;cursor:pointer;color:var(--texto-muted);font-size:1.2rem;line-height:1">✕</button>
+      </div>
+    </div>
+    <div id="notif-list" class="notif-list"></div>
+  </div>
+  <div id="notif-overlay" class="notif-overlay" onclick="cerrarPanelNotif()"></div>
+
+
+  <!-- Modal: Reportar Incidencia (pre-definido para evitar bugs de posición) -->
+  <div class="modal-overlay" id="modal-incidencia" role="dialog" aria-modal="true" aria-labelledby="modal-incid-title">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header" style="border-bottom:2px solid var(--red)">
+        <h3 id="modal-incid-title" style="color:var(--red)">⚠️ Reportar incidencia</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-incidencia')" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Laboratorio</label>
+          <select class="form-control" id="incid-lab"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de problema</label>
+          <select class="form-control" id="incid-tipo"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción detallada</label>
+          <textarea class="form-control" id="incid-desc" rows="3"
+            placeholder="Describí el problema: equipos afectados, síntomas, etc."></textarea>
+        </div>
+        <div class="form-group" id="incid-bloquear-wrap">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem">
+            <input type="checkbox" id="incid-bloquear" style="width:16px;height:16px" />
+            Marcar el laboratorio como NO DISPONIBLE hasta resolver la incidencia
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-incidencia')">Cancelar</button>
+        <button class="btn-ok" style="background:var(--red);border-color:var(--red)"
+          onclick="guardarIncidencia()">Reportar incidencia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Agregar Evento Escolar (pre-definido para evitar bugs de posición) -->
+  <div class="modal-overlay" id="modal-evento-escolar" role="dialog" aria-modal="true"
+    aria-labelledby="modal-evento-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-evento-title">📌 Agregar fecha especial</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-evento-escolar')" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Tipo de evento</label>
+          <select class="form-control" id="ev-tipo" onchange="toggleFechaEvento()">
+            <option value="feriado">Feriado</option>
+            <option value="examen">Semana de examen</option>
+            <option value="receso">Receso escolar</option>
+            <option value="acto">Acto escolar</option>
+            <option value="mantenimiento">Mantenimiento lab</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Título / descripción</label>
+          <input class="form-control" id="ev-titulo" type="text" placeholder="Ej: Feriado nacional 25 de mayo" />
+        </div>
+        <div class="form-group" id="ev-fecha-simple">
+          <label class="form-label">Fecha</label>
+          <input class="form-control" id="ev-fecha" type="date" />
+        </div>
+        <div class="form-group" id="ev-fecha-rango" style="display:none">
+          <label class="form-label">Fecha de inicio</label>
+          <input class="form-control" id="ev-fecha-ini" type="date" />
+          <label class="form-label" style="margin-top:.5rem">Fecha de fin</label>
+          <input class="form-control" id="ev-fecha-fin" type="date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Laboratorio afectado (opcional)</label>
+          <select class="form-control" id="ev-lab">
+            <option value="">Todos los laboratorios</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-evento-escolar')">Cancelar</button>
+        <button class="btn-ok" onclick="guardarEventoEscolar()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" role="region" aria-label="Notificaciones" aria-live="polite"></div>
+
+  <!--
   Módulos de JavaScript — cargar EN ESTE ORDEN (cada uno depende del anterior)
   ┌─────────────────────────────────────────────────────────────────┐
-  │  config.js      → constantes y estado global                   │
-  │  db.js          → base de datos SQL via api.php (SQLite)          │
-  │  helpers.js     → utilidades puras (fechas, lookups, roles)    │
-  │  ui.js          → toast, modales, UIHelper                     │
-  │  nav.js         → navegación entre páginas y filtros           │
-  │  calendario.js  → renderizado del calendario semanal           │
-  │  reservas.js    → modal de reserva + aprobación de solicitudes │
-  │  espera.js      → lista de espera                              │
-  │  misReservas.js → vista "Mis reservas"                         │
-  │  admin.js       → panel de administración + CRUD               │
-  │  init.js        → arranque (sesión, eventos, carga de datos)   │
+  │  config.js      → constantes y estado global                    │
+  │  db.js          → base de datos SQL via api.php (SQLite)        │
+  │  helpers.js     → utilidades puras (fechas, lookups, roles)     │
+  │  ui.js          → toast, modales, UIHelper                      │
+  │  nav.js         → navegación entre páginas y filtros            │
+  │  calendario.js  → renderizado del calendario semanal            │
+  │  reservas.js    → modal de reserva + aprobación de solicitudes  │
+  │  espera.js      → lista de espera                               │
+  │  misReservas.js → vista "Mis reservas"                          │
+  │  admin.js       → panel de administración + CRUD                │
+  │  init.js        → arranque (sesión, eventos, carga de datos)    │
   └─────────────────────────────────────────────────────────────────┘
 -->
-<script src="js/config.js"></script>
-<script src="js/db.js"></script>
-<script src="js/helpers.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/nav.js"></script>
-<script src="js/calendario.js"></script>
-<script src="js/reservas.js"></script>
-<script src="js/espera.js"></script>
-<script src="js/misReservas.js"></script>
-<script src="js/admin.js"></script>
-<script src="js/notificaciones.js"></script>
-<script src="js/estadisticas.js"></script>
-<script src="js/conflictos.js"></script>
-<script src="js/calendario_escolar.js"></script>
-<script src="js/incidencias.js"></script>
-<script src="js/init.js"></script>
-<script src="js/db-override.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/helpers.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/calendario.js"></script>
+  <script src="js/reservas.js"></script>
+  <script src="js/espera.js"></script>
+  <script src="js/misReservas.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/notificaciones.js"></script>
+  <script src="js/estadisticas.js"></script>
+  <script src="js/conflictos.js"></script>
+  <script src="js/calendario_escolar.js"></script>
+  <script src="js/incidencias.js"></script>
+  <script src="js/init.js"></script>
+  <script src="js/db-override.js"></script>
 </body>
+
 </html>

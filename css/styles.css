@@ -503,6 +503,7 @@ a { text-decoration: none; }
    ============================================================ */
 
 .sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -512,6 +513,56 @@ a { text-decoration: none; }
   background: var(--white);
   border-right: 1px solid var(--border);
   overflow-y: auto;
+  transition: width .22s ease, min-width .22s ease, padding .22s ease;
+}
+
+.sidebar.collapsed {
+  width: 38px;
+  min-width: 38px;
+  padding: .75rem 0;
+  overflow: hidden;
+}
+
+.sidebar-inner {
+  min-width: 194px;
+  transition: opacity .15s ease;
+}
+
+.sidebar.collapsed .sidebar-inner {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-btn {
+  position: absolute;
+  top: 10px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all .12s;
+}
+
+.toggle-btn:hover {
+  background: var(--navy-faint);
+  border-color: var(--navy);
+}
+
+.toggle-icon {
+  width: 12px;
+  height: 12px;
+  transition: transform .22s ease;
+}
+
+.sidebar.collapsed .toggle-icon {
+  transform: rotate(180deg);
 }
 
 .sec-label {
