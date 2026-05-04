@@ -40,7 +40,7 @@ function renderAdmin() {
   if (typeof actualizarBadgeIncidencias === 'function') actualizarBadgeIncidencias();
 }
 
-// ── Tabla de solicitudes pendientes ──────────────────────────
+// ── Tabla de solicitudes pendientes ─────────────────────────
 function renderSolicitudesAdmin() {
   var el = document.getElementById('solicitudes-tbody');
   if (!el) return;
