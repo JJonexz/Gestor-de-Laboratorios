@@ -50,7 +50,7 @@ function initSchema($pdo) {
             nombre    VARCHAR(100) NOT NULL,
             ocupado   TINYINT NOT NULL DEFAULT 0,
             capacidad SMALLINT NOT NULL DEFAULT 20,
-            notas     TEXT NOT NULL DEFAULT '',
+            notas     VARCHAR(500) NOT NULL DEFAULT '',
             PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -73,7 +73,7 @@ function initSchema($pdo) {
             curso        VARCHAR(20) NOT NULL,
             orient       VARCHAR(10) NOT NULL DEFAULT 'bas',
             profeId      INT NOT NULL,
-            secuencia    TEXT NOT NULL,
+            secuencia    VARCHAR(500) NOT NULL DEFAULT '',
             cicloClases  TINYINT NOT NULL DEFAULT 1,
             renovaciones TINYINT NOT NULL DEFAULT 0,
             anual        TINYINT NOT NULL DEFAULT 0,
@@ -91,7 +91,7 @@ function initSchema($pdo) {
             curso             VARCHAR(20) NOT NULL,
             orient            VARCHAR(10) NOT NULL DEFAULT 'bas',
             profeId           INT NOT NULL,
-            secuencia         TEXT NOT NULL,
+            secuencia         VARCHAR(500) NOT NULL DEFAULT '',
             cicloClases       TINYINT NOT NULL DEFAULT 1,
             estado            VARCHAR(20) NOT NULL DEFAULT 'pendiente',
             esRenovacion      TINYINT NOT NULL DEFAULT 0,
