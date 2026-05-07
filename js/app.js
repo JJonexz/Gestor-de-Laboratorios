@@ -411,7 +411,11 @@ function renderCalendario() {
   var solicDia = SOLICITUDES.filter(function (s) { return s.semanaOffset === semanaOffset && s.dia === diaActual && s.estado === 'pendiente'; });
   var grid = document.getElementById('cal-body');
   if (!grid) return;
-  var labsFiltrados = LABS.filter(function (l) { return filtroLab === 'todos' || filtroLab === l.id; });
+  var labsFiltrados = LABS.filter(function (l) {
+    var matchLab = filtroLab === 'todos' || filtroLab === l.id;
+    var matchSearch = filtroBusquedaLab === '' || l.nombre.toLowerCase().indexOf(filtroBusquedaLab) !== -1 || l.id.toString().toLowerCase().indexOf(filtroBusquedaLab) !== -1;
+    return matchLab && matchSearch;
+  });
 
   // ── NUEVO: filtro de turno ──────────────────────────────────────────────
   var turnosFiltrados = filtroTurno === 'todos'

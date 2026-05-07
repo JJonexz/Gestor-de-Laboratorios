@@ -164,7 +164,9 @@ function renderCalendario() {
   }
 
   var labsFiltrados = LABS.filter(function(l) {
-    return filtroLab === 'todos' || filtroLab === l.id;
+    var matchLab = filtroLab === 'todos' || filtroLab === l.id;
+    var matchSearch = filtroBusquedaLab === '' || l.nombre.toLowerCase().indexOf(filtroBusquedaLab) !== -1 || l.id.toString().toLowerCase().indexOf(filtroBusquedaLab) !== -1;
+    return matchLab && matchSearch;
   });
 
   // Filtro de turno

@@ -196,7 +196,8 @@
         <div class="cal-header">
           <div class="cal-title" id="cal-title-text" aria-live="polite">Cargando…</div>
           <div class="cal-controls">
-            <div class="lab-filter-bar" role="group" aria-label="Filtrar por laboratorio">
+            <div class="lab-filter-bar" role="group" aria-label="Filtrar por laboratorio" style="flex-wrap: wrap; gap: 8px;">
+              <input type="search" class="search-input" id="search-lab-cal" placeholder="Buscar aula..." style="padding: 0.3rem 0.55rem; font-size: 0.75rem; border: 1px solid var(--border,#dde1e7); border-radius: 4px; max-width: 150px; background: #fff; color: var(--text2,#374151);" oninput="setLabSearch(this.value)">
               <button class="lab-filter-btn active" id="filt-todos" aria-pressed="true"
                 onclick="setLabFilter('todos')">Todos</button>
               <span id="lab-filter-btns"></span>

@@ -16,6 +16,7 @@ var semanaOffset = 0;   // 0 = semana actual, +1 = siguiente, etc.
 var diaActual = 0;   // 0=Lun … 4=Vie
 var filtroOrient = 'all';
 var filtroLab = 'todos';
+var filtroBusquedaLab = '';
 var filtroTurno = 'todos';
 var modoUsuario = 'prof';  // 'prof' | 'admin'
 var editDocenteId = null;   // ID del docente que se está editando (null = nuevo)

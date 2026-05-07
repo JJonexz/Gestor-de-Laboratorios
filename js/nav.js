@@ -122,6 +122,12 @@ function selOrient(el, orient) {
   renderCalendario();
 }
 
+// ── Filtro de búsqueda de laboratorio ─────────────────────────
+function setLabSearch(query) {
+  filtroBusquedaLab = query.toLowerCase().trim();
+  renderCalendario();
+}
+
 // ── Filtro de laboratorio ─────────────────────────────────────
 function setLabFilter(labId) {
   filtroLab = labId;
