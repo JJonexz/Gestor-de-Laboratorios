@@ -259,7 +259,7 @@ function abrirModalDocente() {
   ['doc-apellido', 'doc-nombre', 'doc-materia'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  var orient = document.getElementById('doc-orient'); if (orient) orient.value = 'info';
+  UIHelper.setOrientValues('doc-orient-group', 'info');
   abrirModal('modal-docente');
 }
 
@@ -270,7 +270,7 @@ function editarDocente(id) {
   document.getElementById('doc-apellido').value = p.apellido;
   document.getElementById('doc-nombre').value   = p.nombre;
   document.getElementById('doc-materia').value  = p.materia;
-  document.getElementById('doc-orient').value   = p.orientacion;
+  UIHelper.setOrientValues('doc-orient-group', p.orientacion);
   abrirModal('modal-docente');
 }
 

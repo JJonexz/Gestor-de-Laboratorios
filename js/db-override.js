@@ -15,7 +15,7 @@ guardarReserva = function() {
   var curso    = document.getElementById('f-curso').value.trim();
   var materia  = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
   var secuencia = document.getElementById('f-secuencia').value.trim();
-  var orient   = document.getElementById('f-orient').value;
+  var orient   = UIHelper.getOrientValues('f-orient-group');
 
   if (materia) secuencia = '[' + materia + '] ' + secuencia;
   var periodoEl = document.getElementById('f-periodo');
@@ -52,7 +52,7 @@ guardarReserva = function() {
   var profeSel = document.getElementById('f-profe');
   var profeId = (esDirectivo() && profeSel && profeSel.value)
     ? parseInt(profeSel.value)
-    : getCurrentProfId();
+    : (window.SESSION ? window.SESSION.profeId : getCurrentProfId());
 
   cerrarModal('modal-reserva');
 
@@ -83,7 +83,7 @@ guardarReserva = function() {
     modulosAReservar.forEach(function(m) {
       promises2.push(apiPost('solicitudes', {
         semanaOffset: semanaOffset, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
-        orient: orient, profeId: getCurrentProfId(), secuencia: secuencia, cicloClases: 1,
+        orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()), secuencia: secuencia, cicloClases: 1,
         estado: 'pendiente', esRenovacion: 0, renovacionNum: 0
       }));
     });
@@ -206,7 +206,7 @@ guardarEdicionReserva = function() {
 
   var nuevoCurso    = document.getElementById('edit-curso').value.trim();
   var nuevaSecuencia = document.getElementById('edit-secuencia').value.trim();
-  var nuevaOrient   = document.getElementById('edit-orient').value;
+  var nuevaOrient   = UIHelper.getOrientValues('edit-orient-group');
   var scopeSel      = document.getElementById('edit-scope');
   var scope         = scopeSel ? scopeSel.value : 'puntual';
   var editProfeSel  = document.getElementById('edit-profe');
@@ -245,10 +245,10 @@ guardarEdicionReserva = function() {
 
 // ── guardarDocente ───────────────────────────────────────────
 guardarDocente = function() {
-  var apellido    = document.getElementById('d-apellido').value.trim();
-  var nombre      = document.getElementById('d-nombre').value.trim();
-  var materia     = document.getElementById('d-materia').value.trim();
-  var orientacion = document.getElementById('d-orient').value;
+  var apellido    = document.getElementById('doc-apellido').value.trim();
+  var nombre      = document.getElementById('doc-nombre').value.trim();
+  var materia     = document.getElementById('doc-materia').value.trim();
+  var orientacion = UIHelper.getOrientValues('doc-orient-group');
 
   if (!apellido || !nombre || !materia) { toast('Completa todos los campos del docente.', 'err'); return; }
 
@@ -289,14 +289,20 @@ eliminarDocente = function(id) {
 
 // ── guardarLab ───────────────────────────────────────────────
 guardarLab = function() {
-  var id        = document.getElementById('lab-id').value.trim().toUpperCase();
   var nombre    = document.getElementById('lab-nombre').value.trim();
   var capacidad = parseInt(document.getElementById('lab-capacidad').value || '20');
   var notas     = document.getElementById('lab-notas').value.trim();
+  var estado    = document.getElementById('lab-estado').value;
 
-  if (!id || !nombre) { toast('Completa ID y nombre.', 'err'); return; }
+  if (!nombre) { toast('Ingresa el nombre del espacio.', 'err'); return; }
 
-  var datos = { id: id, nombre: nombre, capacidad: capacidad, notas: notas, ocupado: 0 };
+  // Si es un lab nuevo, generamos un ID basado en el nombre o correlativo si no hay campo ID
+  var id = editLabId;
+  if (!id) {
+     id = String.fromCharCode(65 + LABS.length); // Fallback: A, B, C...
+  }
+
+  var datos = { id: id, nombre: nombre, capacidad: capacidad, notas: notas, ocupado: estado === 'ocupado' ? 1 : 0 };
 
   if (editLabId !== null) {
     apiPut('labs/' + editLabId, datos).then(function(actualizado) {
@@ -383,12 +389,12 @@ agregarEspera = function() {
   if (!ocupado) { toast('Ese turno esta disponible, reservalo directamente.', 'info'); cerrarModal('modal-espera'); return; }
 
   var yaEnEspera = LISTA_ESPERA.find(function(e) {
-    return e.lab === lab && e.dia === parseInt(dia) && e.modulo === parseInt(modulo) && e.profeId === getCurrentProfId() && e.semanaOffset === semanaOffset;
+    return e.lab === lab && e.dia === parseInt(dia) && e.modulo === parseInt(modulo) && e.profeId === (window.SESSION ? window.SESSION.profeId : getCurrentProfId()) && e.semanaOffset === semanaOffset;
   });
   if (yaEnEspera) { toast('Ya estas anotado en espera para ese turno.', 'warn'); cerrarModal('modal-espera'); return; }
 
   apiPost('espera', {
-    profeId: getCurrentProfId(), lab: lab, dia: parseInt(dia),
+    profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()), lab: lab, dia: parseInt(dia),
     modulo: parseInt(modulo), semanaOffset: semanaOffset
   }).then(function(nueva) {
     LISTA_ESPERA.push(nueva);

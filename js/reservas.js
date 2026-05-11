@@ -151,7 +151,7 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   if (fCurso) fCurso.value = '';
   if (fSeq) fSeq.value = '';
 
-  if (orient) UIHelper.setOrientValues('f-orient-group', 'bas');
+  UIHelper.setOrientValues('f-orient-group', 'bas');
 
   checkConflict();
 

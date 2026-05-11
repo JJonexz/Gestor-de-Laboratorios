@@ -681,10 +681,6 @@ function poblarSelectsReserva() {
     TURNOS_CONFIG.forEach(function (t) { opts += '<option value="turno_' + t.label + '">' + t.icon + ' Turno completo ' + t.label + ' (' + t.modulos.length + ' hs)</option>'; });
     fPeriodo.innerHTML = opts;
   }
-  var fOrient = document.getElementById('f-orient');
-  if (fOrient) {
-    fOrient.innerHTML = Object.keys(ORIENTACIONES).map(function (k) { var o = ORIENTACIONES[k]; return '<option value="' + k + '">' + o.emoji + ' ' + o.nombre + '</option>'; }).join('');
-  }
 }
 
 function abrirModalReserva() {
@@ -692,7 +688,7 @@ function abrirModalReserva() {
   ['f-lab', 'f-dia', 'f-curso', 'f-secuencia'].forEach(function (id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  var orient = document.getElementById('f-orient'); if (orient) orient.value = 'info';
+  UIHelper.setOrientValues('f-orient-group', 'bas');
   var fmod = document.getElementById('f-modulo'); if (fmod) fmod.value = '';
   var fper = document.getElementById('f-periodo'); if (fper) fper.value = '1';
   var cw = document.getElementById('conflict-warning'); if (cw) cw.classList.remove('show');
@@ -718,7 +714,7 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   var fSeq = document.getElementById('f-secuencia');
   if (fCurso) fCurso.value = '';
   if (fSeq) fSeq.value = '';
-  var orient = document.getElementById('f-orient'); if (orient) orient.value = 'info';
+  UIHelper.setOrientValues('f-orient-group', 'bas');
   checkConflict();
 
   // Checkbox anual: AGREGADO A ESTA FUNCIÓN TAMBIÉN
@@ -758,7 +754,7 @@ function guardarReserva() {
   var modulo = document.getElementById('f-modulo').value;
   var curso = document.getElementById('f-curso').value.trim();
   var secuencia = document.getElementById('f-secuencia').value.trim();
-  var orient = document.getElementById('f-orient').value;
+  var orient = UIHelper.getOrientValues('f-orient-group');
   var periodoEl = document.getElementById('f-periodo');
   var periodo = periodoEl ? periodoEl.value : '1';
   var anualChk = document.querySelector('#modal-reserva #f-anual');
