@@ -639,6 +639,77 @@ a { text-decoration: none; }
 .mini-stat.rj .mini-stat-n { color: var(--red); }
 .mini-stat.vd .mini-stat-n { color: var(--green); }
 
+/* Botón toggle para Laboratorios */
+.labs-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  width: 100%;
+  padding: .3rem .5rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background .12s;
+}
+.labs-toggle-btn:hover {
+  background: var(--navy-faint);
+}
+
+.labs-toggle-btn .sec-label {
+  margin-bottom: 0;
+  padding-left: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.labs-toggle-icon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  transition: transform .22s ease;
+}
+
+/* Cuando está cerrado, la flecha apunta hacia abajo */
+.labs-container.closed .labs-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Contenedor de labs con animación suave */
+.labs-container {
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: max-height .22s ease, opacity .15s ease;
+  opacity: 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.labs-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.labs-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.labs-container::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.labs-container::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+.labs-container.closed {
+  max-height: 0;
+  opacity: 0;
+}
+
 /* Botones de acción en sidebar */
 .cta-btn {
   display: flex;

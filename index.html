@@ -168,10 +168,15 @@
         </svg>
       </button>
       <div class="sidebar-inner">
-        <!-- <div>
-          <div class="sec-label" id="labs-heading">Laboratorios</div>
-          <div id="sidebar-labs" role="group" aria-labelledby="labs-heading"></div>
-        </div> -->
+        <div>
+          <button class="labs-toggle-btn" id="labsToggleBtn" aria-expanded="false" aria-label="Expandir/contraer laboratorios">
+            <span class="sec-label">Laboratorios</span>
+            <svg class="labs-toggle-icon" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 5L6 8L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div id="sidebar-labs" class="labs-container" role="group" aria-labelledby="labsToggleBtn"></div>
+        </div>
         <div>
           <div class="sec-label">Esta semana</div>
           <div class="mini-stats" id="mini-stats" aria-label="Estadísticas de la semana"></div>

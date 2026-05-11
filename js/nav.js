@@ -24,6 +24,23 @@ if (btn && sidebar) {
   });
 }
 
+// ── Toggle Labs Container ────────────────────────────────────
+const labsToggleBtn = document.getElementById('labsToggleBtn');
+const labsContainer = document.getElementById('sidebar-labs');
+let labsClosed = true; // Por defecto, cerrado
+
+if (labsToggleBtn && labsContainer) {
+  // Inicializar en estado cerrado
+  labsContainer.classList.add('closed');
+  labsToggleBtn.setAttribute('aria-expanded', 'false');
+
+  labsToggleBtn.addEventListener('click', () => {
+    labsClosed = !labsClosed;
+    labsContainer.classList.toggle('closed', labsClosed);
+    labsToggleBtn.setAttribute('aria-expanded', !labsClosed);
+  });
+}
+
 // ── Días del calendario ──────────────────────────────────────
 function navDia(dir) {
   diaActual = Math.max(0, Math.min(4, diaActual + dir));
