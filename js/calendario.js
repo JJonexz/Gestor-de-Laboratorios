@@ -255,7 +255,9 @@ function renderCalendario() {
         if (!oriOk) {
           html += _celdaLibre(diaActual, mid, lab.id);
         } else {
-          var ori = ORIENTACIONES[r.orient];
+          // Robustez: manejar orientaciones múltiples (CSV) tomando la primera para el estilo
+          var orientKey = (r.orient || 'bas').split(',')[0];
+          var ori = ORIENTACIONES[orientKey] || ORIENTACIONES['bas'];
           var p   = getProfe(r.profeId);
           var puedeEditar = esDirectivo() || r.profeId === getCurrentProfId();
           html +=
@@ -404,7 +406,8 @@ function renderVencimientosCalendario() {
 
   el.innerHTML = sorted.slice(0, 6).map(function(r) {
     var p   = getProfe(r.profeId);
-    var ori = ORIENTACIONES[r.orient];
+    var orientKey = (r.orient || 'bas').split(',')[0];
+    var ori = ORIENTACIONES[orientKey] || ORIENTACIONES['bas'];
     return (
       '<div class="list-item">' +
         '<div class="venc-dot" style="background:' + (colores[r.cicloClases] || 'var(--green)') + '"></div>' +

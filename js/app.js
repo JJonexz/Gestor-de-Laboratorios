@@ -108,51 +108,58 @@ function loadFromLocalStorage() {
   }
 }
 
-{ key: 'pautas', url: 'data/pautas.json' },
-{ key: 'recreos', url: 'data/recreos.json' },
+function loadFromJSON(callback) {
+  var files = [
+    { key: 'labs', url: 'data/rooms.json' },
+    { key: 'profesores', url: 'data/profesores.json' },
+    { key: 'reservas', url: 'data/reservas.json' },
+    { key: 'solicitudes', url: 'data/solicitudes.json' },
+    { key: 'espera', url: 'data/espera.json' },
+    { key: 'pautas', url: 'data/pautas.json' },
+    { key: 'recreos', url: 'data/recreos.json' },
   ];
-var results = {};
-var pending = files.length;
+  var results = {};
+  var pending = files.length;
 
-// Normaliza campos numéricos críticos para que === no falle
-function normalizarEntrada(r) {
-  return Object.assign({}, r, {
-    semanaOffset: parseInt(r.semanaOffset, 10) || 0,
-    dia: parseInt(r.dia, 10) || 0,
-    modulo: parseInt(r.modulo, 10) || 0,
-  });
-}
-
-function aplicar() {
-  LABS = results.labs || [];
-  PROFESORES = results.profesores || [];
-  RESERVAS = (results.reservas || []).map(normalizarEntrada);
-  SOLICITUDES = (results.solicitudes || []).map(normalizarEntrada);
-  LISTA_ESPERA = (results.espera || []).map(normalizarEntrada);
-  PAUTAS = results.pautas || [];
-  RECREOS = results.recreos || [];
-  var maxId = 0;
-  [RESERVAS, SOLICITUDES, LISTA_ESPERA].forEach(function (arr) {
-    arr.forEach(function (x) { if (x.id > maxId) maxId = x.id; });
-  });
-  nextId = Math.max(500, maxId + 1);
-}
-
-files.forEach(function (f) {
-  fetch(f.url)
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      results[f.key] = data;
-      pending--;
-      if (pending === 0) { aplicar(); saveDB(); if (callback) callback(); }
-    })
-    .catch(function (err) {
-      console.warn('Error cargando', f.url, err);
-      results[f.key] = [];
-      pending--;
-      if (pending === 0) { aplicar(); if (callback) callback(); }
+  // Normaliza campos numéricos críticos para que === no falle
+  function normalizarEntrada(r) {
+    return Object.assign({}, r, {
+      semanaOffset: parseInt(r.semanaOffset, 10) || 0,
+      dia: parseInt(r.dia, 10) || 0,
+      modulo: parseInt(r.modulo, 10) || 0,
     });
-});
+  }
+
+  function aplicar() {
+    LABS = results.labs || [];
+    PROFESORES = results.profesores || [];
+    RESERVAS = (results.reservas || []).map(normalizarEntrada);
+    SOLICITUDES = (results.solicitudes || []).map(normalizarEntrada);
+    LISTA_ESPERA = (results.espera || []).map(normalizarEntrada);
+    PAUTAS = results.pautas || [];
+    RECREOS = results.recreos || [];
+    var maxId = 0;
+    [RESERVAS, SOLICITUDES, LISTA_ESPERA].forEach(function (arr) {
+      arr.forEach(function (x) { if (x.id > maxId) maxId = x.id; });
+    });
+    nextId = Math.max(500, maxId + 1);
+  }
+
+  files.forEach(function (f) {
+    fetch(f.url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        results[f.key] = data;
+        pending--;
+        if (pending === 0) { aplicar(); saveDB(); if (callback) callback(); }
+      })
+      .catch(function (err) {
+        console.warn('Error cargando', f.url, err);
+        results[f.key] = [];
+        pending--;
+        if (pending === 0) { aplicar(); if (callback) callback(); }
+      });
+  });
 }
 
 // ============================================================
@@ -681,6 +688,10 @@ function poblarSelectsReserva() {
     TURNOS_CONFIG.forEach(function (t) { opts += '<option value="turno_' + t.label + '">' + t.icon + ' Turno completo ' + t.label + ' (' + t.modulos.length + ' hs)</option>'; });
     fPeriodo.innerHTML = opts;
   }
+  var fOrient = document.getElementById('f-orient');
+  if (fOrient) {
+    fOrient.innerHTML = Object.keys(ORIENTACIONES).map(function (k) { var o = ORIENTACIONES[k]; return '<option value="' + k + '">' + o.emoji + ' ' + o.nombre + '</option>'; }).join('');
+  }
 }
 
 function abrirModalReserva() {
@@ -754,7 +765,7 @@ function guardarReserva() {
   var modulo = document.getElementById('f-modulo').value;
   var curso = document.getElementById('f-curso').value.trim();
   var secuencia = document.getElementById('f-secuencia').value.trim();
-  var orient = UIHelper.getOrientValues('f-orient-group');
+  var orient = document.getElementById('f-orient').value;
   var periodoEl = document.getElementById('f-periodo');
   var periodo = periodoEl ? periodoEl.value : '1';
   var anualChk = document.querySelector('#modal-reserva #f-anual');

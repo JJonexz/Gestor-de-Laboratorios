@@ -338,9 +338,14 @@ function verDetalle(reservaId) {
   var p = getProfe(r.profeId);
   var oris = (r.orient || 'bas').split(',');
   var orientBadges = oris.map(function(o) {
-    var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+    var ori = ORIENTACIONES[o.trim()] || ORIENTACIONES['bas'];
     return '<span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
   }).join(' ');
+
+  var fecha = getDiaDate(r.semanaOffset, r.dia);
+  var mod   = getModulo(r.modulo);
+  var pct   = (r.cicloClases / 3) * 100;
+  var barClass = r.cicloClases >= 3 ? 'full' : (r.cicloClases >= 2 ? 'mid' : 'low');
 
   var body = document.getElementById('modal-detalle-body');
   if (body) {
@@ -352,13 +357,13 @@ function verDetalle(reservaId) {
       '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><div class="orient-badge-group">' + orientBadges + '</div></div></div>' +
       '<div class="detail-row"><div class="detail-label">Secuencia</div><div class="detail-value" style="font-style:italic;color:var(--muted);">"' + r.secuencia + '"</div></div>' +
       '<div style="margin-top:14px;">' +
-      '<div class="ciclo-bar-label">' +
-      '<span style="font-size:12px;font-weight:700;">Ciclo didáctico</span>' +
-      '<span style="font-size:11px;color:var(--muted);">Clase ' + r.cicloClases + ' de 3' +
-      (r.renovaciones ? '&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación ' + r.renovaciones + '/1</span>' : '') +
-      '</span>' +
-      '</div>' +
-      '<div class="ciclo-bar"><div class="ciclo-bar-fill ' + barClass + '" style="width:' + pct + '%"></div></div>' +
+        '<div class="ciclo-bar-label">' +
+          '<span style="font-size:12px;font-weight:700;">Ciclo didáctico</span>' +
+          '<span style="font-size:11px;color:var(--muted);">Clase ' + r.cicloClases + ' de 3' +
+          (r.renovaciones ? '&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación ' + r.renovaciones + '/1</span>' : '') +
+          '</span>' +
+        '</div>' +
+        '<div class="ciclo-bar"><div class="ciclo-bar-fill ' + barClass + '" style="width:' + pct + '%"></div></div>' +
       '</div>';
   }
 
@@ -390,18 +395,20 @@ function verDetalleSolicitud(solId) {
   var p = getProfe(s.profeId);
   var oris = (s.orient || 'bas').split(',');
   var orientBadges = oris.map(function(o) {
-    var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+    var ori = ORIENTACIONES[o.trim()] || ORIENTACIONES['bas'];
     return '<span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
   }).join(' ');
+
+  var fecha = getDiaDate(s.semanaOffset, s.dia);
+  var mod   = getModulo(s.modulo);
 
   var body = document.getElementById('modal-detalle-body');
   if (body) {
     body.innerHTML =
-      '<div class="pending-alert" role="status">⏳ ' +
+      '<div class="pending-alert" role="status">⏳ Solicitud pendiente de aprobación</div>' +
       (s.esRenovacion
-        ? 'Solicitud de <strong>renovación semana ' + s.renovacionNum + '/1</strong> — pendiente de aprobación.'
-        : 'Esta solicitud está <strong>pendiente de aprobación</strong>.') +
-      '</div>' +
+        ? '<div style="margin-bottom:10px;font-size:13px;">Solicitud de <strong>renovación semana ' + s.renovacionNum + '/1</strong>.</div>'
+        : '') +
       '<div class="detail-row"><div class="detail-label">Docente</div><div class="detail-value">Prof. ' + p.apellido + ', ' + p.nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">' + getLab(s.lab).nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[s.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +

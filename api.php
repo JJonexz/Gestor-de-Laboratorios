@@ -10,6 +10,18 @@
 // Autenticación: tabla `personal` de la BDD escuela
 // ============================================================
 
+// Mostrar errores PHP en la respuesta JSON (debug — quitar en producción)
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+set_exception_handler(function($e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage(), 'file' => basename($e->getFile()), 'line' => $e->getLine()], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    throw new ErrorException($errstr, $errno, 0, $errfile, $errline);
+});
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -39,7 +51,8 @@ function getDB() {
         PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
     ]);
 
-    initSchema($pdo);
+    // Opcional: Solo inicializar si se solicita explícitamente o en el login
+    // Para evitar deadlocks en peticiones concurrentes, no ejecutamos initSchema siempre.
     return $pdo;
 }
 
@@ -182,11 +195,24 @@ function err($msg, $code=400) { http_response_code($code); echo json_encode(['ok
 function body() { return json_decode(file_get_contents('php://input'), true) ?? []; }
 
 function castRow($r) {
-    return array_map(function($v) {
-        if (is_null($v)) return null;
-        if (is_numeric($v) && strpos((string)$v, '.') === false) return (int)$v;
-        return $v;
-    }, $r);
+    $numericStringsAsInt = true; 
+    foreach($r as $key => $v) {
+        if (is_null($v)) {
+            $r[$key] = null;
+            continue;
+        }
+        // No castear a int los IDs de laboratorio o referencias de lab para evitar fallos de === en JS
+        if ($key === 'lab' || ($key === 'id' && !is_numeric($v))) {
+            $r[$key] = (string)$v;
+            continue;
+        }
+        if (is_numeric($v) && strpos((string)$v, '.') === false && strlen((string)$v) < 10) {
+            $r[$key] = (int)$v;
+        } else {
+            $r[$key] = $v;
+        }
+    }
+    return $r;
 }
 function castRows($rows) { return array_map('castRow', $rows); }
 
@@ -207,6 +233,7 @@ switch ($resource) {
     // ── AUTH / LOGIN ──────────────────────────────────────────
     case 'auth':
     case 'login':
+        initSchema($db); // Inicializar/Sincronizar solo al loguear
         if ($method !== 'POST') err('Method not allowed', 405);
         $b        = body();
         $username = strtolower(trim($b['username'] ?? ''));
