@@ -689,6 +689,38 @@
     </div>
   </div>
 
+  <!-- Reasignar aula -->
+  <div class="modal-overlay" id="modal-reasignar" role="dialog" aria-modal="true"
+    aria-labelledby="modal-reasignar-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-reasignar-title"><span aria-hidden="true">🔀</span> Reasignar aula</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-reasignar')" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="reasignar-reserva-id" value="">
+        <div class="modal-info-hint" id="reasignar-info" role="note" style="margin-bottom:.9rem;"></div>
+        <div class="form-group">
+          <label class="form-label" for="reasignar-lab">Nuevo laboratorio</label>
+          <select class="form-control" id="reasignar-lab"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reasignar-scope">¿Qué horas reasignar?</label>
+          <select class="form-control" id="reasignar-scope">
+            <option value="una">Solo esta hora</option>
+            <option value="dia">Todas las horas de este curso en el día</option>
+            <option value="anual" id="reasignar-opt-anual" style="display:none;">Toda la serie anual</option>
+          </select>
+        </div>
+        <div id="reasignar-conflictos" style="display:none;margin-top:8px;padding:10px 12px;border-radius:8px;background:#fff3cd;color:#856404;font-size:12px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-reasignar')">Cancelar</button>
+        <button class="btn-ok" id="reasignar-btn-ok" onclick="ejecutarReasignacion()">🔀 Reasignar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Agregar/editar docente -->
   <div class="modal-overlay" id="modal-docente" role="dialog" aria-modal="true" aria-labelledby="modal-docente-title">
     <div class="modal modal-sm">

@@ -381,6 +381,7 @@ function verDetalle(reservaId) {
       '<button class="btn-cancel" onclick="cerrarModal(\'modal-detalle\')">Cerrar</button>' +
       renovBtn +
       (isOwn ? '<button class="btn-ok" style="background:var(--navy-light);" onclick="cerrarModal(\'modal-detalle\');editarReserva(' + r.id + ')">✎ Editar</button>' : '') +
+      (isOwn ? '<button class="btn-ok" style="background:var(--amber);color:#333;" onclick="cerrarModal(\'modal-detalle\');abrirModalReasignar(' + r.id + ')">🔀 Reasignar</button>' : '') +
       (isOwn ? '<button class="btn-danger" onclick="cerrarModal(\'modal-detalle\');cancelarReserva(' + r.id + ')">Cancelar reserva</button>' : '');
   }
 
@@ -652,5 +653,176 @@ function guardarEdicionReserva() {
     toast(actualizadas + ' módulo(s) actualizado(s).', 'ok');
   }
 
+  renderAll();
+}
+
+// ============================================================
+// REASIGNAR AULA — Mover reservas de un lab a otro
+// ============================================================
+
+// Abre el modal de reasignación desde el detalle de una reserva
+function abrirModalReasignar(reservaId) {
+  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  if (!r) return;
+
+  var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
+  if (!isOwn) { toast('No tenés permiso para reasignar esta reserva.', 'err'); return; }
+
+  // Guardar ID
+  document.getElementById('reasignar-reserva-id').value = reservaId;
+
+  // Info de contexto
+  var mod = getModulo(r.modulo);
+  var lab = getLab(r.lab);
+  var p = getProfe(r.profeId);
+  document.getElementById('reasignar-info').innerHTML =
+    '<strong>' + r.curso + '</strong> · ' + lab.nombre +
+    ' · ' + DIAS_LARGO[r.dia] + ' ' + mod.label +
+    ' (' + mod.inicio + '–' + mod.fin + ')' +
+    (esDirectivo() ? ' · Prof. ' + p.apellido : '');
+
+  // Poblar selector de labs (excluyendo el actual y los que están en mantenimiento)
+  var selLab = document.getElementById('reasignar-lab');
+  if (selLab) {
+    selLab.innerHTML = '<option value="">Seleccionar nuevo laboratorio…</option>' +
+      LABS.filter(function (l) { return l.id !== r.lab && !l.ocupado; }).map(function (l) {
+        return '<option value="' + l.id + '">' + l.nombre + '</option>';
+      }).join('');
+  }
+
+  // Mostrar opción anual si corresponde
+  var optAnual = document.getElementById('reasignar-opt-anual');
+  if (optAnual) optAnual.style.display = r.anual ? 'block' : 'none';
+
+  // Reset scope
+  var scopeSel = document.getElementById('reasignar-scope');
+  if (scopeSel) scopeSel.value = 'una';
+
+  // Limpiar conflictos
+  var confEl = document.getElementById('reasignar-conflictos');
+  if (confEl) confEl.style.display = 'none';
+
+  // Listener para chequear conflictos al cambiar lab o scope
+  if (selLab) selLab.onchange = function () { checkConflictosReasignacion(r); };
+  if (scopeSel) scopeSel.onchange = function () { checkConflictosReasignacion(r); };
+
+  abrirModal('modal-reasignar');
+}
+
+// Chequea si hay conflictos con el lab destino
+function checkConflictosReasignacion(r) {
+  var nuevoLab = document.getElementById('reasignar-lab').value;
+  var scope = document.getElementById('reasignar-scope').value;
+  var confEl = document.getElementById('reasignar-conflictos');
+  var btnOk = document.getElementById('reasignar-btn-ok');
+  if (!nuevoLab || !confEl) { if (confEl) confEl.style.display = 'none'; return; }
+
+  // Buscar las reservas que se moverían
+  var aReasignar = obtenerReservasParaReasignar(r, scope);
+
+  // Buscar conflictos en el lab destino
+  var conflictos = [];
+  aReasignar.forEach(function (res) {
+    var existente = RESERVAS.find(function (x) {
+      return x.semanaOffset === res.semanaOffset &&
+        x.dia === res.dia &&
+        x.modulo === res.modulo &&
+        x.lab === nuevoLab;
+    });
+    if (existente) {
+      var mod = getModulo(res.modulo);
+      conflictos.push(DIAS_SEMANA[res.dia] + ' ' + mod.label);
+    }
+  });
+
+  if (conflictos.length) {
+    confEl.style.display = 'block';
+    confEl.innerHTML = '⚠️ <strong>' + conflictos.length + ' conflicto(s)</strong> en ' +
+      getLab(nuevoLab).nombre + ': ' + conflictos.slice(0, 5).join(', ') +
+      (conflictos.length > 5 ? ' y ' + (conflictos.length - 5) + ' más…' : '') +
+      '<br><small>Esas horas se omitirán en la reasignación.</small>';
+    if (conflictos.length >= aReasignar.length) {
+      btnOk.disabled = true;
+      confEl.innerHTML += '<br><strong>No hay horas disponibles para reasignar.</strong>';
+    } else {
+      btnOk.disabled = false;
+    }
+  } else {
+    confEl.style.display = 'none';
+    btnOk.disabled = false;
+  }
+}
+
+// Obtiene las reservas afectadas según el scope
+function obtenerReservasParaReasignar(r, scope) {
+  if (scope === 'una') {
+    return [r];
+  } else if (scope === 'dia') {
+    // Todas las horas de este curso en el mismo día/semana/lab/profe
+    return RESERVAS.filter(function (x) {
+      return x.semanaOffset === r.semanaOffset &&
+        x.dia === r.dia &&
+        x.lab === r.lab &&
+        x.curso === r.curso &&
+        x.profeId === r.profeId;
+    });
+  } else if (scope === 'anual') {
+    // Toda la serie anual del mismo curso/día/lab/profe
+    return RESERVAS.filter(function (x) {
+      return x.lab === r.lab &&
+        x.dia === r.dia &&
+        x.curso === r.curso &&
+        x.profeId === r.profeId &&
+        x.anual === true;
+    });
+  }
+  return [r];
+}
+
+// Ejecuta la reasignación
+function ejecutarReasignacion() {
+  var reservaId = parseInt(document.getElementById('reasignar-reserva-id').value);
+  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  if (!r) return;
+
+  var nuevoLab = document.getElementById('reasignar-lab').value;
+  var scope = document.getElementById('reasignar-scope').value;
+
+  if (!nuevoLab) { toast('Seleccioná un laboratorio destino.', 'err'); return; }
+
+  var labDestino = getLab(nuevoLab);
+  var labOrigen = getLab(r.lab);
+  var aReasignar = obtenerReservasParaReasignar(r, scope);
+
+  var movidas = 0;
+  var omitidas = 0;
+
+  aReasignar.forEach(function (res) {
+    // Verificar que no haya conflicto en el destino
+    var existente = RESERVAS.find(function (x) {
+      return x.semanaOffset === res.semanaOffset &&
+        x.dia === res.dia &&
+        x.modulo === res.modulo &&
+        x.lab === nuevoLab;
+    });
+    if (existente) {
+      omitidas++;
+      return;
+    }
+    res.lab = nuevoLab;
+    movidas++;
+  });
+
+  if (movidas === 0) {
+    toast('No se pudo reasignar: todos los horarios están ocupados en ' + labDestino.nombre + '.', 'warn');
+    return;
+  }
+
+  saveDB();
+  cerrarModal('modal-reasignar');
+
+  var msg = movidas + ' hora(s) reasignada(s) de ' + labOrigen.nombre + ' → ' + labDestino.nombre + '.';
+  if (omitidas) msg += ' (' + omitidas + ' omitida(s) por conflicto)';
+  toast(msg, 'ok');
   renderAll();
 }

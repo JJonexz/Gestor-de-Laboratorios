@@ -601,7 +601,7 @@ function verDetalle(reservaId) {
         ? '<button class="btn-ok" onclick="cerrarModal(\'modal-detalle\');renovarReserva(' + r.id + ')">🔄 Nueva reserva</button>'
         : '<button class="btn-ok" onclick="renovarReserva(' + r.id + ');cerrarModal(\'modal-detalle\')">↻ Solicitar renovación</button>';
     }
-    footer.innerHTML = '<button class="btn-cancel" onclick="cerrarModal(\'modal-detalle\')">Cerrar</button>' + renovBtn + (isOwn ? '<button class="btn-danger" onclick="cerrarModal(\'modal-detalle\');cancelarReserva(' + r.id + ')">Cancelar reserva</button>' : '');
+    footer.innerHTML = '<button class="btn-cancel" onclick="cerrarModal(\'modal-detalle\')">Cerrar</button>' + renovBtn + (isOwn ? '<button class="btn-ok" style="background:var(--amber);color:#333;" onclick="cerrarModal(\'modal-detalle\');abrirModalReasignar(' + r.id + ')">🔀 Reasignar</button>' : '') + (isOwn ? '<button class="btn-danger" onclick="cerrarModal(\'modal-detalle\');cancelarReserva(' + r.id + ')">Cancelar reserva</button>' : '');
   }
   abrirModal('modal-detalle');
 }
