@@ -779,6 +779,62 @@ function obtenerReservasParaReasignar(r, scope) {
   return [r];
 }
 
+// ── Mover reserva por drag & drop ────────────────────────────
+// Mueve una reserva a un nuevo día/módulo/lab conservando todos sus datos.
+// Solo el dueño o un directivo pueden mover la reserva.
+function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
+  var r = RESERVAS.find(function(x) { return x.id === reservaId; });
+  if (!r) { toast('No se encontró la reserva.', 'err'); return; }
+
+  var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
+  if (!isOwn) { toast('No tenés permiso para mover esta reserva.', 'err'); return; }
+
+  // Mismo slot: no hacer nada
+  if (r.dia === nuevoDia && r.modulo === nuevoModulo && r.lab === nuevoLab) return;
+
+  // Verificar que el destino esté libre
+  var ocupado = RESERVAS.find(function(x) {
+    return x.semanaOffset === semanaOffset &&
+      x.dia === nuevoDia &&
+      x.modulo === nuevoModulo &&
+      x.lab === nuevoLab &&
+      x.id !== reservaId;
+  });
+  if (ocupado) { toast('Ese horario ya está ocupado. No se puede mover.', 'warn'); return; }
+
+  var solicPendiente = SOLICITUDES.find(function(s) {
+    return s.semanaOffset === semanaOffset &&
+      s.dia === nuevoDia &&
+      s.modulo === nuevoModulo &&
+      s.lab === nuevoLab &&
+      s.estado === 'pendiente';
+  });
+  if (solicPendiente) { toast('Ese horario tiene una solicitud pendiente.', 'warn'); return; }
+
+  // Descripción del movimiento para confirmación
+  var modOrig  = getModulo(r.modulo);
+  var modDest  = getModulo(nuevoModulo);
+  var labOrig  = getLab(r.lab);
+  var labDest  = getLab(nuevoLab);
+
+  var desdeStr = DIAS_SEMANA[r.dia]   + ' · ' + modOrig.label + ' (' + modOrig.inicio + '–' + modOrig.fin + ')' + (r.lab !== nuevoLab ? ' · ' + labOrig.nombre : '');
+  var hastaStr = DIAS_SEMANA[nuevoDia] + ' · ' + modDest.label + ' (' + modDest.inicio + '–' + modDest.fin + ')' + (r.lab !== nuevoLab ? ' · ' + labDest.nombre : '');
+
+  confirmar(
+    '¿Mover <strong>' + r.curso + '</strong>?<br>' +
+    '<small style="color:var(--muted)">De: ' + desdeStr + '</small><br>' +
+    '<small style="color:var(--muted)">A:&nbsp;&nbsp; ' + hastaStr + '</small>',
+    function() {
+      r.dia    = nuevoDia;
+      r.modulo = nuevoModulo;
+      r.lab    = nuevoLab;
+      saveDB();
+      toast('Reserva movida a ' + hastaStr + '.', 'ok');
+      renderAll();
+    }
+  );
+}
+
 // Ejecuta la reasignación
 function ejecutarReasignacion() {
   var reservaId = parseInt(document.getElementById('reasignar-reserva-id').value);
