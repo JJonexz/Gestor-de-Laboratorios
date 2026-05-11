@@ -825,12 +825,58 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
     '<small style="color:var(--muted)">De: ' + desdeStr + '</small><br>' +
     '<small style="color:var(--muted)">A:&nbsp;&nbsp; ' + hastaStr + '</small>',
     function() {
+      // Guardar valores originales por si falla la API
+      var diaOriginal    = r.dia;
+      var moduloOriginal = r.modulo;
+      var labOriginal    = r.lab;
+
+      // Actualizar en memoria primero (respuesta optimista)
       r.dia    = nuevoDia;
       r.modulo = nuevoModulo;
       r.lab    = nuevoLab;
-      saveDB();
-      toast('Reserva movida a ' + hastaStr + '.', 'ok');
       renderAll();
+
+      // Persistir en la base de datos via API
+      fetch('api.php/reservas/' + r.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          semanaOffset: r.semanaOffset,
+          dia:          nuevoDia,
+          modulo:       nuevoModulo,
+          lab:          nuevoLab,
+          curso:        r.curso,
+          orient:       r.orient    || 'bas',
+          profeId:      r.profeId,
+          secuencia:    r.secuencia || '',
+          cicloClases:  r.cicloClases  || 1,
+          renovaciones: r.renovaciones || 0,
+          anual:        r.anual ? 1 : 0
+        })
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          saveDB();
+          toast('Reserva movida a ' + hastaStr + '.', 'ok');
+        } else {
+          // Revertir si la API devolvió error
+          r.dia    = diaOriginal;
+          r.modulo = moduloOriginal;
+          r.lab    = labOriginal;
+          renderAll();
+          toast('Error al guardar en la base de datos: ' + (data.error || 'Error desconocido'), 'err');
+        }
+      })
+      .catch(function(err) {
+        // Revertir si falló la conexión
+        r.dia    = diaOriginal;
+        r.modulo = moduloOriginal;
+        r.lab    = labOriginal;
+        renderAll();
+        toast('No se pudo conectar con el servidor.', 'err');
+        console.error('[moverReservaASlot] fetch error:', err);
+      });
     }
   );
 }
