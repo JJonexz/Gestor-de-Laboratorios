@@ -238,12 +238,10 @@ switch ($resource) {
         $b        = body();
         $username = strtolower(trim($b['username'] ?? ''));
         $password = $b['password'] ?? '';
-        $role     = $b['role'] ?? 'prof';
 
         // Administrador estático
         if ($username === 'admin' && $password === 'admin123') {
-            if ($role !== 'admin') err('Credenciales incorrectas para el rol seleccionado', 401);
-            ok(['id'=>0,'display'=>'Administrador','role'=>'admin','profeId'=>null]);
+            ok(['id'=>0,'display'=>'Administrador','role'=>'admin','profeId'=>null,'tag'=>'admin']);
         }
 
         // DNI numérico
@@ -298,11 +296,13 @@ switch ($resource) {
         }
 
         $display = ucwords(strtolower(trim($row['apellido'])));
+        $computedRole = (isset($row['tag']) && !empty(trim($row['tag']))) ? 'admin' : 'prof';
         ok([
             'id'      => (int)$row['dni'],
-            'display' => ($role === 'admin' ? '' : 'Prof. ') . $display,
-            'role'    => $role,
+            'display' => ($computedRole === 'admin' ? '' : 'Prof. ') . $display,
+            'role'    => $computedRole,
             'profeId' => $profId ? (int)$profId : null,
+            'tag'     => $row['tag'] ?? '',
         ]);
 
     // ── PERSONAL (búsqueda de docentes) ──────────────────────

@@ -90,20 +90,6 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
     </div>
   </div>
 
-  <div class="role-group">
-    <label class="form-label">Entrás como…</label>
-    <div class="role-selector">
-      <label class="role-btn sel" id="role-prof" onclick="selRole('prof')">
-        <span class="role-btn-icon">👤</span>
-        <span class="role-btn-label">Docente</span>
-      </label>
-      <label class="role-btn" id="role-admin" onclick="selRole('admin')">
-        <span class="role-btn-icon">🔑</span>
-        <span class="role-btn-label">Directivo</span>
-      </label>
-    </div>
-  </div>
-
   <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar →</button>
 
   <div class="info-box">
@@ -117,13 +103,6 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
 
 <script>
 var SESSION_KEY = 'SAEP_session_data';
-var selectedRole = 'prof';
-
-function selRole(r) {
-  selectedRole = r;
-  document.getElementById('role-prof').classList.toggle('sel', r === 'prof');
-  document.getElementById('role-admin').classList.toggle('sel', r === 'admin');
-}
 
 function togglePass() {
   var f = document.getElementById('f-pass');
@@ -151,7 +130,7 @@ function doLogin() {
   fetch('./api.php/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: username, password: password, role: selectedRole })
+    body: JSON.stringify({ username: username, password: password })
   })
   .then(function(r) { return r.json(); })
   .then(function(json) {
@@ -165,18 +144,11 @@ function doLogin() {
     }
 
     var found = json.data;
-    var isAdmin = (found.role === 'admin' || found.id === 0);
-
-    // Validar coherencia rol seleccionado / rol devuelto
-    if (selectedRole === 'admin' && !isAdmin) {
-      errEl.textContent = 'No tenés permisos de directivo.';
-      errEl.classList.add('show');
-      return;
-    }
+    var userRole = (found.tag && found.tag.trim() !== '') ? 'admin' : 'prof';
 
     var sessionPayload = {
       user:    username,
-      role:    (selectedRole === 'admin' && isAdmin) ? 'admin' : 'prof',
+      role:    userRole,
       id:      found.id,
       display: found.display,
       profeId: found.profeId != null ? found.profeId : found.id
