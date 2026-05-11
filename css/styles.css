@@ -534,9 +534,11 @@ a { text-decoration: none; }
 }
 
 .toggle-btn {
-  position: absolute;
+  position: relative;
+  align-self: flex-end;
   top: 10px;
   right: 6px;
+  margin-bottom: 3px;
   width: 26px;
   height: 26px;
   border-radius: 50%;
@@ -547,7 +549,8 @@ a { text-decoration: none; }
   align-items: center;
   justify-content: center;
   z-index: 10;
-  transition: all .12s;
+  transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
 }
 
 .toggle-btn:hover {
@@ -679,7 +682,7 @@ a { text-decoration: none; }
 
 /* Contenedor de labs con animación suave */
 .labs-container {
-  max-height: 200px;
+  max-height: 400px;
   overflow-y: auto;
   overflow-x: hidden;
   transition: max-height .22s ease, opacity .15s ease;
