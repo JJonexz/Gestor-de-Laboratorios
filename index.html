@@ -10,6 +10,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* ── Drag & Drop de reservas ── */
+    .at-event[draggable="true"] { cursor: grab; }
+    .at-event[draggable="true"]:active { cursor: grabbing; }
+    .at-event.dragging { opacity: .45; box-shadow: 0 0 0 2px var(--navy); }
+    .drag-hint { font-size: 14px; color: rgba(255,255,255,.6); margin-top: 1px; }
+    .at-event[draggable="true"]:hover .drag-hint { color: rgba(255,255,255,.95); }
+    .at-libre.drag-over {
+      background: var(--navy-faint, #eef2f9) !important;
+      border: 2px dashed var(--navy, #1a3a6b) !important;
+      transform: scale(1.04);
+      transition: transform .1s, border .1s;
+    }
+  </style>
   <link rel="icon" type="image/webp" href="img/logo.webp">
 </head>
 

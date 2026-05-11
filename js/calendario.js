@@ -262,11 +262,12 @@ function renderCalendario() {
           var puedeEditar = esDirectivo() || r.profeId === getCurrentProfId();
           html +=
             '<div class="at-event ' + ori.ev + '" role="button" tabindex="0" ' +
-            'onclick="verDetalle(' + r.id + ')" title="' + r.curso + ' — Prof. ' + p.apellido + '">' +
+            (puedeEditar ? 'draggable="true" ondragstart="dragReservaStart(event,' + r.id + ')" ondragend="dragReservaEnd(event)" ' : '') +
+            'onclick="verDetalle(' + r.id + ')" title="' + r.curso + ' — Prof. ' + p.apellido + (puedeEditar ? ' · Arrastrá para mover' : '') + '">' +
               '<div class="at-ev-curso">' + r.curso + ' ' + ori.emoji + '</div>' +
               '<div class="at-ev-prof">'  + p.apellido + '</div>' +
               (puedeEditar
-                ? '<div class="at-ev-edit-hint" title="Clic para editar">✎</div>'
+                ? '<div class="at-ev-edit-hint drag-hint" title="Arrastrá para cambiar de horario">⠿</div>'
                 : '') +
             '</div>';
         }
@@ -300,12 +301,52 @@ function renderCalendario() {
 // Genera el HTML de una celda libre (helper interno)
 function _celdaLibre(dia, modulo, labId) {
   return (
-    '<div class="at-event at-libre" role="button" tabindex="0" ' +
+    '<div class="at-event at-libre drag-target" role="button" tabindex="0" ' +
     'onclick="abrirModalReservaSlot(' + dia + ',' + modulo + ',\'' + labId + '\')" ' +
+    'ondragover="dragOverLibre(event)" ondragleave="dragLeaveLibre(event)" ondrop="dropReserva(event,' + dia + ',' + modulo + ',\'' + labId + '\')" ' +
     'title="Disponible — clic para reservar">' +
       '<span class="at-ev-plus">+</span>' +
     '</div>'
   );
+}
+
+// ── Drag & Drop de reservas ───────────────────────────────────
+var _dragReservaId = null;
+
+function dragReservaStart(event, reservaId) {
+  _dragReservaId = reservaId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', reservaId);
+  // Pequeño delay para que el navegador muestre el ghost antes de opacar
+  var el = event.currentTarget;
+  setTimeout(function() { el.classList.add('dragging'); }, 0);
+}
+
+function dragReservaEnd(event) {
+  _dragReservaId = null;
+  var el = event.currentTarget;
+  if (el) el.classList.remove('dragging');
+  // Limpiar highlights en targets
+  document.querySelectorAll('.drag-over').forEach(function(e) { e.classList.remove('drag-over'); });
+}
+
+function dragOverLibre(event) {
+  if (_dragReservaId === null) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  event.currentTarget.classList.add('drag-over');
+}
+
+function dragLeaveLibre(event) {
+  event.currentTarget.classList.remove('drag-over');
+}
+
+function dropReserva(event, nuevoDia, nuevoModulo, nuevoLab) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  var reservaId = _dragReservaId !== null ? _dragReservaId : parseInt(event.dataTransfer.getData('text/plain'));
+  if (!reservaId) return;
+  moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab);
 }
 
 // ── Edición de recreos ────────────────────────────────────────
