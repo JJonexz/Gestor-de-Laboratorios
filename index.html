@@ -564,11 +564,33 @@
       
       <!-- FILA DE CURSO, GRUPO Y MATERIA -->
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="f-curso">Curso</label>
-          <select class="form-control" id="f-curso" required>
+        <div class="form-group" style="position: relative;" id="f-curso-container">
+          <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span>Curso</span>
+            <a href="#" id="add-another-course" style="font-size: 11px; font-weight: 600; color: var(--navy); text-decoration: none;">🔗 Agrupar otro curso</a>
+          </label>
+          <input type="text" class="form-control" id="f-curso-search" placeholder="🔍 Buscar curso..." autocomplete="off" required>
+          <div class="custom-select-dropdown" id="f-curso-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 160px; overflow-y: auto; background: var(--white); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 1000; padding: 4px 0; margin-top: 4px;">
+            <!-- Cursos se renderizan aquí -->
+          </div>
+          <select id="f-curso" style="display:none;" required>
             <option value="">Seleccionar curso…</option>
           </select>
+
+          <!-- SEGUNDO CURSO (AGRUPADO) - OCULTO POR DEFECTO -->
+          <div class="form-group" style="position: relative; display: none; margin-top: 8px;" id="f-curso-2-container">
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+              <span style="color:var(--navy); font-weight:600;">Segundo Curso (Agrupado)</span>
+              <a href="#" id="remove-course-2" style="color: var(--red); text-decoration: none; font-size: 11px; font-weight: 600;">✕ Quitar</a>
+            </label>
+            <input type="text" class="form-control" id="f-curso-search-2" placeholder="🔍 Buscar segundo curso..." autocomplete="off">
+            <div class="custom-select-dropdown" id="f-curso-dropdown-2" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 160px; overflow-y: auto; background: var(--white); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 1000; padding: 4px 0; margin-top: 4px;">
+              <!-- Cursos secundarios se renderizan aquí -->
+            </div>
+            <select id="f-curso-2" style="display:none;">
+              <option value="">Seleccionar curso…</option>
+            </select>
+          </div>
         </div>
         
         <!-- AGREGADO: Campo Grupo (inmediatamente después de curso) -->

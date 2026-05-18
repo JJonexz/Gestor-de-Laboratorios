@@ -253,7 +253,7 @@ function renderCalendario() {
 
       if (rs.length > 0) {
         var rendered = 0;
-        var usaStack = rs.length > 1 || rs.length < maxG;
+        var usaStack = rs.length > 1 || (rs.length > 0 && esDirectivo()) || rs.length < maxG;
         if (usaStack) html += '<div class="at-cell-stack">';
         rs.forEach(function(r) {
           var oriOk = filtroOrient === 'all' || r.orient === filtroOrient;
@@ -276,7 +276,7 @@ function renderCalendario() {
         // slot con espacio libre → mostrar "+" para agregar grupo adicional
         if (rendered === 0) {
           html += _celdaLibre(diaActual, mid, lab.id);
-        } else if (rs.length < maxG && esDirectivo()) {
+        } else if (esDirectivo()) {
           html += '<div class="at-slot-extra">' + _celdaLibre(diaActual, mid, lab.id) + '</div>';
         }
         if (usaStack) html += '</div>';

@@ -87,14 +87,106 @@ function poblarSelectsReserva() {
       }).join('');
   });
 
-  // Cursos (master table)
-  var fCurso = document.getElementById('f-curso');
-  if (fCurso && CURSOS.length > 0) {
-    fCurso.innerHTML = '<option value="">Seleccionar curso…</option>' +
-      CURSOS.map(function(c) {
-        var label = c.ano + '°' + c.division + (c.turno ? ' ('+c.turno+')' : '');
-        return '<option value="'+label+'">'+label+'</option>';
-      }).join('');
+  // Función helper para habilitar buscador customizado en un select
+  function habilitarBuscadorCurso(selId, searchId, dropId, containerId) {
+    var fSel = document.getElementById(selId);
+    var fSearch = document.getElementById(searchId);
+    var fDrop = document.getElementById(dropId);
+
+    if (fSel && fSearch && fDrop && CURSOS.length > 0) {
+      // 1. Poblar el select
+      fSel.innerHTML = '<option value="">Seleccionar curso…</option>' +
+        CURSOS.map(function(c) {
+          var label = c.ano + '°' + c.division + (c.turno ? ' ('+c.turno+')' : '');
+          return '<option value="'+label+'">'+label+'</option>';
+        }).join('');
+
+      // 2. Definir función para renderizar dropdown custom
+      function renderCustomDropdown(filtro) {
+        var query = (filtro || '').toLowerCase().trim();
+        var filtered = CURSOS.filter(function(c) {
+          var label = (c.ano + '°' + c.division + (c.turno ? ' ('+c.turno+')' : '')).toLowerCase();
+          return !query || label.indexOf(query) >= 0;
+        });
+
+        if (filtered.length === 0) {
+          fDrop.innerHTML = '<div style="padding: 8px 12px; color: var(--muted); font-size: 0.85rem; text-align: center;">No se encontraron cursos</div>';
+          return;
+        }
+
+        fDrop.innerHTML = filtered.map(function(c) {
+          var label = c.ano + '°' + c.division + (c.turno ? ' ('+c.turno+')' : '');
+          return '<div class="custom-select-item" data-val="' + label + '">' + label + '</div>';
+        }).join('');
+
+        // Evento click al elegir un curso
+        fDrop.querySelectorAll('.custom-select-item').forEach(function(item) {
+          item.addEventListener('click', function() {
+            var val = this.getAttribute('data-val');
+            fSearch.value = val;
+            fSel.value = val;
+            fSel.dispatchEvent(new Event('change'));
+            fDrop.style.display = 'none';
+          });
+        });
+      }
+
+      renderCustomDropdown('');
+
+      // Binders para la búsqueda interactiva
+      if (!fSearch.dataset.bind) {
+        fSearch.addEventListener('focus', function() {
+          fDrop.style.display = 'block';
+          renderCustomDropdown(this.value);
+        });
+
+        fSearch.addEventListener('input', function() {
+          fDrop.style.display = 'block';
+          renderCustomDropdown(this.value);
+        });
+
+        // Cerrar dropdown al hacer click afuera
+        document.addEventListener('click', function(e) {
+          var container = document.getElementById(containerId);
+          if (container && !container.contains(e.target)) {
+            fDrop.style.display = 'none';
+          }
+        });
+
+        fSearch.dataset.bind = '1';
+      }
+    }
+  }
+
+  // Inicializar buscadores para ambos cursos
+  habilitarBuscadorCurso('f-curso', 'f-curso-search', 'f-curso-dropdown', 'f-curso-container');
+  habilitarBuscadorCurso('f-curso-2', 'f-curso-search-2', 'f-curso-dropdown-2', 'f-curso-2-container');
+
+  // Lógica para agregar/quitar el segundo curso dinámicamente
+  var addBtn = document.getElementById('add-another-course');
+  var removeBtn = document.getElementById('remove-course-2');
+  var curso2Container = document.getElementById('f-curso-2-container');
+  var fCurso2 = document.getElementById('f-curso-2');
+  var fCursoSearch2 = document.getElementById('f-curso-search-2');
+
+  if (addBtn && removeBtn && curso2Container) {
+    if (!addBtn.dataset.bind) {
+      addBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        curso2Container.style.display = 'block';
+        addBtn.style.display = 'none';
+      });
+
+      removeBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        curso2Container.style.display = 'none';
+        addBtn.style.display = 'inline-block';
+        if (fCurso2) fCurso2.value = '';
+        if (fCursoSearch2) fCursoSearch2.value = '';
+      });
+
+      addBtn.dataset.bind = '1';
+    }
   }
 
   // Materias (datalist)
@@ -115,6 +207,21 @@ function abrirModalReserva() {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
+  var fCursoSearch = document.getElementById('f-curso-search');
+  if (fCursoSearch) fCursoSearch.value = '';
+
+  var fCursoSearch2 = document.getElementById('f-curso-search-2');
+  if (fCursoSearch2) fCursoSearch2.value = '';
+
+  var fCurso2 = document.getElementById('f-curso-2');
+  if (fCurso2) fCurso2.value = '';
+
+  var curso2Container = document.getElementById('f-curso-2-container');
+  if (curso2Container) curso2Container.style.display = 'none';
+
+  var addBtn = document.getElementById('add-another-course');
+  if (addBtn) addBtn.style.display = 'inline-block';
+
   UIHelper.setOrientValues('f-orient-group', 'bas');
   var fmod = document.getElementById('f-modulo'); if (fmod) fmod.value = '';
   var fper = document.getElementById('f-periodo'); if (fper) fper.value = '1';
@@ -154,6 +261,22 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   var fMod = document.getElementById('f-modulo');
 
   if (fLab) fLab.value = lab;
+
+  var fCursoSearch = document.getElementById('f-curso-search');
+  if (fCursoSearch) fCursoSearch.value = '';
+
+  var fCursoSearch2 = document.getElementById('f-curso-search-2');
+  if (fCursoSearch2) fCursoSearch2.value = '';
+
+  var fCurso2 = document.getElementById('f-curso-2');
+  if (fCurso2) fCurso2.value = '';
+
+  var curso2Container = document.getElementById('f-curso-2-container');
+  if (curso2Container) curso2Container.style.display = 'none';
+
+  var addBtn = document.getElementById('add-another-course');
+  if (addBtn) addBtn.style.display = 'inline-block';
+
   if (fDia) fDia.value = dia;
   if (fMod) fMod.value = modulo;
 
@@ -224,31 +347,55 @@ function poblarSelectorGrupo(cursoId, grupoIdActual) {
   });
 }
 
-// ── Verificación de conflicto en tiempo real ─────────────────
 function checkConflict() {
-  var lab = document.getElementById('f-lab');
+  var labs = [];
+  var labGroup = document.getElementById('f-lab-group');
+  if (labGroup) {
+    document.querySelectorAll('#f-lab-group input[type="checkbox"]:checked').forEach(function(cb) {
+      labs.push(cb.value);
+    });
+  }
+  if (labs.length === 0) {
+    var lab = document.getElementById('f-lab');
+    if (lab && lab.value) labs.push(lab.value);
+  }
+
   var dia = document.getElementById('f-dia');
   var mod = document.getElementById('f-modulo');
   var cw = document.getElementById('conflict-warning');
-  if (!lab || !dia || !mod || !cw) return;
-  if (!lab.value || dia.value === '' || mod.value === '') { cw.classList.remove('show'); return; }
+  if (labs.length === 0 || !dia || !mod || !cw) {
+    if (cw) cw.classList.remove('show');
+    return;
+  }
+  if (dia.value === '' || mod.value === '') { cw.classList.remove('show'); return; }
 
-  var labData2  = getLab(lab.value);
-  var maxG2     = (labData2 && labData2.max_grupos) ? labData2.max_grupos : 1;
-  var enSlot2   = RESERVAS.filter(function(r) {
-    return r.semanaOffset === semanaOffset
-      && r.dia === parseInt(dia.value)
-      && r.modulo === parseInt(mod.value)
-      && r.lab === lab.value;
-  });
-  var solConflict = SOLICITUDES.find(function(s) {
-    return s.semanaOffset === semanaOffset
-      && s.dia === parseInt(dia.value)
-      && s.modulo === parseInt(mod.value)
-      && s.lab === lab.value
-      && s.estado === 'pendiente';
-  });
-  cw.classList.toggle('show', !!(enSlot2.length >= maxG2 || solConflict));
+  var conflict = false;
+
+  for (var i = 0; i < labs.length; i++) {
+    var labVal = labs[i];
+    var labData2  = getLab(labVal);
+    var maxG2     = (labData2 && labData2.max_grupos) ? labData2.max_grupos : 1;
+    var enSlot2   = RESERVAS.filter(function(r) {
+      return r.semanaOffset === semanaOffset
+        && r.dia === parseInt(dia.value)
+        && r.modulo === parseInt(mod.value)
+        && r.lab === labVal;
+    });
+    var solConflict = SOLICITUDES.find(function(s) {
+      return s.semanaOffset === semanaOffset
+        && s.dia === parseInt(dia.value)
+        && s.modulo === parseInt(mod.value)
+        && s.lab === labVal
+        && s.estado === 'pendiente';
+    });
+
+    if (enSlot2.length >= maxG2 || solConflict) {
+      conflict = true;
+      break;
+    }
+  }
+
+  cw.classList.toggle('show', conflict);
 }
 
 // ── Expande un período a una lista de IDs de módulos ─────────
@@ -890,24 +1037,35 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
   // Mismo slot: no hacer nada
   if (r.dia === nuevoDia && r.modulo === nuevoModulo && r.lab === nuevoLab) return;
 
-  // Verificar que el destino esté libre
-  var ocupado = RESERVAS.find(function(x) {
+  // Verificar que el destino no haya alcanzado el cupo máximo de grupos
+  var labDestData = getLab(nuevoLab);
+  var maxG = (labDestData && labDestData.max_grupos) ? labDestData.max_grupos : 1;
+
+  var reservasDest = RESERVAS.filter(function(x) {
     return x.semanaOffset === semanaOffset &&
       x.dia === nuevoDia &&
       x.modulo === nuevoModulo &&
       x.lab === nuevoLab &&
       x.id !== reservaId;
   });
-  if (ocupado) { toast('Ese horario ya está ocupado. No se puede mover.', 'warn'); return; }
 
-  var solicPendiente = SOLICITUDES.find(function(s) {
+  if (reservasDest.length >= maxG) {
+    toast('El salón de destino (' + labDestData.nombre + ') ya alcanzó el límite de ' + maxG + ' grupo(s) para este módulo.', 'warn');
+    return;
+  }
+
+  var solicPendiente = SOLICITUDES.filter(function(s) {
     return s.semanaOffset === semanaOffset &&
       s.dia === nuevoDia &&
       s.modulo === nuevoModulo &&
       s.lab === nuevoLab &&
       s.estado === 'pendiente';
   });
-  if (solicPendiente) { toast('Ese horario tiene una solicitud pendiente.', 'warn'); return; }
+
+  if (reservasDest.length + solicPendiente.length >= maxG) {
+    toast('El salón de destino (' + labDestData.nombre + ') ya tiene solicitudes pendientes que completan el límite.', 'warn');
+    return;
+  }
 
   // Descripción del movimiento para confirmación
   var modOrig  = getModulo(r.modulo);
@@ -918,8 +1076,13 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
   var desdeStr = DIAS_SEMANA[r.dia]   + ' · ' + modOrig.label + ' (' + modOrig.inicio + '–' + modOrig.fin + ')' + (r.lab !== nuevoLab ? ' · ' + labOrig.nombre : '');
   var hastaStr = DIAS_SEMANA[nuevoDia] + ' · ' + modDest.label + ' (' + modDest.inicio + '–' + modDest.fin + ')' + (r.lab !== nuevoLab ? ' · ' + labDest.nombre : '');
 
+  var esAgrupamiento = reservasDest.length > 0;
+  var confirmTitle = esAgrupamiento
+    ? '¿Estás seguro de agrupar <strong>' + r.curso + '</strong> en el salón ' + labDest.nombre + ' junto con el curso ' + reservasDest.map(function(x){ return '<strong>'+x.curso+'</strong>'; }).join(', ') + '?'
+    : '¿Mover <strong>' + r.curso + '</strong>?';
+
   confirmar(
-    '¿Mover <strong>' + r.curso + '</strong>?<br>' +
+    confirmTitle + '<br>' +
     '<small style="color:var(--muted)">De: ' + desdeStr + '</small><br>' +
     '<small style="color:var(--muted)">A:&nbsp;&nbsp; ' + hastaStr + '</small>',
     function() {

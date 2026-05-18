@@ -2021,59 +2021,38 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 }
 .at-cell-stack {
   display: flex;
-  flex-direction: row;
-  gap: 2px;
+  flex-direction: column;
+  gap: 4px;
   width: 100%;
   height: 100%;
   align-items: stretch;
 }
 
 .at-cell-stack > .at-event {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 38px;
+  height: auto;
+  width: 100%;
   overflow: hidden;
-  width: 0;        /* fuerza distribución equitativa ignorando contenido */
+  padding: 4px 5px 4px 7px;
 }
 
 .at-cell-stack > .at-slot-extra {
-  flex: 0 0 26px;
-  min-width: 0;
+  flex: 0 0 0px;
+  min-height: 0px;
   overflow: hidden;
+  opacity: 0;
+  margin-top: 0px;
+  transition: flex-basis 0.2s ease, min-height 0.2s ease, opacity 0.2s ease, margin 0.2s ease;
 }
-/* Eventos dentro de stack multi-grupo: texto adaptable */
-.at-cell-stack > .at-event {
-  padding: 3px 2px 3px 7px;
-  gap: 1px;
-  justify-content: center;       /* centra el bloque curso+prof+grupo verticalmente */
+
+.at-event-cell:hover .at-cell-stack > .at-slot-extra {
+  flex: 0 0 38px;
+  min-height: 38px;
+  margin-top: 4px;
+  opacity: 1;
 }
-.at-cell-stack > .at-event::before {
-  width: 3px;                 /* uniforme con eventos normales */
-}
-.at-cell-stack > .at-event .at-ev-curso {
-  font-size: .62rem;
-  white-space: normal;
-  overflow-wrap: break-word;  /* rompe solo si no hay otra opción */
-  word-break: normal;         /* no parte palabras a mitad */
-  line-height: 1.1;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;      /* máximo 2 líneas */
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.at-cell-stack > .at-event .at-ev-prof {
-  font-size: .55rem;
-  white-space: nowrap;        /* apellido: 1 línea + ellipsis */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.1;
-}
-.at-cell-stack > .at-event .at-ev-grupo {
-  display: inline-block;
-  align-self: flex-start;   /* badge no se estira al ancho del evento */
-  font-size: .55rem;
-  padding: 0 2px;
-  margin-top: 1px;
-}
+
 .at-cell-stack > .at-event .at-ev-edit-hint {
   display: none;
 }
@@ -2136,13 +2115,27 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   border-radius: var(--radius-sm);
   align-items: center;
   justify-content: center;
-  opacity: 0.6;
+  opacity: 0;
   transition: opacity 0.2s, border-color 0.2s;
 }
 
-.at-event-cell > .at-libre:hover {
+.at-event-cell:hover > .at-libre {
   opacity: 1;
   border-color: var(--navy);
+}
+
+/* Custom searchable select dropdown styling */
+.custom-select-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.15s ease, color 0.15s ease;
+  color: var(--navy-dark, #0d1e3d);
+}
+
+.custom-select-item:hover {
+  background: var(--navy-faint, #eef2f9);
+  color: var(--navy);
 }
 
 /* Icono "+" de la celda vacía principal (centrado y grande) */

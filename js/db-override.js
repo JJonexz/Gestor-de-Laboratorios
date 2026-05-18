@@ -9,10 +9,27 @@
 // ── guardarReserva ───────────────────────────────────────────
 var _guardarReserva_original = guardarReserva;
 guardarReserva = function() {
-  var lab      = document.getElementById('f-lab').value;
+  var labVal = document.getElementById('f-lab').value;
+  if (!labVal) {
+    toast('Por favor, selecciona un laboratorio.', 'err');
+    return;
+  }
+  var currentLab = labVal;
+
   var dia      = document.getElementById('f-dia').value;
   var modulo   = document.getElementById('f-modulo').value;
-  var curso    = document.getElementById('f-curso').value.trim();
+  
+  // Obtener cursos (con soporte para agrupamiento de 2 cursos)
+  var courses = [];
+  var cursoVal1 = document.getElementById('f-curso').value.trim();
+  if (cursoVal1) courses.push(cursoVal1);
+  
+  var cursoVal2 = document.getElementById('f-curso-2') ? document.getElementById('f-curso-2').value.trim() : '';
+  var isCurso2Visible = document.getElementById('f-curso-2-container') && document.getElementById('f-curso-2-container').style.display !== 'none';
+  if (isCurso2Visible && cursoVal2) {
+    courses.push(cursoVal2);
+  }
+
   var materia  = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
   var secuencia = document.getElementById('f-secuencia').value.trim();
   var orient   = UIHelper.getOrientValues('f-orient-group');
@@ -23,8 +40,8 @@ guardarReserva = function() {
   var anualChk = document.querySelector('#modal-reserva #f-anual');
   var esAnual  = esDirectivo() && anualChk !== null && anualChk.checked;
 
-  if (!lab || dia === '' || modulo === '' || !curso || !secuencia) {
-    toast('Por favor completa todos los campos.', 'err'); return;
+  if (!currentLab || dia === '' || modulo === '' || courses.length === 0 || !secuencia) {
+    toast('Por favor completa todos los campos y selecciona al menos un curso.', 'err'); return;
   }
 
   var modulosAReservar = getModulosParaPeriodo(parseInt(modulo), periodo);
@@ -35,24 +52,50 @@ guardarReserva = function() {
     for (var sw = semanaBase; sw < semanaBase + 40; sw++) semanasAReservar.push(sw);
   }
 
+  var forceBooking = 0;
   if (!esAnual) {
-    var _labData   = getLab(lab);
+    var _labData   = getLab(currentLab);
     var _maxGrupos = (_labData && _labData.max_grupos) ? _labData.max_grupos : 1;
     for (var mi = 0; mi < modulosAReservar.length; mi++) {
       var m = modulosAReservar[mi];
       var reservasEnSlot = RESERVAS.filter(function(r) {
-        return r.semanaOffset === semanaOffset && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
+        return r.semanaOffset === semanaOffset && r.dia === parseInt(dia) && r.modulo === m && r.lab === currentLab;
       });
-      if (reservasEnSlot.length >= _maxGrupos) {
-        toast('El módulo ' + getModulo(m).label + ' ya tiene ' + _maxGrupos + ' grupo(s) asignado(s) (máximo del salón).', 'warn');
-        return;
+      // Si el total de reservas existentes más las nuevas superan el límite
+      if (reservasEnSlot.length + courses.length > _maxGrupos) {
+        if (esDirectivo()) {
+          var confirmarForzar = confirm(
+            'El módulo ' + getModulo(m).label + ' en ' + _labData.nombre + ' ya tiene ' + reservasEnSlot.length + ' grupo(s) asignado(s) de un máximo de ' + _maxGrupos + '.\n\n' +
+            '¿Desea forzar la reserva de todas formas (colocar los cursos uno encima de otro)?'
+          );
+          if (confirmarForzar) {
+            forceBooking = 1;
+          } else {
+            return;
+          }
+        } else {
+          toast('El módulo ' + getModulo(m).label + ' en ' + _labData.nombre + ' ya tiene ' + reservasEnSlot.length + ' grupo(s) asignado(s) (máximo de ' + _maxGrupos + ').', 'warn');
+          return;
+        }
       }
       var solicsPendientes = SOLICITUDES.filter(function(s) {
-        return s.semanaOffset === semanaOffset && s.dia === parseInt(dia) && s.modulo === m && s.lab === lab && s.estado === 'pendiente';
+        return s.semanaOffset === semanaOffset && s.dia === parseInt(dia) && s.modulo === m && s.lab === currentLab && s.estado === 'pendiente';
       });
-      if (reservasEnSlot.length + solicsPendientes.length >= _maxGrupos) {
-        toast('El módulo ' + getModulo(m).label + ' ya tiene solicitudes pendientes que completarían el cupo del salón.', 'warn');
-        return;
+      if (reservasEnSlot.length + solicsPendientes.length + courses.length > _maxGrupos && !forceBooking) {
+        if (esDirectivo()) {
+          var confirmarForzar2 = confirm(
+            'El módulo ' + getModulo(m).label + ' en ' + _labData.nombre + ' tiene solicitudes pendientes que completarían el cupo del salón.\n\n' +
+            '¿Desea forzar la reserva de todas formas?'
+          );
+          if (confirmarForzar2) {
+            forceBooking = 1;
+          } else {
+            return;
+          }
+        } else {
+          toast('El módulo ' + getModulo(m).label + ' en ' + _labData.nombre + ' ya tiene solicitudes pendientes.', 'warn');
+          return;
+        }
       }
     }
   }
@@ -68,42 +111,46 @@ guardarReserva = function() {
     var promises = [];
     semanasAReservar.forEach(function(sem) {
       modulosAReservar.forEach(function(m) {
-        var enSlotAnual = RESERVAS.filter(function(r) {
-          return r.semanaOffset === sem && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
+        courses.forEach(function(curso) {
+          var enSlotAnual = RESERVAS.filter(function(r) {
+            return r.semanaOffset === sem && r.dia === parseInt(dia) && r.modulo === m && r.lab === currentLab;
+          });
+          var _labA   = getLab(currentLab);
+          var _maxA   = (_labA && _labA.max_grupos) ? _labA.max_grupos : 1;
+          if (enSlotAnual.length >= _maxA && !forceBooking) return;
+          var grupoIdEl = document.getElementById('reserva-grupo');
+          var grupoId   = grupoIdEl && grupoIdEl.value !== '' ? parseInt(grupoIdEl.value) : null;
+          promises.push(apiPost('reservas', {
+            semanaOffset: sem, dia: parseInt(dia), modulo: m, lab: currentLab, curso: curso,
+            orient: orient, profeId: profeId, secuencia: secuencia, cicloClases: 1,
+            renovaciones: 0, anual: esAnual ? 1 : 0, grupoId: grupoId, force: forceBooking
+          }));
         });
-        var _labA   = getLab(lab);
-        var _maxA   = (_labA && _labA.max_grupos) ? _labA.max_grupos : 1;
-        if (enSlotAnual.length >= _maxA) return;
-        var grupoIdEl = document.getElementById('reserva-grupo');
-        var grupoId   = grupoIdEl && grupoIdEl.value !== '' ? parseInt(grupoIdEl.value) : null;
-        promises.push(apiPost('reservas', {
-          semanaOffset: sem, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
-          orient: orient, profeId: profeId, secuencia: secuencia, cicloClases: 1,
-          renovaciones: 0, anual: esAnual ? 1 : 0, grupoId: grupoId
-        }));
       });
     });
     Promise.all(promises).then(function(nuevas) {
       nuevas.forEach(function(r) { RESERVAS.push(r); });
       toast(esAnual
-        ? 'Reserva anual creada: ' + nuevas.length + ' entradas.'
-        : 'Reserva creada (' + nuevas.length + ' modulo' + (nuevas.length > 1 ? 's' : '') + ').', 'ok');
+        ? 'Reserva anual creada para ' + courses.length + ' curso(s): ' + nuevas.length + ' entradas.'
+        : 'Reserva creada con agrupamiento de curso(s) (' + nuevas.length + ' módulo' + (nuevas.length > 1 ? 's' : '') + ').', 'ok');
       renderAll();
     }).catch(function(e) { toast('Error al guardar: ' + e.message, 'err'); });
   } else {
     var promises2 = [];
     modulosAReservar.forEach(function(m) {
-      var grupoIdEl2 = document.getElementById('reserva-grupo');
-      var grupoId2   = grupoIdEl2 && grupoIdEl2.value !== '' ? parseInt(grupoIdEl2.value) : null;
-      promises2.push(apiPost('solicitudes', {
-        semanaOffset: semanaOffset, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
-        orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()), secuencia: secuencia, cicloClases: 1,
-        estado: 'pendiente', esRenovacion: 0, renovacionNum: 0, grupoId: grupoId2
-      }));
+      courses.forEach(function(curso) {
+        var grupoIdEl2 = document.getElementById('reserva-grupo');
+        var grupoId2   = grupoIdEl2 && grupoIdEl2.value !== '' ? parseInt(grupoIdEl2.value) : null;
+        promises2.push(apiPost('solicitudes', {
+          semanaOffset: semanaOffset, dia: parseInt(dia), modulo: m, lab: currentLab, curso: curso,
+          orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()), secuencia: secuencia, cicloClases: 1,
+          estado: 'pendiente', esRenovacion: 0, renovacionNum: 0, grupoId: grupoId2
+        }));
+      });
     });
     Promise.all(promises2).then(function(nuevas) {
       nuevas.forEach(function(s) { SOLICITUDES.push(s); });
-      toast('Solicitud enviada (' + nuevas.length + ' modulo' + (nuevas.length > 1 ? 's' : '') + ').', 'info');
+      toast('Solicitud de reserva enviada para ' + courses.length + ' curso(s) (' + nuevas.length + ' módulo' + (nuevas.length > 1 ? 's' : '') + ').', 'info');
       renderAll();
     }).catch(function(e) { toast('Error al enviar solicitud: ' + e.message, 'err'); });
   }
