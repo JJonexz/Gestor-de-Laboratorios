@@ -6,9 +6,40 @@
 //   • Menú hamburguesa y menú de sesión
 //   • Cerrar sesión
 //   • Filtros de orientación y laboratorio
+//   • Toggle collapse/expand de sidebar
 //
 // Depende de: config.js, ui.js
 // ============================================================
+
+// ── Toggle Sidebar ───────────────────────────────────────────
+const sidebar = document.getElementById('sidebar');
+const btn = document.getElementById('toggleBtn');
+let collapsed = false;
+
+if (btn && sidebar) {
+  btn.addEventListener('click', () => {
+    collapsed = !collapsed;
+    sidebar.classList.toggle('collapsed', collapsed);
+    btn.setAttribute('aria-label', collapsed ? 'Mostrar panel lateral' : 'Ocultar panel lateral');
+  });
+}
+
+// ── Toggle Labs Container ────────────────────────────────────
+const labsToggleBtn = document.getElementById('labsToggleBtn');
+const labsContainer = document.getElementById('sidebar-labs');
+let labsClosed = true; // Por defecto, cerrado
+
+if (labsToggleBtn && labsContainer) {
+  // Inicializar en estado cerrado
+  labsContainer.classList.add('closed');
+  labsToggleBtn.setAttribute('aria-expanded', 'false');
+
+  labsToggleBtn.addEventListener('click', () => {
+    labsClosed = !labsClosed;
+    labsContainer.classList.toggle('closed', labsClosed);
+    labsToggleBtn.setAttribute('aria-expanded', !labsClosed);
+  });
+}
 
 // ── Días del calendario ──────────────────────────────────────
 function navDia(dir) {
@@ -105,6 +136,12 @@ function selOrient(el, orient) {
   el.classList.add('sel');
   el.setAttribute('aria-selected', 'true');
   filtroOrient = orient;
+  renderCalendario();
+}
+
+// ── Filtro de búsqueda de laboratorio ─────────────────────────
+function setLabSearch(query) {
+  filtroBusquedaLab = query.toLowerCase().trim();
   renderCalendario();
 }
 

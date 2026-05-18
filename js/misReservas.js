@@ -60,19 +60,24 @@ function renderMisReservas() {
       '<div class="section-label-strip">⏳ Solicitudes pendientes de aprobación</div>' +
       '<div class="reservas-grid">' +
       misSols.map(function(s) {
-        var ori = ORIENTACIONES[s.orient];
+        var oris = (s.orient || 'bas').split(',');
+        var firstOri = ORIENTACIONES[oris[0]] || ORIENTACIONES.bas;
+        var orientBadges = oris.map(function(o) {
+          var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+          return '<span class="meta-tag orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
+        }).join('');
         var lab = getLab(s.lab);
         var mod = getModulo(s.modulo);
         return (
           '<div class="reserva-card reserva-card-pending">' +
-            '<div class="reserva-card-stripe ' + s.orient + '"></div>' +
+            '<div class="reserva-card-stripe ' + oris[0] + '"></div>' +
             '<div class="reserva-card-body">' +
               '<div class="reserva-card-header">' +
                 '<div>' +
                   '<div class="reserva-card-title">' + lab.nombre + '</div>' +
                   '<div class="reserva-meta">' +
                     '<span class="meta-tag">' + DIAS_LARGO[s.dia] + ' ' + mod.inicio + '</span>' +
-                    '<span class="meta-tag orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>' +
+                    orientBadges +
                   '</div>' +
                 '</div>' +
                 '<div class="reserva-curso-badge">' + s.curso + '</div>' +
@@ -96,7 +101,12 @@ function renderMisReservas() {
       '<div class="reservas-grid">' +
       misRes.map(function(r) {
         var p          = getProfe(r.profeId);
-        var ori        = ORIENTACIONES[r.orient];
+        var oris       = (r.orient || 'bas').split(',');
+        var firstOri   = ORIENTACIONES[oris[0]] || ORIENTACIONES.bas;
+        var orientBadges = oris.map(function(o) {
+          var ori = ORIENTACIONES[o] || ORIENTACIONES.bas;
+          return '<span class="meta-tag orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
+        }).join('');
         var lab        = getLab(r.lab);
         var mod        = getModulo(r.modulo);
         var needsRenew = r.cicloClases >= 3;
@@ -114,14 +124,14 @@ function renderMisReservas() {
 
         return (
           '<div class="reserva-card">' +
-            '<div class="reserva-card-stripe ' + r.orient + '"></div>' +
+            '<div class="reserva-card-stripe ' + oris[0] + '"></div>' +
             '<div class="reserva-card-body">' +
               '<div class="reserva-card-header">' +
                 '<div>' +
                   '<div class="reserva-card-title">' + lab.nombre + '</div>' +
                   '<div class="reserva-meta">' +
                     '<span class="meta-tag">' + DIAS_LARGO[r.dia] + ' ' + mod.inicio + '</span>' +
-                    '<span class="meta-tag orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>' +
+                    orientBadges +
                     (isAdmin ? '<span class="meta-tag">Prof. ' + p.apellido + '</span>' : '') +
                   '</div>' +
                 '</div>' +

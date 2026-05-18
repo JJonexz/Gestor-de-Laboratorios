@@ -70,14 +70,8 @@ function poblarSelectsReserva() {
     fPeriodo.innerHTML = opts;
   }
 
-  // Orientaciones
-  var fOrient = document.getElementById('f-orient');
-  if (fOrient) {
-    fOrient.innerHTML = Object.keys(ORIENTACIONES).map(function (k) {
-      var o = ORIENTACIONES[k];
-      return '<option value="' + k + '">' + o.emoji + ' ' + o.nombre + '</option>';
-    }).join('');
-  }
+  // Orientaciones (reset)
+  UIHelper.setOrientValues('f-orient-group', 'bas');
 
   // Profesores (solo para directivos)
   ['f-profe', 'edit-profe'].forEach(function (sid) {
@@ -92,6 +86,24 @@ function poblarSelectsReserva() {
         return '<option value="' + p.id + '">Prof. ' + p.apellido + ', ' + p.nombre + ' — ' + p.materia + '</option>';
       }).join('');
   });
+
+  // Cursos (master table)
+  var fCurso = document.getElementById('f-curso');
+  if (fCurso && CURSOS.length > 0) {
+    fCurso.innerHTML = '<option value="">Seleccionar curso…</option>' +
+      CURSOS.map(function(c) {
+        var label = c.ano + '°' + c.division + (c.turno ? ' ('+c.turno+')' : '');
+        return '<option value="'+label+'">'+label+'</option>';
+      }).join('');
+  }
+
+  // Materias (datalist)
+  var matList = document.getElementById('materias-list');
+  if (matList && MATERIAS.length > 0) {
+    matList.innerHTML = MATERIAS.map(function(m) {
+      return '<option value="'+m.nombre+'">'+m.abreviatura+'</option>';
+    }).join('');
+  }
 }
 
 // ── Abrir modal (botón "Nueva reserva") ──────────────────────
@@ -99,11 +111,11 @@ function abrirModalReserva() {
   poblarSelectsReserva();
 
   // Limpiar campos
-  ['f-lab', 'f-dia', 'f-curso', 'f-secuencia'].forEach(function (id) {
+  ['f-lab', 'f-dia', 'f-curso', 'f-materia', 'f-secuencia'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
-  var orient = document.getElementById('f-orient'); if (orient) orient.value = 'info';
+  UIHelper.setOrientValues('f-orient-group', 'bas');
   var fmod = document.getElementById('f-modulo'); if (fmod) fmod.value = '';
   var fper = document.getElementById('f-periodo'); if (fper) fper.value = '1';
   var cw = document.getElementById('conflict-warning'); if (cw) cw.classList.remove('show');
@@ -139,8 +151,7 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   if (fCurso) fCurso.value = '';
   if (fSeq) fSeq.value = '';
 
-  var orient = document.getElementById('f-orient');
-  if (orient) orient.value = 'info';
+  UIHelper.setOrientValues('f-orient-group', 'bas');
 
   checkConflict();
 
@@ -205,8 +216,11 @@ function guardarReserva() {
   var dia = document.getElementById('f-dia').value;
   var modulo = document.getElementById('f-modulo').value;
   var curso = document.getElementById('f-curso').value.trim();
+  var materia = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
   var secuencia = document.getElementById('f-secuencia').value.trim();
-  var orient = document.getElementById('f-orient').value;
+  var orient = UIHelper.getOrientValues('f-orient-group');
+
+  if (materia) secuencia = '[' + materia + '] ' + secuencia;
   var periodoEl = document.getElementById('f-periodo');
   var periodo = periodoEl ? periodoEl.value : '1';
 
@@ -322,11 +336,16 @@ function verDetalle(reservaId) {
   if (!r) return;
 
   var p = getProfe(r.profeId);
-  var ori = ORIENTACIONES[r.orient];
+  var oris = (r.orient || 'bas').split(',');
+  var orientBadges = oris.map(function(o) {
+    var ori = ORIENTACIONES[o.trim()] || ORIENTACIONES['bas'];
+    return '<span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
+  }).join(' ');
+
   var fecha = getDiaDate(r.semanaOffset, r.dia);
-  var mod = getModulo(r.modulo);
-  var pct = (r.cicloClases / 3) * 100;
-  var barClass = r.cicloClases === 3 ? 'danger' : r.cicloClases === 2 ? 'warn' : 'ok';
+  var mod   = getModulo(r.modulo);
+  var pct   = (r.cicloClases / 3) * 100;
+  var barClass = r.cicloClases >= 3 ? 'full' : (r.cicloClases >= 2 ? 'mid' : 'low');
 
   var body = document.getElementById('modal-detalle-body');
   if (body) {
@@ -335,16 +354,16 @@ function verDetalle(reservaId) {
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">' + getLab(r.lab).nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[r.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + r.curso + '</div></div>' +
-      '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span></div></div>' +
+      '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><div class="orient-badge-group">' + orientBadges + '</div></div></div>' +
       '<div class="detail-row"><div class="detail-label">Secuencia</div><div class="detail-value" style="font-style:italic;color:var(--muted);">"' + r.secuencia + '"</div></div>' +
       '<div style="margin-top:14px;">' +
-      '<div class="ciclo-bar-label">' +
-      '<span style="font-size:12px;font-weight:700;">Ciclo didáctico</span>' +
-      '<span style="font-size:11px;color:var(--muted);">Clase ' + r.cicloClases + ' de 3' +
-      (r.renovaciones ? '&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación ' + r.renovaciones + '/1</span>' : '') +
-      '</span>' +
-      '</div>' +
-      '<div class="ciclo-bar"><div class="ciclo-bar-fill ' + barClass + '" style="width:' + pct + '%"></div></div>' +
+        '<div class="ciclo-bar-label">' +
+          '<span style="font-size:12px;font-weight:700;">Ciclo didáctico</span>' +
+          '<span style="font-size:11px;color:var(--muted);">Clase ' + r.cicloClases + ' de 3' +
+          (r.renovaciones ? '&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación ' + r.renovaciones + '/1</span>' : '') +
+          '</span>' +
+        '</div>' +
+        '<div class="ciclo-bar"><div class="ciclo-bar-fill ' + barClass + '" style="width:' + pct + '%"></div></div>' +
       '</div>';
   }
 
@@ -362,6 +381,7 @@ function verDetalle(reservaId) {
       '<button class="btn-cancel" onclick="cerrarModal(\'modal-detalle\')">Cerrar</button>' +
       renovBtn +
       (isOwn ? '<button class="btn-ok" style="background:var(--navy-light);" onclick="cerrarModal(\'modal-detalle\');editarReserva(' + r.id + ')">✎ Editar</button>' : '') +
+      (isOwn ? '<button class="btn-ok" style="background:var(--amber);color:#333;" onclick="cerrarModal(\'modal-detalle\');abrirModalReasignar(' + r.id + ')">🔀 Reasignar</button>' : '') +
       (isOwn ? '<button class="btn-danger" onclick="cerrarModal(\'modal-detalle\');cancelarReserva(' + r.id + ')">Cancelar reserva</button>' : '');
   }
 
@@ -374,23 +394,27 @@ function verDetalleSolicitud(solId) {
   if (!s) return;
 
   var p = getProfe(s.profeId);
-  var ori = ORIENTACIONES[s.orient];
+  var oris = (s.orient || 'bas').split(',');
+  var orientBadges = oris.map(function(o) {
+    var ori = ORIENTACIONES[o.trim()] || ORIENTACIONES['bas'];
+    return '<span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
+  }).join(' ');
+
   var fecha = getDiaDate(s.semanaOffset, s.dia);
-  var mod = getModulo(s.modulo);
+  var mod   = getModulo(s.modulo);
 
   var body = document.getElementById('modal-detalle-body');
   if (body) {
     body.innerHTML =
-      '<div class="pending-alert" role="status">⏳ ' +
+      '<div class="pending-alert" role="status">⏳ Solicitud pendiente de aprobación</div>' +
       (s.esRenovacion
-        ? 'Solicitud de <strong>renovación semana ' + s.renovacionNum + '/1</strong> — pendiente de aprobación.'
-        : 'Esta solicitud está <strong>pendiente de aprobación</strong>.') +
-      '</div>' +
+        ? '<div style="margin-bottom:10px;font-size:13px;">Solicitud de <strong>renovación semana ' + s.renovacionNum + '/1</strong>.</div>'
+        : '') +
       '<div class="detail-row"><div class="detail-label">Docente</div><div class="detail-value">Prof. ' + p.apellido + ', ' + p.nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">' + getLab(s.lab).nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[s.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + s.curso + '</div></div>' +
-      '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span></div></div>' +
+      '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><div class="orient-badge-group">' + orientBadges + '</div></div></div>' +
       '<div class="detail-row"><div class="detail-label">Secuencia</div><div class="detail-value" style="font-style:italic;color:var(--muted);">"' + s.secuencia + '"</div></div>';
   }
 
@@ -497,7 +521,7 @@ function editarReserva(reservaId) {
   document.getElementById('edit-reserva-id').value = reservaId;
   document.getElementById('edit-curso').value = r.curso;
   document.getElementById('edit-secuencia').value = r.secuencia;
-  document.getElementById('edit-orient').value = r.orient;
+  UIHelper.setOrientValues('edit-orient-group', r.orient);
 
   // Info de contexto (solo lectura)
   var mod = getModulo(r.modulo);
@@ -542,7 +566,7 @@ function guardarEdicionReserva() {
 
   var nuevoCurso = document.getElementById('edit-curso').value.trim();
   var nuevaSecuencia = document.getElementById('edit-secuencia').value.trim();
-  var nuevaOrient = document.getElementById('edit-orient').value;
+  var nuevaOrient = UIHelper.getOrientValues('edit-orient-group');
   var scopeSel = document.getElementById('edit-scope');
   var scope = scopeSel ? scopeSel.value : 'puntual';
 
@@ -629,5 +653,278 @@ function guardarEdicionReserva() {
     toast(actualizadas + ' módulo(s) actualizado(s).', 'ok');
   }
 
+  renderAll();
+}
+
+// ============================================================
+// REASIGNAR AULA — Mover reservas de un lab a otro
+// ============================================================
+
+// Abre el modal de reasignación desde el detalle de una reserva
+function abrirModalReasignar(reservaId) {
+  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  if (!r) return;
+
+  var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
+  if (!isOwn) { toast('No tenés permiso para reasignar esta reserva.', 'err'); return; }
+
+  // Guardar ID
+  document.getElementById('reasignar-reserva-id').value = reservaId;
+
+  // Info de contexto
+  var mod = getModulo(r.modulo);
+  var lab = getLab(r.lab);
+  var p = getProfe(r.profeId);
+  document.getElementById('reasignar-info').innerHTML =
+    '<strong>' + r.curso + '</strong> · ' + lab.nombre +
+    ' · ' + DIAS_LARGO[r.dia] + ' ' + mod.label +
+    ' (' + mod.inicio + '–' + mod.fin + ')' +
+    (esDirectivo() ? ' · Prof. ' + p.apellido : '');
+
+  // Poblar selector de labs (excluyendo el actual y los que están en mantenimiento)
+  var selLab = document.getElementById('reasignar-lab');
+  if (selLab) {
+    selLab.innerHTML = '<option value="">Seleccionar nuevo laboratorio…</option>' +
+      LABS.filter(function (l) { return l.id !== r.lab && !l.ocupado; }).map(function (l) {
+        return '<option value="' + l.id + '">' + l.nombre + '</option>';
+      }).join('');
+  }
+
+  // Mostrar opción anual si corresponde
+  var optAnual = document.getElementById('reasignar-opt-anual');
+  if (optAnual) optAnual.style.display = r.anual ? 'block' : 'none';
+
+  // Reset scope
+  var scopeSel = document.getElementById('reasignar-scope');
+  if (scopeSel) scopeSel.value = 'una';
+
+  // Limpiar conflictos
+  var confEl = document.getElementById('reasignar-conflictos');
+  if (confEl) confEl.style.display = 'none';
+
+  // Listener para chequear conflictos al cambiar lab o scope
+  if (selLab) selLab.onchange = function () { checkConflictosReasignacion(r); };
+  if (scopeSel) scopeSel.onchange = function () { checkConflictosReasignacion(r); };
+
+  abrirModal('modal-reasignar');
+}
+
+// Chequea si hay conflictos con el lab destino
+function checkConflictosReasignacion(r) {
+  var nuevoLab = document.getElementById('reasignar-lab').value;
+  var scope = document.getElementById('reasignar-scope').value;
+  var confEl = document.getElementById('reasignar-conflictos');
+  var btnOk = document.getElementById('reasignar-btn-ok');
+  if (!nuevoLab || !confEl) { if (confEl) confEl.style.display = 'none'; return; }
+
+  // Buscar las reservas que se moverían
+  var aReasignar = obtenerReservasParaReasignar(r, scope);
+
+  // Buscar conflictos en el lab destino
+  var conflictos = [];
+  aReasignar.forEach(function (res) {
+    var existente = RESERVAS.find(function (x) {
+      return x.semanaOffset === res.semanaOffset &&
+        x.dia === res.dia &&
+        x.modulo === res.modulo &&
+        x.lab === nuevoLab;
+    });
+    if (existente) {
+      var mod = getModulo(res.modulo);
+      conflictos.push(DIAS_SEMANA[res.dia] + ' ' + mod.label);
+    }
+  });
+
+  if (conflictos.length) {
+    confEl.style.display = 'block';
+    confEl.innerHTML = '⚠️ <strong>' + conflictos.length + ' conflicto(s)</strong> en ' +
+      getLab(nuevoLab).nombre + ': ' + conflictos.slice(0, 5).join(', ') +
+      (conflictos.length > 5 ? ' y ' + (conflictos.length - 5) + ' más…' : '') +
+      '<br><small>Esas horas se omitirán en la reasignación.</small>';
+    if (conflictos.length >= aReasignar.length) {
+      btnOk.disabled = true;
+      confEl.innerHTML += '<br><strong>No hay horas disponibles para reasignar.</strong>';
+    } else {
+      btnOk.disabled = false;
+    }
+  } else {
+    confEl.style.display = 'none';
+    btnOk.disabled = false;
+  }
+}
+
+// Obtiene las reservas afectadas según el scope
+function obtenerReservasParaReasignar(r, scope) {
+  if (scope === 'una') {
+    return [r];
+  } else if (scope === 'dia') {
+    // Todas las horas de este curso en el mismo día/semana/lab/profe
+    return RESERVAS.filter(function (x) {
+      return x.semanaOffset === r.semanaOffset &&
+        x.dia === r.dia &&
+        x.lab === r.lab &&
+        x.curso === r.curso &&
+        x.profeId === r.profeId;
+    });
+  } else if (scope === 'anual') {
+    // Toda la serie anual del mismo curso/día/lab/profe
+    return RESERVAS.filter(function (x) {
+      return x.lab === r.lab &&
+        x.dia === r.dia &&
+        x.curso === r.curso &&
+        x.profeId === r.profeId &&
+        x.anual === true;
+    });
+  }
+  return [r];
+}
+
+// ── Mover reserva por drag & drop ────────────────────────────
+// Mueve una reserva a un nuevo día/módulo/lab conservando todos sus datos.
+// Solo el dueño o un directivo pueden mover la reserva.
+function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
+  var r = RESERVAS.find(function(x) { return x.id === reservaId; });
+  if (!r) { toast('No se encontró la reserva.', 'err'); return; }
+
+  var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
+  if (!isOwn) { toast('No tenés permiso para mover esta reserva.', 'err'); return; }
+
+  // Mismo slot: no hacer nada
+  if (r.dia === nuevoDia && r.modulo === nuevoModulo && r.lab === nuevoLab) return;
+
+  // Verificar que el destino esté libre
+  var ocupado = RESERVAS.find(function(x) {
+    return x.semanaOffset === semanaOffset &&
+      x.dia === nuevoDia &&
+      x.modulo === nuevoModulo &&
+      x.lab === nuevoLab &&
+      x.id !== reservaId;
+  });
+  if (ocupado) { toast('Ese horario ya está ocupado. No se puede mover.', 'warn'); return; }
+
+  var solicPendiente = SOLICITUDES.find(function(s) {
+    return s.semanaOffset === semanaOffset &&
+      s.dia === nuevoDia &&
+      s.modulo === nuevoModulo &&
+      s.lab === nuevoLab &&
+      s.estado === 'pendiente';
+  });
+  if (solicPendiente) { toast('Ese horario tiene una solicitud pendiente.', 'warn'); return; }
+
+  // Descripción del movimiento para confirmación
+  var modOrig  = getModulo(r.modulo);
+  var modDest  = getModulo(nuevoModulo);
+  var labOrig  = getLab(r.lab);
+  var labDest  = getLab(nuevoLab);
+
+  var desdeStr = DIAS_SEMANA[r.dia]   + ' · ' + modOrig.label + ' (' + modOrig.inicio + '–' + modOrig.fin + ')' + (r.lab !== nuevoLab ? ' · ' + labOrig.nombre : '');
+  var hastaStr = DIAS_SEMANA[nuevoDia] + ' · ' + modDest.label + ' (' + modDest.inicio + '–' + modDest.fin + ')' + (r.lab !== nuevoLab ? ' · ' + labDest.nombre : '');
+
+  confirmar(
+    '¿Mover <strong>' + r.curso + '</strong>?<br>' +
+    '<small style="color:var(--muted)">De: ' + desdeStr + '</small><br>' +
+    '<small style="color:var(--muted)">A:&nbsp;&nbsp; ' + hastaStr + '</small>',
+    function() {
+      // Guardar valores originales por si falla la API
+      var diaOriginal    = r.dia;
+      var moduloOriginal = r.modulo;
+      var labOriginal    = r.lab;
+
+      // Actualizar en memoria primero (respuesta optimista)
+      r.dia    = nuevoDia;
+      r.modulo = nuevoModulo;
+      r.lab    = nuevoLab;
+      renderAll();
+
+      // Persistir en la base de datos via API
+      fetch('api.php/reservas/' + r.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          semanaOffset: r.semanaOffset,
+          dia:          nuevoDia,
+          modulo:       nuevoModulo,
+          lab:          nuevoLab,
+          curso:        r.curso,
+          orient:       r.orient    || 'bas',
+          profeId:      r.profeId,
+          secuencia:    r.secuencia || '',
+          cicloClases:  r.cicloClases  || 1,
+          renovaciones: r.renovaciones || 0,
+          anual:        r.anual ? 1 : 0
+        })
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          saveDB();
+          toast('Reserva movida a ' + hastaStr + '.', 'ok');
+        } else {
+          // Revertir si la API devolvió error
+          r.dia    = diaOriginal;
+          r.modulo = moduloOriginal;
+          r.lab    = labOriginal;
+          renderAll();
+          toast('Error al guardar en la base de datos: ' + (data.error || 'Error desconocido'), 'err');
+        }
+      })
+      .catch(function(err) {
+        // Revertir si falló la conexión
+        r.dia    = diaOriginal;
+        r.modulo = moduloOriginal;
+        r.lab    = labOriginal;
+        renderAll();
+        toast('No se pudo conectar con el servidor.', 'err');
+        console.error('[moverReservaASlot] fetch error:', err);
+      });
+    }
+  );
+}
+
+// Ejecuta la reasignación
+function ejecutarReasignacion() {
+  var reservaId = parseInt(document.getElementById('reasignar-reserva-id').value);
+  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  if (!r) return;
+
+  var nuevoLab = document.getElementById('reasignar-lab').value;
+  var scope = document.getElementById('reasignar-scope').value;
+
+  if (!nuevoLab) { toast('Seleccioná un laboratorio destino.', 'err'); return; }
+
+  var labDestino = getLab(nuevoLab);
+  var labOrigen = getLab(r.lab);
+  var aReasignar = obtenerReservasParaReasignar(r, scope);
+
+  var movidas = 0;
+  var omitidas = 0;
+
+  aReasignar.forEach(function (res) {
+    // Verificar que no haya conflicto en el destino
+    var existente = RESERVAS.find(function (x) {
+      return x.semanaOffset === res.semanaOffset &&
+        x.dia === res.dia &&
+        x.modulo === res.modulo &&
+        x.lab === nuevoLab;
+    });
+    if (existente) {
+      omitidas++;
+      return;
+    }
+    res.lab = nuevoLab;
+    movidas++;
+  });
+
+  if (movidas === 0) {
+    toast('No se pudo reasignar: todos los horarios están ocupados en ' + labDestino.nombre + '.', 'warn');
+    return;
+  }
+
+  saveDB();
+  cerrarModal('modal-reasignar');
+
+  var msg = movidas + ' hora(s) reasignada(s) de ' + labOrigen.nombre + ' → ' + labDestino.nombre + '.';
+  if (omitidas) msg += ' (' + omitidas + ' omitida(s) por conflicto)';
+  toast(msg, 'ok');
   renderAll();
 }

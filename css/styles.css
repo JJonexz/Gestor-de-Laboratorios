@@ -503,6 +503,7 @@ a { text-decoration: none; }
    ============================================================ */
 
 .sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -512,6 +513,59 @@ a { text-decoration: none; }
   background: var(--white);
   border-right: 1px solid var(--border);
   overflow-y: auto;
+  transition: width .22s ease, min-width .22s ease, padding .22s ease;
+}
+
+.sidebar.collapsed {
+  width: 38px;
+  min-width: 38px;
+  padding: .75rem 0;
+  overflow: hidden;
+}
+
+.sidebar-inner {
+  min-width: 194px;
+  transition: opacity .15s ease;
+}
+
+.sidebar.collapsed .sidebar-inner {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-btn {
+  position: relative;
+  align-self: flex-end;
+  top: 10px;
+  right: 6px;
+  margin-bottom: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.toggle-btn:hover {
+  background: var(--navy-faint);
+  border-color: var(--navy);
+}
+
+.toggle-icon {
+  width: 12px;
+  height: 12px;
+  transition: transform .22s ease;
+}
+
+.sidebar.collapsed .toggle-icon {
+  transform: rotate(180deg);
 }
 
 .sec-label {
@@ -587,6 +641,77 @@ a { text-decoration: none; }
 .mini-stat.az .mini-stat-n { color: var(--navy); }
 .mini-stat.rj .mini-stat-n { color: var(--red); }
 .mini-stat.vd .mini-stat-n { color: var(--green); }
+
+/* Botón toggle para Laboratorios */
+.labs-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  width: 100%;
+  padding: .3rem .5rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background .12s;
+}
+.labs-toggle-btn:hover {
+  background: var(--navy-faint);
+}
+
+.labs-toggle-btn .sec-label {
+  margin-bottom: 0;
+  padding-left: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.labs-toggle-icon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  transition: transform .22s ease;
+}
+
+/* Cuando está cerrado, la flecha apunta hacia abajo */
+.labs-container.closed .labs-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Contenedor de labs con animación suave */
+.labs-container {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: max-height .22s ease, opacity .15s ease;
+  opacity: 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.labs-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.labs-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.labs-container::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.labs-container::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+.labs-container.closed {
+  max-height: 0;
+  opacity: 0;
+}
 
 /* Botones de acción en sidebar */
 .cta-btn {
@@ -2291,4 +2416,54 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   gap: 12px;
   margin-bottom: 1.25rem;
   flex-wrap: wrap;
+}
+
+/* ============================================================
+   ORIENTACIÓN MULTIPLE
+   ============================================================ */
+.orient-check-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  background: #f9fafb;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.orient-check-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background .2s;
+}
+.orient-check-group label:hover {
+  background: #f3f4f6;
+}
+.orient-check-group input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.orient-badge-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.orient-badge.mini {
+  padding: 1px 4px;
+  font-size: 9px;
+}
+
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding-bottom: 1rem;
 }

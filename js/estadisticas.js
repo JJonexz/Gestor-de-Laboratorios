@@ -91,7 +91,10 @@ function calcularStats() {
   // Por orientación
   var porOrient = { info:0, const:0, tur:0, bas:0 };
   reservas.forEach(function(r) {
-    if (porOrient[r.orient] !== undefined) porOrient[r.orient]++;
+    var oris = (r.orient || 'bas').split(',');
+    oris.forEach(function(o) {
+      if (porOrient[o] !== undefined) porOrient[o]++;
+    });
   });
 
   // Por docente
@@ -292,7 +295,10 @@ function exportarCSV() {
   RESERVAS.forEach(function(r) {
     var p = getProfe(r.profeId);
     var mod = getModulo(r.modulo);
-    var ori = ORIENTACIONES[r.orient];
+    var oris = (r.orient || 'bas').split(',');
+    var oriNames = oris.map(function(o) {
+      return ORIENTACIONES[o] ? ORIENTACIONES[o].nombre : o;
+    }).join('; ');
     rows.push([
       r.id,
       r.lab,
@@ -300,7 +306,7 @@ function exportarCSV() {
       mod ? mod.label : r.modulo,
       mod ? mod.inicio : '',
       r.curso,
-      ori ? ori.nombre : r.orient,
+      oriNames,
       p ? (p.apellido + ', ' + p.nombre) : r.profeId,
       p ? p.materia : '',
       r.cicloClases,
