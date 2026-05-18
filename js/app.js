@@ -1396,14 +1396,19 @@ document.addEventListener('DOMContentLoaded', function () {
     var el = document.getElementById(id);
     if (el) el.addEventListener('change', checkConflict);
   });
-  // Listener filtro de turno → re-renderiza la grilla
-  var ftEl = document.getElementById('filtro-turno');
-  if (ftEl) {
-    ftEl.addEventListener('change', function () {
-      filtroTurno = ftEl.value;
-      renderCalendario();
-    });
-  }
+  // Listener filtro de turno → botones en vez de select
+  window.setTurnoFilter = function(value) {
+    filtroTurno = value;
+    var bar = document.getElementById('turno-filter-bar');
+    if (bar) {
+      bar.querySelectorAll('.turno-filter-btn').forEach(function(btn) {
+        var isActive = btn.getAttribute('data-turno') === value;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    }
+    renderCalendario();
+  };
 
   // ── 7. CARGA DE DATOS ─────────────────────────────────────
   // Intento 1: localStorage (persiste entre recargas)

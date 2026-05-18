@@ -220,16 +220,12 @@
               <button class="lab-filter-btn active" id="filt-todos" aria-pressed="true"
                 onclick="setLabFilter('todos')">Todos</button>
               <span id="lab-filter-btns"></span>
-              <div class="turno-filter-bar" role="group" aria-label="Filtrar por turno horario"
-                style="display:flex;align-items:center;gap:6px;">
-                <select id="filtro-turno" aria-label="Turno horario"
-                  style="font-family:var(--font,Inter,sans-serif);font-size:.75rem;font-weight:600;padding:.3rem .55rem;border:1px solid var(--border,#dde1e7);border-radius:4px;color:var(--text2,#374151);background:#fff;cursor:pointer;">
-                  <option value="todos">🕐 Todos</option>
-                  <option value="Mañana">🌅 Mañana</option>
-                  <option value="Tarde">☀️ Tarde</option>
-                  <option value="Vespertino">🌆 Vespertino</option>
-                </select>
-              </div>
+            </div>
+            <div class="turno-filter-bar" id="turno-filter-bar" role="group" aria-label="Filtrar por turno horario">
+              <button class="turno-filter-btn active" data-turno="todos" aria-pressed="true" onclick="setTurnoFilter('todos')">🕐 Todos</button>
+              <button class="turno-filter-btn" data-turno="Mañana" aria-pressed="false" onclick="setTurnoFilter('Mañana')">🌅 Mañana</button>
+              <button class="turno-filter-btn" data-turno="Tarde" aria-pressed="false" onclick="setTurnoFilter('Tarde')">☀️ Tarde</button>
+              <button class="turno-filter-btn" data-turno="Vespertino" aria-pressed="false" onclick="setTurnoFilter('Vespertino')">🌆 Vespertino</button>
             </div>
             <div class="week-nav" role="group" aria-label="Navegar semanas">
               <button class="week-btn" onclick="navSemana(-1)" aria-label="Semana anterior">‹ Semana ant.</button>
