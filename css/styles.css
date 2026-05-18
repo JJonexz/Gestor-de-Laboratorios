@@ -821,6 +821,40 @@ a { text-decoration: none; }
 .lab-filter-btn.active           { background: var(--navy); color: #fff; }
 .lab-filter-btn:hover:not(.active) { background: var(--border); color: var(--text); }
 
+/* Filtro de turno horario (botones segmentados) */
+.turno-filter-bar {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--gris-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 100%;
+  flex-basis: 100%;
+}
+.turno-filter-btn {
+  flex: 1;
+  padding: .45rem .5rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s ease;
+}
+.turno-filter-btn.active {
+  background: var(--navy);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(26, 58, 107, .18);
+}
+.turno-filter-btn:hover:not(.active) {
+  background: var(--border);
+  color: var(--text);
+}
+
 /* Navegación de semana */
 .week-nav { display: flex; gap: 3px; }
 .week-btn {

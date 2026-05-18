@@ -111,14 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (el) el.addEventListener('change', checkConflict);
   });
 
-  // Filtro de turno en el calendario
-  var ftEl = document.getElementById('filtro-turno');
-  if (ftEl) {
-    ftEl.addEventListener('change', function() {
-      filtroTurno = ftEl.value;
-      renderCalendario();
-    });
-  }
+  // Filtro de turno: ahora manejado por botones con onclick="setTurnoFilter(...)"
 
   // ── 7. Cargar datos ────────────────────────────────────────
   // Prioridad 1: localStorage (persiste entre recargas del navegador)

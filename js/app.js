@@ -1396,14 +1396,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var el = document.getElementById(id);
     if (el) el.addEventListener('change', checkConflict);
   });
-  // Listener filtro de turno → re-renderiza la grilla
-  var ftEl = document.getElementById('filtro-turno');
-  if (ftEl) {
-    ftEl.addEventListener('change', function () {
-      filtroTurno = ftEl.value;
-      renderCalendario();
-    });
-  }
+  // Listener filtro de turno: ahora manejado por botones con onclick="setTurnoFilter(...)"
 
   // ── 7. CARGA DE DATOS ─────────────────────────────────────
   // Intento 1: localStorage (persiste entre recargas)

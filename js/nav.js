@@ -167,3 +167,17 @@ function setLabFilter(labId) {
 
   renderCalendario();
 }
+
+// ── Filtro de turno horario ───────────────────────────────────
+function setTurnoFilter(turno) {
+  filtroTurno = turno;
+
+  // Actualizar estado visual de los botones de turno
+  document.querySelectorAll('.turno-filter-btn').forEach(function(b) {
+    var isActive = b.dataset.turno === turno;
+    b.classList.toggle('active', isActive);
+    b.setAttribute('aria-pressed', String(isActive));
+  });
+
+  renderCalendario();
+}
