@@ -36,16 +36,24 @@ guardarReserva = function() {
   }
 
   if (!esAnual) {
+    var _labData   = getLab(lab);
+    var _maxGrupos = (_labData && _labData.max_grupos) ? _labData.max_grupos : 1;
     for (var mi = 0; mi < modulosAReservar.length; mi++) {
       var m = modulosAReservar[mi];
-      var conflicto = RESERVAS.find(function(r) {
+      var reservasEnSlot = RESERVAS.filter(function(r) {
         return r.semanaOffset === semanaOffset && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
       });
-      if (conflicto) { toast('El modulo ' + getModulo(m).label + ' ya esta reservado.', 'warn'); return; }
-      var solicPendiente = SOLICITUDES.find(function(s) {
+      if (reservasEnSlot.length >= _maxGrupos) {
+        toast('El módulo ' + getModulo(m).label + ' ya tiene ' + _maxGrupos + ' grupo(s) asignado(s) (máximo del salón).', 'warn');
+        return;
+      }
+      var solicsPendientes = SOLICITUDES.filter(function(s) {
         return s.semanaOffset === semanaOffset && s.dia === parseInt(dia) && s.modulo === m && s.lab === lab && s.estado === 'pendiente';
       });
-      if (solicPendiente) { toast('El modulo ' + getModulo(m).label + ' ya tiene solicitud pendiente.', 'warn'); return; }
+      if (reservasEnSlot.length + solicsPendientes.length >= _maxGrupos) {
+        toast('El módulo ' + getModulo(m).label + ' ya tiene solicitudes pendientes que completarían el cupo del salón.', 'warn');
+        return;
+      }
     }
   }
 
@@ -60,14 +68,18 @@ guardarReserva = function() {
     var promises = [];
     semanasAReservar.forEach(function(sem) {
       modulosAReservar.forEach(function(m) {
-        var yaExiste = RESERVAS.find(function(r) {
+        var enSlotAnual = RESERVAS.filter(function(r) {
           return r.semanaOffset === sem && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
         });
-        if (yaExiste) return;
+        var _labA   = getLab(lab);
+        var _maxA   = (_labA && _labA.max_grupos) ? _labA.max_grupos : 1;
+        if (enSlotAnual.length >= _maxA) return;
+        var grupoIdEl = document.getElementById('reserva-grupo');
+        var grupoId   = grupoIdEl && grupoIdEl.value !== '' ? parseInt(grupoIdEl.value) : null;
         promises.push(apiPost('reservas', {
           semanaOffset: sem, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
           orient: orient, profeId: profeId, secuencia: secuencia, cicloClases: 1,
-          renovaciones: 0, anual: esAnual ? 1 : 0
+          renovaciones: 0, anual: esAnual ? 1 : 0, grupoId: grupoId
         }));
       });
     });
@@ -81,10 +93,12 @@ guardarReserva = function() {
   } else {
     var promises2 = [];
     modulosAReservar.forEach(function(m) {
+      var grupoIdEl2 = document.getElementById('reserva-grupo');
+      var grupoId2   = grupoIdEl2 && grupoIdEl2.value !== '' ? parseInt(grupoIdEl2.value) : null;
       promises2.push(apiPost('solicitudes', {
         semanaOffset: semanaOffset, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
         orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()), secuencia: secuencia, cicloClases: 1,
-        estado: 'pendiente', esRenovacion: 0, renovacionNum: 0
+        estado: 'pendiente', esRenovacion: 0, renovacionNum: 0, grupoId: grupoId2
       }));
     });
     Promise.all(promises2).then(function(nuevas) {
@@ -100,10 +114,12 @@ aceptarSolicitud = function(solId) {
   if (modoUsuario !== 'admin') { toast('Solo el directivo puede aprobar solicitudes.', 'err'); return; }
   var s = SOLICITUDES.find(function(x) { return x.id === solId; });
   if (!s) return;
-  var conflicto = RESERVAS.find(function(r) {
+  var labAcept  = getLab(s.lab);
+  var maxAcept  = (labAcept && labAcept.max_grupos) ? labAcept.max_grupos : 1;
+  var enSlotAcept = RESERVAS.filter(function(r) {
     return r.semanaOffset === s.semanaOffset && r.dia === s.dia && r.modulo === s.modulo && r.lab === s.lab;
   });
-  if (conflicto) { toast('Ese turno fue ocupado mientras estaba pendiente.', 'warn'); return; }
+  if (enSlotAcept.length >= maxAcept) { toast('Ese turno ya alcanzó el máximo de ' + maxAcept + ' grupo(s).', 'warn'); return; }
 
   if (s.esRenovacion && s.reservaOriginalId) {
     var rOrig = RESERVAS.find(function(x) { return x.id === s.reservaOriginalId; });
@@ -137,7 +153,7 @@ aceptarSolicitud = function(solId) {
   apiPost('reservas', {
     semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
     curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
-    cicloClases: 1, renovaciones: 0, anual: 0
+    cicloClases: 1, renovaciones: 0, anual: 0, grupoId: s.grupoId || null
   }).then(function(nueva) {
     RESERVAS.push(nueva);
     if (typeof notifSolicitudAprobada === 'function') notifSolicitudAprobada(s);
@@ -302,7 +318,9 @@ guardarLab = function() {
      id = String.fromCharCode(65 + LABS.length); // Fallback: A, B, C...
   }
 
-  var datos = { id: id, nombre: nombre, capacidad: capacidad, notas: notas, ocupado: estado === 'ocupado' ? 1 : 0 };
+  var maxGruposEl = document.getElementById('lab-max-grupos');
+  var maxGrupos   = maxGruposEl ? parseInt(maxGruposEl.value || '1') : 1;
+  var datos = { id: id, nombre: nombre, capacidad: capacidad, notas: notas, ocupado: estado === 'ocupado' ? 1 : 0, max_grupos: maxGrupos };
 
   if (editLabId !== null) {
     apiPut('labs/' + editLabId, datos).then(function(actualizado) {

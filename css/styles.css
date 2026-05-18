@@ -1957,8 +1957,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
 /* Encabezado de hora */
 .at-hora-header {
-  min-width: 78px;
-  width: 78px;
+  min-width: 95px;
+  width: 95px;
   padding: 3px 4px;
   background: var(--gris-card);
   border-left: 1px solid var(--border);
@@ -2001,10 +2001,81 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
 /* Celda de evento en la tabla */
 .at-event-cell {
-  height: 50px;
+  height: auto;
+  min-height: 50px;
   padding: 3px;
   border-left: 1px solid var(--border);
-  vertical-align: middle;
+  vertical-align: middle;   /* centra el evento en la fila de la tabla */
+}
+.at-ev-grupo {
+  font-size: 10px;
+  font-weight: 700;
+  color: inherit;
+  opacity: 0.9;
+  margin-top: 1px;
+  letter-spacing: 0.3px;
+  background: rgba(0,0,0,0.12);
+  border-radius: 3px;
+  padding: 0 3px;
+  display: inline-block;
+}
+.at-cell-stack {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+}
+
+.at-cell-stack > .at-event {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  width: 0;        /* fuerza distribución equitativa ignorando contenido */
+}
+
+.at-cell-stack > .at-slot-extra {
+  flex: 0 0 26px;
+  min-width: 0;
+  overflow: hidden;
+}
+/* Eventos dentro de stack multi-grupo: texto adaptable */
+.at-cell-stack > .at-event {
+  padding: 3px 2px 3px 7px;
+  gap: 1px;
+  justify-content: center;       /* centra el bloque curso+prof+grupo verticalmente */
+}
+.at-cell-stack > .at-event::before {
+  width: 3px;                 /* uniforme con eventos normales */
+}
+.at-cell-stack > .at-event .at-ev-curso {
+  font-size: .62rem;
+  white-space: normal;
+  overflow-wrap: break-word;  /* rompe solo si no hay otra opción */
+  word-break: normal;         /* no parte palabras a mitad */
+  line-height: 1.1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;      /* máximo 2 líneas */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.at-cell-stack > .at-event .at-ev-prof {
+  font-size: .55rem;
+  white-space: nowrap;        /* apellido: 1 línea + ellipsis */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1;
+}
+.at-cell-stack > .at-event .at-ev-grupo {
+  display: inline-block;
+  align-self: flex-start;   /* badge no se estira al ancho del evento */
+  font-size: .55rem;
+  padding: 0 2px;
+  margin-top: 1px;
+}
+.at-cell-stack > .at-event .at-ev-edit-hint {
+  display: none;
 }
 .at-recreo-cell {
   width: 30px;
@@ -2019,11 +2090,11 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   flex-direction: column;
   justify-content: center;
   gap: 2px;
-  height: 100%;
+  height: auto;
   min-height: 38px;
   padding: 4px 5px;
   border-radius: var(--radius-sm);
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
   transition: opacity .1s;
 }
@@ -2055,19 +2126,94 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 }
 
 /* Celda vacía (disponible) */
-.at-libre {
+/* ─── CELDA LIBRE PRINCIPAL (Cuando el turno está totalmente vacío) ─── */
+.at-event-cell > .at-libre {
+  display: flex;
+  flex: 1;
+  width: 100%;
   background: var(--gris-card);
   border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
   align-items: center;
   justify-content: center;
-  opacity: .6;
+  opacity: 0.6;
+  transition: opacity 0.2s, border-color 0.2s;
 }
-.at-libre:hover { opacity: 1; border-color: var(--navy); }
-.at-ev-plus { font-size: 17px; font-weight: 300; color: #9ca3af; line-height: 1; }
-.at-libre:hover .at-ev-plus { color: var(--navy); }
 
-/* Celda ocupada por otro laboratorio */
-.at-ocupado-otro { background: #f1f3f5; cursor: default; opacity: 0.6; }
+.at-event-cell > .at-libre:hover {
+  opacity: 1;
+  border-color: var(--navy);
+}
+
+/* Icono "+" de la celda vacía principal (centrado y grande) */
+.at-event-cell > .at-libre .at-ev-plus {
+  font-size: 17px;
+  font-weight: 300;
+  color: #9ca3af;
+  line-height: 1;
+}
+
+.at-event-cell > .at-libre:hover .at-ev-plus {
+  color: var(--navy);
+}
+
+
+/* ─── CELDA OCUPADA POR OTRO LAB ─── */
+.at-ocupado-otro { 
+  background: #f1f3f5; 
+  cursor: default; 
+  opacity: 0.6; 
+}
+
+
+/* ─── BOTÓN EXTRA (Para agregar un segundo grupo al lado de un aula) ─── */
+.at-slot-extra {
+  flex: 0 0 0px;       /* 0px por defecto: no roba espacio a las demás celdas */
+  max-width: 0px;
+  margin-left: 0px;
+  overflow: hidden;
+  opacity: 0;
+  transition: flex-basis 0.2s ease, max-width 0.2s ease, opacity 0.2s ease, margin 0.2s ease;
+}
+
+/* Se despliega suavemente solo al hacer hover sobre la celda con el aula */
+.at-event-cell:hover .at-slot-extra {
+  flex: 0 0 22px;      /* Ancho ultra fino ideal */
+  max-width: 22px;
+  margin-left: 5px;    /* Separación estética del aula asignada */
+  opacity: 1;
+}
+
+/* El botón "+" pequeño dentro del extra (estilo píldora) */
+.at-slot-extra .at-libre {
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.08); 
+  border-radius: 6px;
+  height: 100%;
+  min-height: unset;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.at-slot-extra .at-libre:hover {
+  background: var(--navy-faint);
+  border-color: var(--navy);
+}
+
+/* Icono "+" pequeño dentro del extra */
+.at-slot-extra .at-ev-plus {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1;
+}
+
+.at-slot-extra .at-libre:hover .at-ev-plus {
+  color: var(--navy);
+}
 
 
 /* ============================================================
