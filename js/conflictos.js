@@ -11,6 +11,11 @@
 // Depende de: config.js, db.js, notificaciones.js
 // ============================================================
 
+// BLOQUE NUEVO — función que faltaba, usada en adquirirLock y validarConflicto
+function getSesionActualConflicto() {
+  return window.SESSION || null;
+}
+
 var LOCK_KEY     = 'gestor_eest1_locks';
 var SYNC_KEY     = 'gestor_eest1_sync';
 var LOCK_TTL_MS  = 10000; // 10 segundos máximo de lock
@@ -63,19 +68,35 @@ function validarConflicto(lab, dia, modulo, semanaOffset, solicitanteId, ignorar
   semanaOffset = semanaOffset || 0;
 
   // 1. Verificar reservas existentes
-  var conflictoReserva = RESERVAS.find(function(r) {
+  // REEMPLAZAR CON ESTE BLOQUE
+  // 1. Verificar capacidad de grupos del lab
+  var labData    = getLab(lab);
+  var maxGrupos  = (labData && labData.max_grupos) ? labData.max_grupos : 1;
+  var reservasSlot = RESERVAS.filter(function(r) {
     return r.lab === lab &&
            r.dia === dia &&
            r.modulo === modulo &&
            r.semanaOffset === semanaOffset &&
            r.id !== ignorarId;
   });
-  if (conflictoReserva) {
-    var p = getProfe(conflictoReserva.profeId);
+  if (reservasSlot.length >= maxGrupos) {
+    var ocupantes = reservasSlot.map(function(r) {
+      var p = getProfe(r.profeId);
+      // Si tiene grupoId, mostrar nombre del grupo; sino, mostrar curso
+      var grupoNombre = '';
+      if (r.grupoId && typeof GRUPOS !== 'undefined') {
+        var g = GRUPOS.find(function(x) { return x.id === r.grupoId; });
+        grupoNombre = g ? String(g.nombre) : r.curso;
+      } else {
+        grupoNombre = r.curso;
+      }
+      return grupoNombre + (p ? ' (Prof. ' + p.apellido + ')' : '');
+    }).join(', ');
     return {
       tipo: 'reserva',
-      mensaje: 'El Lab.' + lab + ' ya tiene una reserva confirmada para ese módulo' +
-               (p ? ' (Prof. ' + p.apellido + ')' : '') + '.'
+      mensaje: 'El Lab.' + lab + ' ya alcanzó el máximo de ' + maxGrupos +
+               ' grupo' + (maxGrupos > 1 ? 's' : '') + ' para ese módulo. ' +
+               'Ocupado por: ' + ocupantes + '.'
     };
   }
 
@@ -114,7 +135,18 @@ function validarConflicto(lab, dia, modulo, semanaOffset, solicitanteId, ignorar
 
 // ── Aprobar solicitud con validación atómica ─────────────────
 // Reemplaza la función aceptarSolicitud en reservas.js
+// REEMPLAZAR CON ESTE BLOQUE
 function aceptarSolicitudSegura(id) {
+  // Redirige a la versión con persistencia real (db-override.js).
+  // La versión anterior mutaba RESERVAS en memoria sin llamar a la API.
+  if (typeof aceptarSolicitud === 'function') {
+    aceptarSolicitud(id);
+  } else {
+    toast('Error interno: función de aprobación no disponible.', 'err');
+  }
+}
+
+function _aceptarSolicitudSegura_original_desactivada(id) {
   var s = SOLICITUDES.find(function(x) { return x.id === id; });
   if (!s) { toast('Solicitud no encontrada', 'err'); return; }
   if (s.estado !== 'pendiente') { toast('Esta solicitud ya fue procesada', 'err'); return; }
@@ -175,7 +207,18 @@ function aceptarSolicitudSegura(id) {
 }
 
 // ── Rechazar con notificación ────────────────────────────────
+// REEMPLAZAR CON ESTE BLOQUE
 function rechazarSolicitudSegura(id, motivo) {
+  // Redirige a la versión con persistencia real (db-override.js).
+  // La versión anterior mutaba estado en memoria sin llamar a la API.
+  if (typeof rechazarSolicitud === 'function') {
+    rechazarSolicitud(id);
+  } else {
+    toast('Error interno: función de rechazo no disponible.', 'err');
+  }
+}
+
+function _rechazarSolicitudSegura_original_desactivada(id, motivo) {
   var s = SOLICITUDES.find(function(x) { return x.id === id; });
   if (!s) { toast('Solicitud no encontrada', 'err'); return; }
 

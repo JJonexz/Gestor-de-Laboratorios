@@ -42,6 +42,7 @@ function loadFromJSON(callback, repeatFactor) {
     PAUTAS       = (data.pautas || []).map(function(p) { return p.texto; });
     CURSOS       = data.cursos      || [];
     MATERIAS     = data.materias    || [];
+    GRUPOS       = data.grupos      || [];
     RECREOS      = [
       { modulo: 2,  evento: 'Recreo de manana',    notas: '30 min - patio principal' },
       { modulo: 8,  evento: 'Recreo de tarde',      notas: '30 min - patio y cantina' },

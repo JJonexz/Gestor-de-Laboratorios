@@ -525,102 +525,109 @@
 
   <!-- Solicitar turno (con selector de período) -->
   <div class="modal-overlay" id="modal-reserva" role="dialog" aria-modal="true" aria-labelledby="modal-reserva-title">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 id="modal-reserva-title"><span aria-hidden="true">📅</span> Solicitar turno</h3>
-        <button class="modal-close" onclick="cerrarModal('modal-reserva')" aria-label="Cerrar modal">✕</button>
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-reserva-title"><span aria-hidden="true">📅</span> Solicitar turno</h3>
+      <button class="modal-close" onclick="cerrarModal('modal-reserva')" aria-label="Cerrar modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-info-hint" id="reserva-hint" role="note">
+        <span aria-hidden="true">ℹ️</span> Tu solicitud será enviada al directivo para aprobación.
       </div>
-      <div class="modal-body">
-        <div class="modal-info-hint" id="reserva-hint" role="note">
-          <span aria-hidden="true">ℹ️</span> Tu solicitud será enviada al directivo para aprobación.
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="f-lab">Laboratorio</label>
-            <select class="form-control" id="f-lab" required></select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="f-dia">Día</label>
-            <select class="form-control" id="f-dia" required></select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="f-modulo">Módulo de inicio</label>
-            <select class="form-control" id="f-modulo" required></select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="f-periodo">⏱ Duración / Período</label>
-            <select class="form-control" id="f-periodo">
-              <option value="1">1 hora (módulo individual)</option>
-              <option value="2">2 horas consecutivas</option>
-              <option value="4">4 horas consecutivas</option>
-              <option value="turno_Mañana">🌅 Turno completo Mañana</option>
-              <option value="turno_Tarde">☀️ Turno completo Tarde</option>
-              <option value="turno_Vespertino">🌆 Turno completo Vespertino</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="f-curso">Curso</label>
-            <select class="form-control" id="f-curso" required>
-              <option value="">Seleccionar curso…</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="f-materia">Materia / Tema</label>
-            <input type="text" class="form-control" id="f-materia" list="materias-list" placeholder="Ej: Programación"
-              required>
-            <datalist id="materias-list"></datalist>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Orientación (podés elegir varias)</label>
-            <div class="orient-check-group" id="f-orient-group">
-              <label><input type="checkbox" value="info"> 💻 Info</label>
-              <label><input type="checkbox" value="const"> 🏗️ Const</label>
-              <label><input type="checkbox" value="tur"> 🌐 Tur</label>
-              <label><input type="checkbox" value="bas"> 📚 Bas</label>
-            </div>
-          </div>
-        </div>
-        <!-- Selector de docente — solo visible para directivos -->
-        <div class="form-group" id="f-profe-wrap" style="display:none;">
-          <label class="form-label" for="f-profe">👤 Asignar docente</label>
-          <select class="form-control" id="f-profe"></select>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="f-lab">Laboratorio</label>
+          <select class="form-control" id="f-lab" required></select>
         </div>
         <div class="form-group">
-          <label class="form-label" for="f-secuencia">Secuencia didáctica</label>
-          <textarea class="form-control" id="f-secuencia" rows="3" placeholder="¿Qué harán en el laboratorio?"
-            required></textarea>
+          <label class="form-label" for="f-dia">Día</label>
+          <select class="form-control" id="f-dia" required></select>
         </div>
-        <div class="conflict-warning" id="conflict-warning" role="alert">
-          ⚠️ Ese horario ya está ocupado o tiene una solicitud pendiente.
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="f-modulo">Módulo de inicio</label>
+          <select class="form-control" id="f-modulo" required></select>
         </div>
+        <div class="form-group">
+          <label class="form-label" for="f-periodo">⏱ Duración / Período</label>
+          <select class="form-control" id="f-periodo">
+            <option value="1">1 hora (módulo individual)</option>
+            <option value="2">2 horas consecutivas</option>
+            <option value="4">4 horas consecutivas</option>
+            <option value="turno_Mañana">🌅 Turno completo Mañana</option>
+            <option value="turno_Tarde">☀️ Turno completo Tarde</option>
+            <option value="turno_Vespertino">🌆 Turno completo Vespertino</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- FILA DE CURSO, GRUPO Y MATERIA -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="f-curso">Curso</label>
+          <select class="form-control" id="f-curso" required>
+            <option value="">Seleccionar curso…</option>
+          </select>
+        </div>
+        
+        <!-- AGREGADO: Campo Grupo (inmediatamente después de curso) -->
+        <div class="form-group">
+          <label class="form-label" for="reserva-grupo">Grupo</label>
+          <select class="form-control" id="reserva-grupo" name="grupoId">
+            <option value="">-- Sin grupo --</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="f-materia">Materia / Tema</label>
+          <input type="text" class="form-control" id="f-materia" list="materias-list" placeholder="Ej: Programación" required>
+          <datalist id="materias-list"></datalist>
+        </div>
+      </div>
 
-        <!-- RESERVA ANUAL — solo visible para directivos (app.js controla display) -->
-        <div id="f-anual-wrap" class="admin-only"
-          style="display:none;margin-top:10px;padding:10px 14px;background:var(--navy-faint,#eef2f9);border-radius:6px;border:1px solid #c7d4ee;">
-          <label
-            style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy,#1a3a6b);">
-            <input type="checkbox" id="f-anual"
-              style="width:15px;height:15px;cursor:pointer;accent-color:var(--navy,#1a3a6b);">
-            📆 Asignar para todo el año lectivo
-          </label>
-          <div style="font-size:11px;color:var(--muted,#6b7280);margin-top:4px;padding-left:25px;">
-            Se generarán entradas semana a semana para el resto del ciclo lectivo (~40 semanas).
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Orientación (podés elegir varias)</label>
+          <div class="orient-check-group" id="f-orient-group">
+            <label><input type="checkbox" value="info"> 💻 Info</label>
+            <label><input type="checkbox" value="const"> 🏗️ Const</label>
+            <label><input type="checkbox" value="tur"> 🌐 Tur</label>
+            <label><input type="checkbox" value="bas"> 📚 Bas</label>
           </div>
         </div>
+      </div>
+      <!-- Selector de docente — solo visible para directivos -->
+      <div class="form-group" id="f-profe-wrap" style="display:none;">
+        <label class="form-label" for="f-profe">👤 Asignar docente</label>
+        <select class="form-control" id="f-profe"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="f-secuencia">Secuencia didáctica</label>
+        <textarea class="form-control" id="f-secuencia" rows="3" placeholder="¿Qué harán en el laboratorio?" required></textarea>
+      </div>
+      <div class="conflict-warning" id="conflict-warning" role="alert">
+        ⚠️ Ese horario ya está ocupado o tiene una solicitud pendiente.
+      </div>
 
+      <!-- RESERVA ANUAL — solo visible para directivos (app.js controla display) -->
+      <div id="f-anual-wrap" class="admin-only" style="display:none;margin-top:10px;padding:10px 14px;background:var(--navy-faint,#eef2f9);border-radius:6px;border:1px solid #c7d4ee;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy,#1a3a6b);">
+          <input type="checkbox" id="f-anual" style="width:15px;height:15px;cursor:pointer;accent-color:var(--navy,#1a3a6b);">
+          📆 Asignar para todo el año lectivo
+        </label>
+        <div style="font-size:11px;color:var(--muted,#6b7280);margin-top:4px;padding-left:25px;">
+          Se generarán entradas semana a semana para el resto del ciclo lectivo (~40 semanas).
+        </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-cancel" onclick="cerrarModal('modal-reserva')">Cancelar</button>
-        <button class="btn-ok" onclick="guardarReserva()">Enviar solicitud</button>
-      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-reserva')">Cancelar</button>
+      <button class="btn-ok" onclick="guardarReserva()">Enviar solicitud</button>
     </div>
   </div>
+</div>
 
   <!-- Ver detalle -->
   <div class="modal-overlay" id="modal-detalle" role="dialog" aria-modal="true" aria-labelledby="modal-detalle-title">
@@ -775,34 +782,54 @@
     </div>
   </div>
 
-  <!-- Agregar/editar espacio -->
-  <div class="modal-overlay" id="modal-lab" role="dialog" aria-modal="true" aria-labelledby="modal-lab-title">
-    <div class="modal modal-sm">
-      <div class="modal-header">
-        <h3 id="modal-lab-title"><span aria-hidden="true">🏫</span> Agregar espacio</h3>
-        <button class="modal-close" onclick="cerrarModal('modal-lab')" aria-label="Cerrar">✕</button>
+<!-- Agregar/editar espacio -->
+<div class="modal-overlay" id="modal-lab" role="dialog" aria-modal="true" aria-labelledby="modal-lab-title">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 id="modal-lab-title"><span aria-hidden="true">🏫</span> Agregar espacio</h3>
+      <button class="modal-close" onclick="cerrarModal('modal-lab')" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label" for="lab-nombre">Nombre del espacio</label>
+        <input class="form-control" id="lab-nombre" type="text" placeholder="Ej: Lab. Informático C" required>
       </div>
-      <div class="modal-body">
-        <div class="form-group"><label class="form-label" for="lab-nombre">Nombre del espacio</label><input
-            class="form-control" id="lab-nombre" type="text" placeholder="Ej: Lab. Informático C" required></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label" for="lab-capacidad">Capacidad</label><input
-              class="form-control" id="lab-capacidad" type="number" min="1" placeholder="Ej: 20"></div>
-          <div class="form-group"><label class="form-label" for="lab-estado">Estado</label><select class="form-control"
-              id="lab-estado">
-              <option value="libre">Disponible</option>
-              <option value="ocupado">En mantenimiento</option>
-            </select></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="lab-capacidad">Capacidad</label>
+          <input class="form-control" id="lab-capacidad" type="number" min="1" placeholder="Ej: 20">
         </div>
-        <div class="form-group"><label class="form-label" for="lab-notas">Equipamiento / notas</label><input
-            class="form-control" id="lab-notas" type="text" placeholder="Ej: Windows 11, Packet Tracer"></div>
+        <div class="form-group">
+          <label class="form-label" for="lab-estado">Estado</label>
+          <select class="form-control" id="lab-estado">
+            <option value="libre">Disponible</option>
+            <option value="ocupado">En mantenimiento</option>
+          </select>
+        </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-cancel" onclick="cerrarModal('modal-lab')">Cancelar</button>
-        <button class="btn-ok" onclick="guardarLab()">Guardar</button>
+      <div class="form-group">
+        <label class="form-label" for="lab-notas">Equipamiento / notas</label>
+        <input class="form-control" id="lab-notas" type="text" placeholder="Ej: Windows 11, Packet Tracer">
       </div>
+      
+      <!-- AGREGADO: Grupos simultáneos por slot -->
+      <div class="form-group">
+        <label class="form-label" for="lab-max-grupos">Grupos simultáneos por slot</label>
+        <div style="display: flex; align-items: center;">
+          <input class="form-control" type="number" id="lab-max-grupos" min="1" max="10" value="1" style="width:80px;" />
+          <small style="color:var(--muted); font-size:11px; margin-left:8px;">
+            1 = exclusivo · 2+ = compartido
+          </small>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-lab')">Cancelar</button>
+      <button class="btn-ok" onclick="guardarLab()">Guardar</button>
     </div>
   </div>
+</div>
 
   <!-- Lista de espera -->
   <div class="modal-overlay" id="modal-espera" role="dialog" aria-modal="true" aria-labelledby="modal-espera-title">
