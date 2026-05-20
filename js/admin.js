@@ -172,7 +172,7 @@ function renderLabsConfig() {
         '<div class="lab-config-info">' +
           '<div class="lab-config-name">' + l.nombre + '</div>' +
           '<div class="lab-config-sub">' + l.capacidad + ' equipos · ' +
-          'Grupos: ' + (l.max_grupos || 1) + ' · ' +
+          'Grupos: ' + getLabMaxGrupos(l.id) + ' · ' +
           (l.notas || 'Sin notas') + '</div>' +
         '</div>' +
         '<span class="orient-badge ' + statusBadge + '" style="margin-right:8px;">' + statusTxt + '</span>' +
@@ -334,7 +334,7 @@ function editarLab(id) {
   document.getElementById('lab-estado').value    = l.ocupado ? 'ocupado' : 'libre';
   document.getElementById('lab-notas').value     = l.notas || '';
   var labMg = document.getElementById('lab-max-grupos');
-  if (labMg) labMg.value = l.max_grupos || 1;
+  if (labMg) labMg.value = getLabMaxGrupos(editLabId);
   abrirModal('modal-lab');
 }
 
@@ -350,7 +350,7 @@ function guardarLab() {
 
   if (editLabId) {
     var l = LABS.find(function(x) { return x.id === editLabId; });
-    if (l) { l.nombre = nombre; l.capacidad = capacidad; l.ocupado = estado === 'ocupado'; l.notas = notas; l.max_grupos = maxGrupos; }
+    setLabMaxGrupos(id, maxGrupos); // persiste en LABS_CONFIG / localStorage
     toast('Espacio actualizado.', 'ok');
   } else {
     var newId = String.fromCharCode(65 + LABS.length);
