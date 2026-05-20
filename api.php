@@ -404,20 +404,7 @@ switch ($resource) {
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
 
             // --- VALIDACIÓN DE LÍMITE DE GRUPOS ---
-            $labRow = $db->query("SELECT max_grupos FROM gestor_labs WHERE id=" . $db->quote($b['lab']))->fetch();
-            $maxG   = $labRow ? (int)$labRow['max_grupos'] : 1;
-
-            $count  = (int)$db->query(
-              "SELECT COUNT(*) FROM gestor_reservas 
-               WHERE lab=" . $db->quote($b['lab']) . "
-               AND dia=" . (int)$b['dia'] . "
-               AND modulo=" . (int)$b['modulo'] . "
-               AND semanaOffset=" . (int)($b['semanaOffset']??0)
-            )->fetchColumn();
-
-            if ($count >= $maxG) {
-              err('Slot lleno: ' . $count . '/' . $maxG . ' grupos', 409);
-            }
+            // Límite de grupos manejado exclusivamente por el frontend (LABS_CONFIG)
             // --------------------------------------
 
             $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')

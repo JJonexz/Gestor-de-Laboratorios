@@ -248,31 +248,36 @@ function renderCalendario() {
       // Celda de módulo de clase
       var rs   = reservasDia.filter(function(x) { return x.modulo === mid && x.lab === lab.id; });
       var s    = solicDia.find(function(x)       { return x.modulo === mid && x.lab === lab.id; });
-      var maxG = lab.max_grupos || 1;
+      var maxG = getLabMaxGrupos(lab.id);
       html += '<td class="at-event-cell">';
 
       if (rs.length > 0) {
         var rendered = 0;
         var usaStack = rs.length > 1 || rs.length < maxG;
         if (usaStack) html += '<div class="at-cell-stack">';
-        rs.forEach(function(r) {
-          var oriOk = filtroOrient === 'all' || r.orient === filtroOrient;
-          if (!oriOk) return;
-          rendered++;
-          var orientKey   = (r.orient || 'bas').split(',')[0];
-          var ori         = ORIENTACIONES[orientKey] || ORIENTACIONES['bas'];
-          var p           = getProfe(r.profeId);
-          var puedeEditar = esDirectivo() || r.profeId === getCurrentProfId();
-          html +=
-            '<div class="at-event ' + ori.ev + '" role="button" tabindex="0" ' +
-            (puedeEditar ? 'draggable="true" ondragstart="dragReservaStart(event,' + r.id + ')" ondragend="dragReservaEnd(event)" ' : '') +
-            'onclick="verDetalle(' + r.id + ')" title="' + r.curso + ' — Prof. ' + p.apellido + (puedeEditar ? ' · Arrastrá para mover' : '') + '">' +
-              '<div class="at-ev-curso">' + r.curso + ' ' + ori.emoji + '</div>' +
-            '<div class="at-ev-prof">'  + p.apellido + '</div>' +
-            (r.grupoId ? '<div class="at-ev-grupo">Gr. ' + getNombreGrupo(r.grupoId) + '</div>' : '') +
-              (puedeEditar ? '<div class="at-ev-edit-hint drag-hint">⠿</div>' : '') +
-            '</div>';
-        });
+        rs.forEach(function(r, rIdx) {
+    var oriOk = filtroOrient === 'all' || r.orient === filtroOrient;
+    if (!oriOk) return;
+    rendered++;
+    var orientKey   = (r.orient || 'bas').split(',')[0];
+    var ori         = ORIENTACIONES[orientKey] || ORIENTACIONES['bas'];
+    var p           = getProfe(r.profeId);
+    var puedeEditar = esDirectivo() || r.profeId === getCurrentProfId();
+    // grupoLabel: posicional solo si hay más de 1 grupo en el slot (sin BD)
+    var _grupoNombre = r.grupoId ? getNombreGrupo(r.grupoId) : '';
+  var grupoLabel = rs.length > 1
+    ? (_grupoNombre ? _grupoNombre : String(rIdx + 1))  // multi: solo "101" sin prefijo
+    : (_grupoNombre ? 'Grupo ' + _grupoNombre : '');    // solo:  "Grupo 101" 
+    html +=
+    '<div class=\"at-event ' + ori.ev + '\" role=\"button\" tabindex=\"0\" ' +
+    (puedeEditar ? 'draggable=\"true\" ondragstart=\"dragReservaStart(event,' + r.id + ')\" ondragend=\"dragReservaEnd(event)\" ' : '') +
+    'onclick=\"verDetalle(' + r.id + ')\" title=\"' + r.curso + ' — Prof. ' + p.apellido + (puedeEditar ? ' · Arrastrá para mover' : '') + '\">' +
+      '<div class=\"at-ev-curso\">' + r.curso + ' ' + ori.emoji + '</div>' +
+      '<div class=\"at-ev-prof\">' + p.apellido + '</div>' +
+      (grupoLabel ? '<div class=\"at-ev-grupo\">' + grupoLabel + '</div>' : '') +
+      (puedeEditar ? '<div class=\"at-ev-edit-hint drag-hint\">⠿</div>' : '') +
+    '</div>';
+  });
         // slot con espacio libre → mostrar "+" para agregar grupo adicional
         if (rendered === 0) {
           html += _celdaLibre(diaActual, mid, lab.id);

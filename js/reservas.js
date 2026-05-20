@@ -234,7 +234,7 @@ function checkConflict() {
   if (!lab.value || dia.value === '' || mod.value === '') { cw.classList.remove('show'); return; }
 
   var labData2  = getLab(lab.value);
-  var maxG2     = (labData2 && labData2.max_grupos) ? labData2.max_grupos : 1;
+  var maxG2 = getLabMaxGrupos(lab.value);
   var enSlot2   = RESERVAS.filter(function(r) {
     return r.semanaOffset === semanaOffset
       && r.dia === parseInt(dia.value)
@@ -297,8 +297,7 @@ function guardarReserva() {
   var materia = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
   var secuencia = document.getElementById('f-secuencia').value.trim();
   var orient = UIHelper.getOrientValues('f-orient-group');
-  var grupoIdEl = document.getElementById('reserva-grupo');
-  var grupoId = grupoIdEl && grupoIdEl.value !== '' ? parseInt(grupoIdEl.value) : null;
+ // grupoId eliminado — no depende de BD
 
   if (materia) secuencia = '[' + materia + '] ' + secuencia;
   var periodoEl = document.getElementById('f-periodo');
@@ -327,7 +326,7 @@ function guardarReserva() {
     for (var mi = 0; mi < modulosAReservar.length; mi++) {
       var m = modulosAReservar[mi];
       var labData   = getLab(lab);
-      var maxGrupos = (labData && labData.max_grupos) ? labData.max_grupos : 1;
+      var maxGrupos = getLabMaxGrupos(lab);
       var enSlot    = RESERVAS.filter(function(r) {
         return r.semanaOffset === semanaOffset && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
       });
@@ -365,7 +364,7 @@ function guardarReserva() {
           cicloClases: 1,
           renovaciones: 0,
           anual: esAnual,
-          grupoId: grupoId,
+          // (línea eliminada — no enviar grupoId a la API)
         });
         totalCreadas++;
       });
@@ -442,8 +441,8 @@ function verDetalle(reservaId) {
       '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[r.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + r.curso + '</div></div>' +
       (r.grupoId
-        ? '<div class="detail-row"><div class="detail-label">Grupo</div><div class="detail-value">' + getNombreGrupo(r.grupoId) + '</div></div>'
-        : '') +
+      ? '<div class="detail-row"><div class="detail-label">Grupo</div><div class="detail-value">Grupo ' + getNombreGrupo(r.grupoId) + '</div></div>'
+      : '') +
       '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><div class="orient-badge-group">' + orientBadges + '</div></div></div>' +
       '<div class="detail-row"><div class="detail-label">Secuencia</div><div class="detail-value" style="font-style:italic;color:var(--muted);">"' + r.secuencia + '"</div></div>' +
       '<div style="margin-top:14px;">' +
@@ -567,7 +566,7 @@ function aceptarSolicitud(solId) {
     id: nextId, semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
     curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
     cicloClases: 1, renovaciones: 0,
-    grupoId: s.grupoId || null,
+    // (línea eliminada)
   };
   RESERVAS.push(nuevaReserva);
   SOLICITUDES = SOLICITUDES.filter(function (x) { return x.id !== solId; });
@@ -698,7 +697,7 @@ function guardarEdicionReserva() {
         x.secuencia = nuevaSecuencia;
         x.orient = nuevaOrient;
         if (nuevoProfeId) x.profeId = nuevoProfeId;
-        x.grupoId = nuevoGrupoId;
+        // (línea eliminada — grupoId no se usa)
         actualizadas++;
       }
     });

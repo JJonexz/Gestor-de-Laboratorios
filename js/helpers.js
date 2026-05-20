@@ -70,3 +70,50 @@ function esHoy(offset, dia) {
   var d = getDiaDate(offset, dia);
   return d.toDateString() === HOY.toDateString();
 }
+// ── Runtime config multi-grupo (SIN columna BD) ──────────────
+// Se carga desde localStorage al iniciar y se persiste ahí.
+(function() {
+  try {
+    var _lc = localStorage.getItem('LABS_CONFIG');
+    if (_lc) window.LABS_CONFIG = JSON.parse(_lc);
+  } catch(e) {}
+  window.LABS_CONFIG = window.LABS_CONFIG || {};
+})();
+
+function getLabMaxGrupos(labId) {
+  // Fuente de verdad: LABS_CONFIG (runtime). Nunca leer max_grupos de la BD.
+  var cfg = window.LABS_CONFIG && window.LABS_CONFIG[String(labId)];
+  if (cfg && cfg.max_grupos) return parseInt(cfg.max_grupos);
+  return 2; // default: 2 grupos por slot
+}
+
+// Inicializar LABS_CONFIG desde el array LABS apenas estén disponibles
+// Llamar después de que la API cargue LABS (en init.js o db-override.js)
+function initLabsConfig() {
+  // Solo respetar valores guardados explícitamente por el admin (> 1)
+  // Ignorar max_grupos de la BD (todos vienen en 1, no refleja la config real)
+  var guardada = {};
+  try {
+    var _lc = localStorage.getItem('LABS_CONFIG');
+    if (_lc) guardada = JSON.parse(_lc);
+  } catch(e) {}
+
+  window.LABS_CONFIG = {};
+  if (typeof LABS === 'undefined' || !LABS.length) return;
+
+  LABS.forEach(function(l) {
+    var key = String(l.id);
+    // Usar solo si el admin lo configuró explícitamente (> 1)
+    var explicit = guardada[key] && parseInt(guardada[key].max_grupos) > 1
+      ? parseInt(guardada[key].max_grupos) : null;
+    window.LABS_CONFIG[key] = { max_grupos: explicit || 2 };
+  });
+
+  try { localStorage.setItem('LABS_CONFIG', JSON.stringify(window.LABS_CONFIG)); } catch(e) {}
+}
+
+function setLabMaxGrupos(labId, maxGrupos) {
+  window.LABS_CONFIG = window.LABS_CONFIG || {};
+  window.LABS_CONFIG[String(labId)] = { max_grupos: parseInt(maxGrupos) || 1 };
+  try { localStorage.setItem('LABS_CONFIG', JSON.stringify(window.LABS_CONFIG)); } catch(e) {}
+}

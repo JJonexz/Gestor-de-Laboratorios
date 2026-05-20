@@ -37,7 +37,7 @@ guardarReserva = function() {
 
   if (!esAnual) {
     var _labData   = getLab(lab);
-    var _maxGrupos = (_labData && _labData.max_grupos) ? _labData.max_grupos : 1;
+    var _maxGrupos = getLabMaxGrupos(lab);
     for (var mi = 0; mi < modulosAReservar.length; mi++) {
       var m = modulosAReservar[mi];
       var reservasEnSlot = RESERVAS.filter(function(r) {
@@ -72,7 +72,7 @@ guardarReserva = function() {
           return r.semanaOffset === sem && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
         });
         var _labA   = getLab(lab);
-        var _maxA   = (_labA && _labA.max_grupos) ? _labA.max_grupos : 1;
+        var _maxA = getLabMaxGrupos(lab);
         if (enSlotAnual.length >= _maxA) return;
         var grupoIdEl = document.getElementById('reserva-grupo');
         var grupoId   = grupoIdEl && grupoIdEl.value !== '' ? parseInt(grupoIdEl.value) : null;
@@ -97,8 +97,9 @@ guardarReserva = function() {
       var grupoId2   = grupoIdEl2 && grupoIdEl2.value !== '' ? parseInt(grupoIdEl2.value) : null;
       promises2.push(apiPost('solicitudes', {
         semanaOffset: semanaOffset, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
-        orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()), secuencia: secuencia, cicloClases: 1,
-        estado: 'pendiente', esRenovacion: 0, renovacionNum: 0, grupoId: grupoId2
+        orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()),
+        secuencia: secuencia, cicloClases: 1, estado: 'pendiente',
+        esRenovacion: 0, renovacionNum: 0, grupoId: grupoId2
       }));
     });
     Promise.all(promises2).then(function(nuevas) {
@@ -115,7 +116,7 @@ aceptarSolicitud = function(solId) {
   var s = SOLICITUDES.find(function(x) { return x.id === solId; });
   if (!s) return;
   var labAcept  = getLab(s.lab);
-  var maxAcept  = (labAcept && labAcept.max_grupos) ? labAcept.max_grupos : 1;
+  var maxAcept = getLabMaxGrupos(s.lab);
   var enSlotAcept = RESERVAS.filter(function(r) {
     return r.semanaOffset === s.semanaOffset && r.dia === s.dia && r.modulo === s.modulo && r.lab === s.lab;
   });
@@ -153,7 +154,7 @@ aceptarSolicitud = function(solId) {
   apiPost('reservas', {
     semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
     curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
-    cicloClases: 1, renovaciones: 0, anual: 0, grupoId: s.grupoId || null
+    cicloClases: 1, renovaciones: 0, anual: 0
   }).then(function(nueva) {
     RESERVAS.push(nueva);
     if (typeof notifSolicitudAprobada === 'function') notifSolicitudAprobada(s);
@@ -320,7 +321,9 @@ guardarLab = function() {
 
   var maxGruposEl = document.getElementById('lab-max-grupos');
   var maxGrupos   = maxGruposEl ? parseInt(maxGruposEl.value || '1') : 1;
-  var datos = { id: id, nombre: nombre, capacidad: capacidad, notas: notas, ocupado: estado === 'ocupado' ? 1 : 0, max_grupos: maxGrupos };
+  // max_grupos NO va a la API — se persiste solo en runtime config
+    setLabMaxGrupos(id, maxGrupos);
+    var datos = { id: id, nombre: nombre, capacidad: capacidad, notas: notas, ocupado: estado === 'ocupado' ? 1 : 0 };
 
   if (editLabId !== null) {
     apiPut('labs/' + editLabId, datos).then(function(actualizado) {
@@ -457,5 +460,6 @@ if (typeof solicitarRenovacion !== 'undefined') {
     );
   };
 }
+
 
 console.log('[DB Override] Funciones SQL activas.');

@@ -2001,11 +2001,13 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
 /* Celda de evento en la tabla */
 .at-event-cell {
-  height: auto;
+  height: 1px;          /* truco TD: permite que hijos usen height:100% */
   min-height: 50px;
+  max-height: 80px;     /* techo fijo: 2 grupos no expanden la fila */
   padding: 3px;
   border-left: 1px solid var(--border);
-  vertical-align: middle;   /* centra el evento en la fila de la tabla */
+  vertical-align: middle;
+  overflow: hidden;
 }
 .at-ev-grupo {
   font-size: 10px;
@@ -2069,10 +2071,14 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 }
 .at-cell-stack > .at-event .at-ev-grupo {
   display: inline-block;
-  align-self: flex-start;   /* badge no se estira al ancho del evento */
-  font-size: .55rem;
+  align-self: flex-start;
+  font-size: .52rem;    /* más compacto en multi-grupo */
   padding: 0 2px;
   margin-top: 1px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .at-cell-stack > .at-event .at-ev-edit-hint {
   display: none;
