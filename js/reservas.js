@@ -132,6 +132,16 @@ function abrirModalReserva() {
   if (profeWrap) profeWrap.style.display = esDirectivo() ? 'block' : 'none';
   if (profeSel) profeSel.value = '';
 
+  poblarSelectorGrupo('', '');
+
+  var fCursoMain = document.getElementById('f-curso');
+  if (fCursoMain && !fCursoMain.dataset.grupoBind) {
+    fCursoMain.addEventListener('change', function() {
+      poblarSelectorGrupo(this.value, '');
+    });
+    fCursoMain.dataset.grupoBind = '1';
+  }
+
   abrirModal('modal-reserva');
 }
 
@@ -142,32 +152,76 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   var fLab = document.getElementById('f-lab');
   var fDia = document.getElementById('f-dia');
   var fMod = document.getElementById('f-modulo');
+
   if (fLab) fLab.value = lab;
   if (fDia) fDia.value = dia;
   if (fMod) fMod.value = modulo;
 
   var fCurso = document.getElementById('f-curso');
   var fSeq = document.getElementById('f-secuencia');
+
   if (fCurso) fCurso.value = '';
   if (fSeq) fSeq.value = '';
+
+  // Inicializar grupos vacío
+  poblarSelectorGrupo('', '');
+
+  // IMPORTANTE:
+  // actualizar grupos automáticamente cuando cambia el curso
+  if (fCurso && !fCurso.dataset.grupoBind) {
+    fCurso.addEventListener('change', function() {
+      poblarSelectorGrupo(this.value, '');
+    });
+
+    // evita múltiples listeners al abrir el modal varias veces
+    fCurso.dataset.grupoBind = '1';
+  }
 
   UIHelper.setOrientValues('f-orient-group', 'bas');
 
   checkConflict();
 
-  // Checkbox de reserva anual (solo para directivos)
+  // Checkbox reserva anual
   var anualWrap = document.getElementById('f-anual-wrap');
   var anualChk = document.getElementById('f-anual');
+
   if (anualWrap) anualWrap.style.display = esDirectivo() ? 'block' : 'none';
   if (anualChk) anualChk.checked = false;
 
-  // Selector de docente (solo para directivos)
+  // Selector docente
   var profeWrap = document.getElementById('f-profe-wrap');
   var profeSel = document.getElementById('f-profe');
+
   if (profeWrap) profeWrap.style.display = esDirectivo() ? 'block' : 'none';
   if (profeSel) profeSel.value = '';
 
   abrirModal('modal-reserva');
+}
+
+
+// Helper selector grupos
+function poblarSelectorGrupo(cursoId, grupoIdActual) {
+  const sel = document.getElementById('reserva-grupo');
+  if (!sel) return;
+
+  sel.innerHTML = '<option value="">-- Sin grupo --</option>';
+
+  if (!cursoId) return;
+
+  const grupos = getGruposByCurso(cursoId);
+
+  grupos.forEach(g => {
+    const opt = document.createElement('option');
+
+    opt.value = g.id;
+    opt.textContent = g.nombre;
+
+    if (String(g.id) === String(grupoIdActual)) {
+      opt.selected = true;
+    }
+
+    sel.appendChild(opt);
+  });
 }
 
 // ── Verificación de conflicto en tiempo real ─────────────────
@@ -179,20 +233,22 @@ function checkConflict() {
   if (!lab || !dia || !mod || !cw) return;
   if (!lab.value || dia.value === '' || mod.value === '') { cw.classList.remove('show'); return; }
 
-  var conflict = RESERVAS.find(function (r) {
+  var labData2  = getLab(lab.value);
+  var maxG2 = getLabMaxGrupos(lab.value);
+  var enSlot2   = RESERVAS.filter(function(r) {
     return r.semanaOffset === semanaOffset
       && r.dia === parseInt(dia.value)
       && r.modulo === parseInt(mod.value)
       && r.lab === lab.value;
   });
-  var solConflict = SOLICITUDES.find(function (s) {
+  var solConflict = SOLICITUDES.find(function(s) {
     return s.semanaOffset === semanaOffset
       && s.dia === parseInt(dia.value)
       && s.modulo === parseInt(mod.value)
       && s.lab === lab.value
       && s.estado === 'pendiente';
   });
-  cw.classList.toggle('show', !!(conflict || solConflict));
+  cw.classList.toggle('show', !!(enSlot2.length >= maxG2 || solConflict));
 }
 
 // ── Expande un período a una lista de IDs de módulos ─────────
@@ -210,6 +266,28 @@ function getModulosParaPeriodo(moduloBase, periodoVal) {
   return MODULOS_CLASE.slice(idx, idx + n).map(function (m) { return m.id; });
 }
 
+// (helpers grupo)
+function getGrupoById(id) {
+  return (window.GRUPOS || []).find(g => String(g.id) === String(id)) || null;
+}
+
+function getGruposByCurso(cursoLabel) {
+  if (!cursoLabel) return [];
+  var curso = (window.CURSOS || []).find(function(c) {
+    var label = c.ano + '°' + c.division + (c.turno ? ' (' + c.turno + ')' : '');
+    return label === cursoLabel;
+  });
+  if (!curso) return [];
+  return (window.GRUPOS || []).filter(function(g) {
+    return String(g.id_cursos) === String(curso.id);
+  });
+}
+
+function getNombreGrupo(id) {
+  const g = getGrupoById(id);
+  return g ? String(g.nombre) : '';
+}
+
 // ── Guardar reserva ──────────────────────────────────────────
 function guardarReserva() {
   var lab = document.getElementById('f-lab').value;
@@ -219,6 +297,7 @@ function guardarReserva() {
   var materia = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
   var secuencia = document.getElementById('f-secuencia').value.trim();
   var orient = UIHelper.getOrientValues('f-orient-group');
+ // grupoId eliminado — no depende de BD
 
   if (materia) secuencia = '[' + materia + '] ' + secuencia;
   var periodoEl = document.getElementById('f-periodo');
@@ -246,11 +325,16 @@ function guardarReserva() {
   if (!esAnual) {
     for (var mi = 0; mi < modulosAReservar.length; mi++) {
       var m = modulosAReservar[mi];
-      var conflicto = RESERVAS.find(function (r) {
+      var labData   = getLab(lab);
+      var maxGrupos = getLabMaxGrupos(lab);
+      var enSlot    = RESERVAS.filter(function(r) {
         return r.semanaOffset === semanaOffset && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
       });
-      if (conflicto) { toast('El módulo ' + getModulo(m).label + ' ya está reservado en esta semana.', 'warn'); return; }
-      var solicPendiente = SOLICITUDES.find(function (s) {
+      if (enSlot.length >= maxGrupos) {
+        toast('El módulo ' + getModulo(m).label + ' ya alcanzó el máximo de ' + maxGrupos + ' grupo(s).', 'warn');
+        return;
+      }
+      var solicPendiente = SOLICITUDES.find(function(s) {
         return s.semanaOffset === semanaOffset && s.dia === parseInt(dia) && s.modulo === m && s.lab === lab && s.estado === 'pendiente';
       });
       if (solicPendiente) { toast('El módulo ' + getModulo(m).label + ' ya tiene solicitud pendiente.', 'warn'); return; }
@@ -280,6 +364,7 @@ function guardarReserva() {
           cicloClases: 1,
           renovaciones: 0,
           anual: esAnual,
+          // (línea eliminada — no enviar grupoId a la API)
         });
         totalCreadas++;
       });
@@ -320,6 +405,7 @@ function guardarReserva() {
         esRenovacion: false,
         renovacionNum: 0,
         anual: false,
+        grupoId: grupoId,
       });
     });
     cerrarModal('modal-reserva');
@@ -354,6 +440,9 @@ function verDetalle(reservaId) {
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">' + getLab(r.lab).nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[r.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + r.curso + '</div></div>' +
+      (r.grupoId
+      ? '<div class="detail-row"><div class="detail-label">Grupo</div><div class="detail-value">Grupo ' + getNombreGrupo(r.grupoId) + '</div></div>'
+      : '') +
       '<div class="detail-row"><div class="detail-label">Orientación</div><div class="detail-value"><div class="orient-badge-group">' + orientBadges + '</div></div></div>' +
       '<div class="detail-row"><div class="detail-label">Secuencia</div><div class="detail-value" style="font-style:italic;color:var(--muted);">"' + r.secuencia + '"</div></div>' +
       '<div style="margin-top:14px;">' +
@@ -477,6 +566,7 @@ function aceptarSolicitud(solId) {
     id: nextId, semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
     curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
     cicloClases: 1, renovaciones: 0,
+    // (línea eliminada)
   };
   RESERVAS.push(nuevaReserva);
   SOLICITUDES = SOLICITUDES.filter(function (x) { return x.id !== solId; });
@@ -553,8 +643,10 @@ function editarReserva(reservaId) {
       if (scopeSel) scopeSel.value = 'puntual'; // default
     }
   }
+ poblarSelectorGrupo(r.curso, r.grupoId || null);
 
-  abrirModal('modal-editar-reserva');
+abrirModal('modal-editar-reserva');
+
 }
 
 // Guarda los cambios del modal de edición.
@@ -569,6 +661,8 @@ function guardarEdicionReserva() {
   var nuevaOrient = UIHelper.getOrientValues('edit-orient-group');
   var scopeSel = document.getElementById('edit-scope');
   var scope = scopeSel ? scopeSel.value : 'puntual';
+  var editGrupoEl = document.getElementById('reserva-grupo');
+  var nuevoGrupoId = editGrupoEl && editGrupoEl.value !== '' ? parseInt(editGrupoEl.value) : null;
 
   // Docente asignado (solo directivos pueden cambiarlo)
   var editProfeSel = document.getElementById('edit-profe');
@@ -603,6 +697,7 @@ function guardarEdicionReserva() {
         x.secuencia = nuevaSecuencia;
         x.orient = nuevaOrient;
         if (nuevoProfeId) x.profeId = nuevoProfeId;
+        // (línea eliminada — grupoId no se usa)
         actualizadas++;
       }
     });
@@ -624,6 +719,7 @@ function guardarEdicionReserva() {
         x.secuencia = nuevaSecuencia;
         x.orient = nuevaOrient;
         if (nuevoProfeId) x.profeId = nuevoProfeId;
+        x.grupoId = nuevoGrupoId;
         actualizadas++;
       }
     });
@@ -645,6 +741,7 @@ function guardarEdicionReserva() {
         x.secuencia = nuevaSecuencia;
         x.orient = nuevaOrient;
         if (nuevoProfeId) x.profeId = nuevoProfeId;
+        x.grupoId = nuevoGrupoId;
         actualizadas++;
       }
     });
@@ -851,7 +948,8 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
           secuencia:    r.secuencia || '',
           cicloClases:  r.cicloClases  || 1,
           renovaciones: r.renovaciones || 0,
-          anual:        r.anual ? 1 : 0
+          anual:        r.anual ? 1 : 0,
+          grupoId:      r.grupoId || null
         })
       })
       .then(function(res) { return res.json(); })

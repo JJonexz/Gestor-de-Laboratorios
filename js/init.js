@@ -117,13 +117,15 @@ document.addEventListener('DOMContentLoaded', function() {
   // Prioridad 1: localStorage (persiste entre recargas del navegador)
   // Prioridad 2: archivos JSON (primer uso o después de resetear)
   var fromLS = loadFromLocalStorage();
-  if (fromLS) {
-    renderCalendario();
-  } else {
-    loadFromJSON(function() {
+    if (fromLS) {
+      if (typeof initLabsConfig === 'function') initLabsConfig();
       renderCalendario();
-    });
-  }
+    } else {
+      loadFromJSON(function() {
+        if (typeof initLabsConfig === 'function') initLabsConfig();
+        renderCalendario();
+      });
+    }
 
   // ── 8. Inicializar módulos nuevos ─────────────────────────
   if (typeof iniciarPollingNotif === 'function') iniciarPollingNotif();

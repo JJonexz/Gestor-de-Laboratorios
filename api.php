@@ -132,6 +132,20 @@ function initSchema($pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
+    // ── Migraciones seguras: añadir columnas nuevas si no existen ──
+    // max_grupos en gestor_labs (soporta múltiples grupos por slot)
+    if (!$pdo->query("SHOW COLUMNS FROM gestor_labs LIKE 'max_grupos'")->fetch()) {
+        $pdo->exec("ALTER TABLE gestor_labs ADD COLUMN max_grupos TINYINT NOT NULL DEFAULT 1");
+    }
+    // grupoId en gestor_reservas (referencia a tabla grupos de la BD escuela)
+    if (!$pdo->query("SHOW COLUMNS FROM gestor_reservas LIKE 'grupoId'")->fetch()) {
+        $pdo->exec("ALTER TABLE gestor_reservas ADD COLUMN grupoId INT DEFAULT NULL");
+    }
+    // grupoId en gestor_solicitudes (misma referencia para solicitudes pendientes)
+    if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'grupoId'")->fetch()) {
+        $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN grupoId INT DEFAULT NULL");
+    }
+
     syncFromMaster($pdo);
 }
 
@@ -139,52 +153,54 @@ function syncFromMaster($pdo) {
     // 1. Sincronizar SALONES -> GESTOR_LABS
     $hasSalones = $pdo->query("SHOW TABLES LIKE 'salones'")->fetch();
     if ($hasSalones) {
-        // Eliminamos labs de ejemplo (A, B, C) si existen
-        $pdo->exec("DELETE FROM gestor_labs WHERE id IN ('A', 'B', 'C')");
-        // Eliminamos reservas y solicitudes que referencien a los labs viejos
-        $pdo->exec("DELETE FROM gestor_reservas WHERE lab IN ('A', 'B', 'C')");
-        $pdo->exec("DELETE FROM gestor_solicitudes WHERE lab IN ('A', 'B', 'C')");
-        
-        // Insertamos/Actualizamos desde salones
+        // Limpiar labs de ejemplo (A,B,C) SOLO si la tabla gestor_labs está vacía
+        // (primer arranque). Nunca borrar si ya hay datos reales cargados.
+        $cntLabs = (int)$pdo->query("SELECT COUNT(*) FROM gestor_labs")->fetchColumn();
+        if ($cntLabs === 0) {
+            $pdo->exec("DELETE FROM gestor_labs WHERE id IN ('A', 'B', 'C')");
+            // Solo borramos reservas/solicitudes fantasma en primer arranque
+            $pdo->exec("DELETE FROM gestor_reservas WHERE lab IN ('A', 'B', 'C')");
+            $pdo->exec("DELETE FROM gestor_solicitudes WHERE lab IN ('A', 'B', 'C')");
+        }
+
+        // INSERT nuevos salones + UPDATE nombre/capacidad/notas de existentes.
+        // NO toca el campo 'ocupado' (lo gestiona el gestor manualmente).
+        // CAST asegura id siempre VARCHAR, consistente con gestor_reservas.lab
         $pdo->exec("
-            INSERT IGNORE INTO gestor_labs (id, nombre, capacidad, notas)
+            INSERT INTO gestor_labs (id, nombre, capacidad, notas)
             SELECT 
-                CAST(id_salones AS CHAR), 
-                CONCAT(tipo, ' ', numero), 
-                capacidad, 
+                CAST(id_salones AS CHAR),
+                CONCAT(tipo, ' ', numero),
+                capacidad,
                 CONCAT('Ubicación: ', ubicacion)
             FROM salones
+            ON DUPLICATE KEY UPDATE
+                nombre    = VALUES(nombre),
+                capacidad = VALUES(capacidad),
+                notas     = VALUES(notas)
         ");
     }
 
     // 2. Sincronizar PERSONAL -> GESTOR_PROFESORES
     $hasPersonal = $pdo->query("SHOW TABLES LIKE 'personal'")->fetch();
     if ($hasPersonal) {
-        // Eliminamos profesores de ejemplo si no tienen DNI vinculado
-        $pdo->exec("DELETE FROM gestor_profesores WHERE dni_personal IS NULL");
-        
+        // Solo eliminamos profesores sin DNI vinculado si no tienen reservas asociadas
         $pdo->exec("
-            INSERT IGNORE INTO gestor_profesores (apellido, nombre, dni_personal, materia)
+            DELETE FROM gestor_profesores
+            WHERE dni_personal IS NULL
+              AND id NOT IN (SELECT DISTINCT profeId FROM gestor_reservas)
+              AND id NOT IN (SELECT DISTINCT profeId FROM gestor_solicitudes)
+        ");
+
+        $pdo->exec("
+            INSERT INTO gestor_profesores (apellido, nombre, dni_personal, materia)
             SELECT apellido, nombre, dni, 'Docente'
             FROM personal
             WHERE dni > 0 AND apellido <> ''
+            ON DUPLICATE KEY UPDATE
+                apellido = VALUES(apellido),
+                nombre   = VALUES(nombre)
         ");
-    }
-
-    // Datos iniciales de ejemplo (solo si no hay nada en absoluto)
-    $cntPautas = $pdo->query('SELECT COUNT(*) FROM gestor_pautas')->fetchColumn();
-    if ($cntPautas == 0) {
-        $pautas = [
-            'Dejar el aula limpia al salir',
-            'Apagar todos los equipos al finalizar la clase',
-            'Renovar el turno cada 3 clases (ciclo didáctico)',
-            'Registrar la secuencia didáctica al reservar',
-            'No consumir alimentos ni bebidas en el laboratorio',
-            'Reportar desperfectos al personal de mantenimiento',
-            'Respetar el horario asignado — no excederse',
-        ];
-        $s = $pdo->prepare('INSERT INTO gestor_pautas(texto) VALUES(?)');
-        foreach ($pautas as $p) $s->execute([$p]);
     }
 }
 
@@ -195,14 +211,18 @@ function err($msg, $code=400) { http_response_code($code); echo json_encode(['ok
 function body() { return json_decode(file_get_contents('php://input'), true) ?? []; }
 
 function castRow($r) {
-    $numericStringsAsInt = true; 
+    // Los rows de gestor_labs tienen el campo 'ocupado' — lo usamos para detectarlos
+    // y forzar su id a string, igual que r.lab en reservas (ambos deben ser string en JS)
+    $isLabRow = array_key_exists('ocupado', $r);
     foreach($r as $key => $v) {
         if (is_null($v)) {
             $r[$key] = null;
             continue;
         }
-        // No castear a int los IDs de laboratorio o referencias de lab para evitar fallos de === en JS
-        if ($key === 'lab' || ($key === 'id' && !is_numeric($v))) {
+        // Forzar string en: campo 'lab' (referencia en reservas/solicitudes),
+        //                    campo 'id' de filas gestor_labs (para que === funcione en JS),
+        //                    campo 'id' no numérico (ej: labs legacy 'A','B','C')
+        if ($key === 'lab' || ($key === 'id' && (!is_numeric($v) || $isLabRow))) {
             $r[$key] = (string)$v;
             continue;
         }
@@ -320,18 +340,18 @@ switch ($resource) {
 
     // ── LABS ──────────────────────────────────────────────────
     case 'labs':
-        if ($method === 'GET') ok($db->query('SELECT * FROM gestor_labs ORDER BY id')->fetchAll());
+        if ($method === 'GET') ok(castRows($db->query('SELECT * FROM gestor_labs ORDER BY id')->fetchAll()));
         if ($method === 'POST') {
             $b = body();
-            $db->prepare('INSERT INTO gestor_labs(id,nombre,ocupado,capacidad,notas) VALUES(?,?,?,?,?)')
-               ->execute([$b['id'],$b['nombre'],(int)($b['ocupado']??0),(int)($b['capacidad']??20),$b['notas']??'']);
-            $s=$db->prepare('SELECT * FROM gestor_labs WHERE id=?'); $s->execute([$b['id']]); ok($s->fetch());
+            $db->prepare('INSERT INTO gestor_labs(id,nombre,ocupado,capacidad,notas,max_grupos) VALUES(?,?,?,?,?,?)')
+               ->execute([$b['id'],$b['nombre'],(int)($b['ocupado']??0),(int)($b['capacidad']??20),$b['notas']??'',(int)($b['max_grupos']??1)]);
+            $s=$db->prepare('SELECT * FROM gestor_labs WHERE id=?'); $s->execute([$b['id']]); ok(castRows([$s->fetch()])[0]);
         }
         if ($method === 'PUT' && $id) {
             $b = body();
-            $db->prepare('UPDATE gestor_labs SET nombre=?,ocupado=?,capacidad=?,notas=? WHERE id=?')
-               ->execute([$b['nombre'],(int)($b['ocupado']??0),(int)($b['capacidad']??20),$b['notas']??'',$id]);
-            $s=$db->prepare('SELECT * FROM gestor_labs WHERE id=?'); $s->execute([$id]); ok($s->fetch());
+            $db->prepare('UPDATE gestor_labs SET nombre=?,ocupado=?,capacidad=?,notas=?,max_grupos=? WHERE id=?')
+               ->execute([$b['nombre'],(int)($b['ocupado']??0),(int)($b['capacidad']??20),$b['notas']??'',(int)($b['max_grupos']??1),$id]);
+            $s=$db->prepare('SELECT * FROM gestor_labs WHERE id=?'); $s->execute([$id]); ok(castRows([$s->fetch()])[0]);
         }
         if ($method === 'DELETE' && $id) {
             $db->prepare('DELETE FROM gestor_labs WHERE id=?')->execute([$id]); ok(['deleted'=>$id]);
@@ -381,21 +401,28 @@ switch ($resource) {
         }
         if ($method === 'POST') {
             $b=body();
-            $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+            $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
+
+            // --- VALIDACIÓN DE LÍMITE DE GRUPOS ---
+            // Límite de grupos manejado exclusivamente por el frontend (LABS_CONFIG)
+            // --------------------------------------
+
+            $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
                            $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
-                           (int)($b['renovaciones']??0),(int)($b['anual']??0)]);
+                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId]);
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
         if ($method === 'PUT' && $id) {
             $b=body();
-            $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=? WHERE id=?')
+            $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
+            $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=? WHERE id=?')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
                            $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
-                           (int)($b['renovaciones']??0),(int)($b['anual']??0),(int)$id]);
+                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,(int)$id]);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([(int)$id]); ok(castRow($s->fetch()));
         }
         if ($method === 'DELETE' && $id) {
@@ -420,13 +447,14 @@ switch ($resource) {
         }
         if ($method === 'POST') {
             $b=body();
-            $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+            $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
+            $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
                            $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            $b['estado']??'pendiente',(int)($b['esRenovacion']??0),
                            isset($b['reservaOriginalId'])?(int)$b['reservaOriginalId']:null,
-                           (int)($b['renovacionNum']??0)]);
+                           (int)($b['renovacionNum']??0),$grupoId]);
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_solicitudes WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
@@ -477,6 +505,12 @@ switch ($resource) {
         err('Not found',404);
 
     // ── CURSOS ────────────────────────────────────────────────
+    case 'grupos':
+        if ($method !== 'GET') err('Method not allowed', 405);
+        $hasGrupos = $db->query("SHOW TABLES LIKE 'grupos'")->fetch();
+        if (!$hasGrupos) ok([]);
+        ok(castRows($db->query('SELECT id, nombre, id_cursos FROM grupos ORDER BY id_cursos, nombre')->fetchAll()));
+
     case 'cursos':
         if ($method !== 'GET') err('Method not allowed', 405);
         ok(castRows($db->query('SELECT id, division, ano, turno FROM cursos ORDER BY ano, division')->fetchAll()));
@@ -498,7 +532,7 @@ switch ($resource) {
         }
 
         $res = [
-            'labs'        => $db->query('SELECT * FROM gestor_labs ORDER BY id')->fetchAll(),
+            'labs'        => castRows($db->query('SELECT * FROM gestor_labs ORDER BY id')->fetchAll()),
             'profesores'  => $profs,
             'reservas'    => castRows($db->query('SELECT * FROM gestor_reservas ORDER BY semanaOffset,dia,modulo')->fetchAll()),
             'solicitudes' => castRows($db->query('SELECT * FROM gestor_solicitudes ORDER BY id')->fetchAll()),
@@ -509,9 +543,12 @@ switch ($resource) {
         // Tablas maestras opcionales
         $hasCursos = $db->query("SHOW TABLES LIKE 'cursos'")->fetch();
         if ($hasCursos) $res['cursos'] = castRows($db->query('SELECT id, division, ano, turno FROM cursos ORDER BY ano, division')->fetchAll());
-        
+
         $hasMaterias = $db->query("SHOW TABLES LIKE 'materias'")->fetch();
         if ($hasMaterias) $res['materias'] = castRows($db->query('SELECT id, nombre, abreviatura FROM materias ORDER BY nombre')->fetchAll());
+
+        $hasGrupos = $db->query("SHOW TABLES LIKE 'grupos'")->fetch();
+        if ($hasGrupos) $res['grupos'] = castRows($db->query('SELECT id, nombre, id_cursos FROM grupos ORDER BY id_cursos, nombre')->fetchAll());
 
         ok($res);
 

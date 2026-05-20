@@ -171,7 +171,9 @@ function renderLabsConfig() {
         '<div class="lab-config-icon">🖥️</div>' +
         '<div class="lab-config-info">' +
           '<div class="lab-config-name">' + l.nombre + '</div>' +
-          '<div class="lab-config-sub">' + l.capacidad + ' equipos · ' + (l.notas || 'Sin notas') + '</div>' +
+          '<div class="lab-config-sub">' + l.capacidad + ' equipos · ' +
+          'Grupos: ' + getLabMaxGrupos(l.id) + ' · ' +
+          (l.notas || 'Sin notas') + '</div>' +
         '</div>' +
         '<span class="orient-badge ' + statusBadge + '" style="margin-right:8px;">' + statusTxt + '</span>' +
         '<div class="lab-config-actions">' +
@@ -318,6 +320,7 @@ function abrirModalLab() {
   ['lab-nombre', 'lab-capacidad', 'lab-notas'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
+  var labMg = document.getElementById('lab-max-grupos'); if (labMg) labMg.value = 1;
   var estado = document.getElementById('lab-estado'); if (estado) estado.value = 'libre';
   abrirModal('modal-lab');
 }
@@ -330,24 +333,28 @@ function editarLab(id) {
   document.getElementById('lab-capacidad').value = l.capacidad || '';
   document.getElementById('lab-estado').value    = l.ocupado ? 'ocupado' : 'libre';
   document.getElementById('lab-notas').value     = l.notas || '';
+  var labMg = document.getElementById('lab-max-grupos');
+  if (labMg) labMg.value = getLabMaxGrupos(editLabId);
   abrirModal('modal-lab');
 }
 
 function guardarLab() {
-  var nombre    = document.getElementById('lab-nombre').value.trim();
-  var capacidad = parseInt(document.getElementById('lab-capacidad').value) || 0;
-  var estado    = document.getElementById('lab-estado').value;
-  var notas     = document.getElementById('lab-notas').value.trim();
+  var nombre     = document.getElementById('lab-nombre').value.trim();
+  var capacidad  = parseInt(document.getElementById('lab-capacidad').value) || 0;
+  var estado     = document.getElementById('lab-estado').value;
+  var notas      = document.getElementById('lab-notas').value.trim();
+  var maxGrupos  = parseInt(document.getElementById('lab-max-grupos').value) || 1;
+  if (maxGrupos < 1) maxGrupos = 1;
 
   if (!nombre) { toast('Ingresá un nombre para el espacio.', 'err'); return; }
 
   if (editLabId) {
     var l = LABS.find(function(x) { return x.id === editLabId; });
-    if (l) { l.nombre = nombre; l.capacidad = capacidad; l.ocupado = estado === 'ocupado'; l.notas = notas; }
+    setLabMaxGrupos(id, maxGrupos); // persiste en LABS_CONFIG / localStorage
     toast('Espacio actualizado.', 'ok');
   } else {
-    var newId = String.fromCharCode(65 + LABS.length); // A, B, C…
-    LABS.push({ id: newId, nombre: nombre, capacidad: capacidad, ocupado: estado === 'ocupado', notas: notas });
+    var newId = String.fromCharCode(65 + LABS.length);
+    LABS.push({ id: newId, nombre: nombre, capacidad: capacidad, ocupado: estado === 'ocupado', notas: notas, max_grupos: maxGrupos });
     toast('Espacio "' + nombre + '" agregado.', 'ok');
   }
 

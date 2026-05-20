@@ -83,6 +83,7 @@ var PAUTAS = [];
 var RECREOS = [];
 var CURSOS = [];
 var MATERIAS = [];
+var GRUPOS = [];  // { id, nombre (int: 306, 312...), id_cursos }
 
 // ── Clave de localStorage ───────────────────────────────────
 var LS_KEY = 'gestor_eest1_db';
