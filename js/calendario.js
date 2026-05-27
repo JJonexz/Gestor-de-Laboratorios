@@ -245,7 +245,7 @@ function renderCalendario() {
       '<td class="at-lab-cell">' +
       '<div class="at-lab-name">' + lab.nombre + '</div>' +
       '<div class="at-lab-status ' + (lab.ocupado ? 'at-status-ocup' : 'at-status-libre') + '">' +
-        (lab.ocupado ? 'Mantenimiento' : 'Disponible') +
+      (lab.ocupado ? 'Mantenimiento' : 'Disponible') +
       '</div>' +
       '</td>';
 
@@ -269,10 +269,7 @@ function renderCalendario() {
       // Total de ítems en el slot (fijos + reservas)
       var totalEnSlot = hf.length + rs.length;
       var tdCls = hf.length > 0 ? ' at-cell-fijo' : '';
-      html += '<td class="at-event-cell' + tdCls + '" ' +
-        'ondragover="dragOverCelda(event)" ondragleave="dragLeaveCelda(event)" ' +
-        'ondrop="dropReserva(event,' + diaActual + ',' + mid + ',\'' + lab.id + '\')">';
-
+      html += '<td class="at-event-cell' + tdCls + '">';
 
       // Usar stack siempre que haya más de 1 ítem o haya espacio libre
       var usaStack = totalEnSlot > 1 || totalEnSlot < maxG || (hf.length > 0 && rs.length > 0);
@@ -288,8 +285,8 @@ function renderCalendario() {
           // Habilitado para todos por ahora (si querés restringirlo a admins, cambiá a: var puedeEditarFijo = esDirectivo(); )
           var puedeEditarFijo = true;
 
-          html += '<div class="at-event ev-fijo" title="Horario fijo: ' + cursoLbl + ' — ' + (h.materia_nombre || '') + ' — Aula ' + aulaCod + '" ' +
-            (puedeEditarFijo ? 'role="button" tabindex="0" draggable="true" ondragstart="dragReservaStart(event,' + h.id + ',\'fijo\')" ondragend="dragReservaEnd(event)" onclick="verDetalleFijo(' + h.id + ')"' : '') + '>' +
+          html += '<div class="at-event ev-fijo drag-target" title="Horario fijo: ' + cursoLbl + ' — ' + (h.materia_nombre || '') + ' — Aula ' + aulaCod + '" ' +
+            (puedeEditarFijo ? 'role="button" tabindex="0" draggable="true" ondragstart="dragReservaStart(event,' + h.id + ',\'fijo\')" ondragend="dragReservaEnd(event)" onclick="verDetalleFijo(' + h.id + ')" ondragover="dragOverLibre(event)" ondragleave="dragLeaveLibre(event)" ondrop="dropReserva(event,' + diaActual + ',' + mid + ',\'' + lab.id + '\')"' : '') + '>' +
             '<div class="at-ev-curso">' + cursoLbl + '</div>' +
             (matAbrev ? '<div class="at-ev-prof at-ev-materia">' + matAbrev + '</div>' : '') +
             '<div class="at-ev-aula">🏫 ' + aulaCod + '</div>' +
@@ -408,21 +405,6 @@ function dragLeaveLibre(event) {
   event.currentTarget.classList.remove('drag-over');
 }
 
-// Drop sobre la celda entera (td) — acepta drops incluso en celdas con contenido
-function dragOverCelda(event) {
-  if (_dragReservaId === null) return;
-  event.preventDefault();
-  event.dataTransfer.dropEffect = 'move';
-  event.currentTarget.classList.add('drag-over-cell');
-}
-
-function dragLeaveCelda(event) {
-  // Solo quitar highlight si realmente salimos del td (no de un hijo)
-  if (!event.currentTarget.contains(event.relatedTarget)) {
-    event.currentTarget.classList.remove('drag-over-cell');
-  }
-}
-
 function dropReserva(event, nuevoDia, nuevoModulo, nuevoLab) {
   event.preventDefault();
   event.currentTarget.classList.remove('drag-over');
@@ -463,24 +445,43 @@ function moverHorarioFijoASlot(fijoId, nuevoDiaNum, nuevoModulo, nuevoLab) {
   var oldIdHoras = h.id_horas;
   var oldSalones = h.id_salones;
 
-  h.dia = nuevoDiaStr;
-  h.id_horas = nuevoIdHoras;
-  h.id_salones = nuevoLab;
-  renderAll();
+  var modOrig  = getModulo(ID_HORAS_A_MODULO[oldIdHoras] || 0);
+  var modDest  = getModulo(nuevoModulo);
+  var labOrig  = getLab(oldSalones);
+  var labDest  = getLab(nuevoLab);
 
-  apiPut('horarios_fijos/' + h.id, {
-    dia: nuevoDiaStr,
-    id_horas: nuevoIdHoras,
-    id_salones: nuevoLab
-  }).then(function () {
-    toast('Horario fijo actualizado en base de datos.', 'ok');
-  }).catch(function (e) {
-    h.dia = oldDiaStr;
-    h.id_horas = oldIdHoras;
-    h.id_salones = oldSalones;
-    renderAll();
-    toast('Error al mover horario fijo: ' + e.message, 'err');
-  });
+  var cursoLbl = h.curso_label || (h.curso_ano ? h.curso_ano + '° ' + (h.curso_division || '') : 'Curso');
+
+  var desdeStr = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'].indexOf(oldDiaStr) >= 0 
+    ? DIAS_SEMANA[['LUN', 'MAR', 'MIE', 'JUE', 'VIE'].indexOf(oldDiaStr)] + ' · ' + modOrig.label
+    : 'Origen desconocido';
+  var hastaStr = DIAS_SEMANA[nuevoDiaNum] + ' · ' + modDest.label + ' (' + modDest.inicio + '–' + modDest.fin + ')';
+
+  confirmar(
+    '¿Mover horario fijo <strong>' + cursoLbl + '</strong>?<br>' +
+    '<small style="color:var(--muted)">De: ' + desdeStr + '</small><br>' +
+    '<small style="color:var(--muted)">A:&nbsp;&nbsp; ' + hastaStr + '</small>',
+    function() {
+      h.dia = nuevoDiaStr;
+      h.id_horas = nuevoIdHoras;
+      h.id_salones = nuevoLab;
+      renderAll();
+
+      apiPut('horarios_fijos/' + h.id, {
+        dia: nuevoDiaStr,
+        id_horas: nuevoIdHoras,
+        id_salones: nuevoLab
+      }).then(function () {
+        toast('Horario fijo actualizado en base de datos.', 'ok');
+      }).catch(function (e) {
+        h.dia = oldDiaStr;
+        h.id_horas = oldIdHoras;
+        h.id_salones = oldSalones;
+        renderAll();
+        toast('Error al mover horario fijo: ' + e.message, 'err');
+      });
+    }
+  );
 }
 
 function verDetalleFijo(fijoId) {
