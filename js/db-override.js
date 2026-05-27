@@ -58,9 +58,11 @@ guardarReserva = function() {
   }
 
   var profeSel = document.getElementById('f-profe');
-  var profeId = (esDirectivo() && profeSel && profeSel.value)
-    ? parseInt(profeSel.value)
-    : (window.SESSION ? window.SESSION.profeId : getCurrentProfId());
+  var profeId = esAnual 
+    ? 'institucional'  // Reservas anuales siempre son institucionales
+    : (esDirectivo() && profeSel && profeSel.value)
+      ? parseInt(profeSel.value)
+      : (window.SESSION ? window.SESSION.profeId : getCurrentProfId());
 
   cerrarModal('modal-reserva');
 

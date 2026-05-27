@@ -86,7 +86,7 @@ function initSchema($pdo) {
             lab          VARCHAR(10) NOT NULL,
             curso        VARCHAR(20) NOT NULL,
             orient       VARCHAR(50) NOT NULL DEFAULT 'bas',
-            profeId      INT NOT NULL,
+            profeId      VARCHAR(50) NOT NULL,
             secuencia    VARCHAR(500) NOT NULL DEFAULT '',
             cicloClases  TINYINT NOT NULL DEFAULT 1,
             renovaciones TINYINT NOT NULL DEFAULT 0,
@@ -104,7 +104,7 @@ function initSchema($pdo) {
             lab               VARCHAR(10) NOT NULL,
             curso             VARCHAR(20) NOT NULL,
             orient            VARCHAR(50) NOT NULL DEFAULT 'bas',
-            profeId           INT NOT NULL,
+            profeId           VARCHAR(50) NOT NULL,
             secuencia         VARCHAR(500) NOT NULL DEFAULT '',
             cicloClases       TINYINT NOT NULL DEFAULT 1,
             estado            VARCHAR(20) NOT NULL DEFAULT 'pendiente',
@@ -117,7 +117,7 @@ function initSchema($pdo) {
 
         CREATE TABLE IF NOT EXISTS gestor_espera (
             id           INT NOT NULL AUTO_INCREMENT,
-            profeId      INT NOT NULL,
+            profeId      VARCHAR(50) NOT NULL,
             lab          VARCHAR(10) NOT NULL,
             dia          TINYINT NOT NULL,
             modulo       TINYINT NOT NULL,
@@ -144,6 +144,20 @@ function initSchema($pdo) {
     // grupoId en gestor_solicitudes (misma referencia para solicitudes pendientes)
     if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'grupoId'")->fetch()) {
         $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN grupoId INT DEFAULT NULL");
+    }
+    
+    // Migración: cambiar profeId de INT a VARCHAR para soportar 'institucional'
+    $reservasProfeCheck = $pdo->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='gestor_reservas' AND COLUMN_NAME='profeId' AND TABLE_SCHEMA=DATABASE()")->fetch();
+    if ($reservasProfeCheck && stripos($reservasProfeCheck['COLUMN_TYPE'], 'INT') !== false) {
+        $pdo->exec("ALTER TABLE gestor_reservas MODIFY COLUMN profeId VARCHAR(50) NOT NULL");
+    }
+    $solicProfeCheck = $pdo->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='gestor_solicitudes' AND COLUMN_NAME='profeId' AND TABLE_SCHEMA=DATABASE()")->fetch();
+    if ($solicProfeCheck && stripos($solicProfeCheck['COLUMN_TYPE'], 'INT') !== false) {
+        $pdo->exec("ALTER TABLE gestor_solicitudes MODIFY COLUMN profeId VARCHAR(50) NOT NULL");
+    }
+    $esperaProfeCheck = $pdo->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='gestor_espera' AND COLUMN_NAME='profeId' AND TABLE_SCHEMA=DATABASE()")->fetch();
+    if ($esperaProfeCheck && stripos($esperaProfeCheck['COLUMN_TYPE'], 'INT') !== false) {
+        $pdo->exec("ALTER TABLE gestor_espera MODIFY COLUMN profeId VARCHAR(50) NOT NULL");
     }
 
     syncFromMaster($pdo);
@@ -434,7 +448,11 @@ switch ($resource) {
         if ($method === 'GET') {
             $where='1=1'; $p=[];
             if (isset($_GET['semanaOffset'])) { $where.=' AND semanaOffset=?'; $p[]=(int)$_GET['semanaOffset']; }
-            if (isset($_GET['profeId']))      { $where.=' AND profeId=?';      $p[]=(int)$_GET['profeId']; }
+            if (isset($_GET['profeId'])) { 
+                // Soportar búsqueda tanto de IDs númericos como de 'institucional'
+                $where.=' AND profeId=?'; 
+                $p[]=($_GET['profeId'] === 'institucional') ? 'institucional' : $_GET['profeId'];
+            }
             $s=$db->prepare("SELECT * FROM gestor_reservas WHERE $where ORDER BY semanaOffset,dia,modulo");
             $s->execute($p); ok(castRows($s->fetchAll()));
         }
@@ -443,7 +461,7 @@ switch ($resource) {
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
 
             // --- VALIDACIÓN BÁSICA ---
-            // Validar que profeId exista
+            // Validar que profeId exista (si no es 'institucional')
             if (isset($b['profeId']) && $b['profeId'] !== 'institucional') {
                 $checkProfe = $db->prepare('SELECT id FROM gestor_profesores WHERE id=?');
                 $checkProfe->execute([(int)$b['profeId']]);
@@ -471,9 +489,12 @@ switch ($resource) {
             // (requeriría JOIN complejo con tabla cupof que no tiene dni_personal)
             // -----------------------------------------------------------------------
 
+            // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
+            $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
+
             $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),$dia,$modulo,
-                           $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
+                           $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId]);
             $newId=(int)$db->lastInsertId();
@@ -482,9 +503,11 @@ switch ($resource) {
         if ($method === 'PUT' && $id) {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
+            // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
+            $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
             $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=? WHERE id=?')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
-                           $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
+                           $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,(int)$id]);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([(int)$id]); ok(castRow($s->fetch()));
@@ -505,16 +528,24 @@ switch ($resource) {
         if ($method === 'GET') {
             $where='1=1'; $p=[];
             if (isset($_GET['estado']))  { $where.=' AND estado=?';  $p[]=$_GET['estado']; }
-            if (isset($_GET['profeId'])) { $where.=' AND profeId=?'; $p[]=(int)$_GET['profeId']; }
+            if (isset($_GET['profeId'])) { 
+                // Soportar búsqueda tanto de IDs numéricos como de 'institucional'
+                $where.=' AND profeId=?'; 
+                $p[]=($_GET['profeId'] === 'institucional') ? 'institucional' : $_GET['profeId'];
+            }
             $s=$db->prepare("SELECT * FROM gestor_solicitudes WHERE $where ORDER BY id");
             $s->execute($p); ok(castRows($s->fetchAll()));
         }
         if ($method === 'POST') {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
+            
+            // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
+            $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
+            
             $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
-                           $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
+                           $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            $b['estado']??'pendiente',(int)($b['esRenovacion']??0),
                            isset($b['reservaOriginalId'])?(int)$b['reservaOriginalId']:null,
