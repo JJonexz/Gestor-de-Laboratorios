@@ -997,15 +997,16 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
   // Mismo slot: no hacer nada
   if (r.dia === nuevoDia && r.modulo === nuevoModulo && r.lab === nuevoLab) return;
 
-  // Verificar que el destino esté libre
-  var ocupado = RESERVAS.find(function(x) {
+  // Verificar que el destino tenga espacio (máx. grupos)
+  var maxG = getLabMaxGrupos(nuevoLab);
+  var enSlot = RESERVAS.filter(function(x) {
     return x.semanaOffset === semanaOffset &&
       x.dia === nuevoDia &&
       x.modulo === nuevoModulo &&
       x.lab === nuevoLab &&
       x.id !== reservaId;
   });
-  if (ocupado) { toast('Ese horario ya está ocupado. No se puede mover.', 'warn'); return; }
+  if (enSlot.length >= maxG) { toast('Ese horario ya alcanzó el máximo de ' + maxG + ' grupo(s).', 'warn'); return; }
 
   var solicPendiente = SOLICITUDES.find(function(s) {
     return s.semanaOffset === semanaOffset &&

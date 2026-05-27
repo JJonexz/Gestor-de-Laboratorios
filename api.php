@@ -609,6 +609,23 @@ switch ($resource) {
         $s->execute();
         ok(castRows($s->fetchAll()));
 
+    // ── HORARIOS FIJOS (Drag & Drop) ──────────────────────────
+    case 'horarios_fijos':
+        if ($method === 'PUT' && $id) {
+            $b = body();
+            if (!isset($b['dia'], $b['id_horas'], $b['id_salones'])) {
+                err('Faltan datos requeridos: dia, id_horas, id_salones', 400);
+            }
+            $db->prepare('UPDATE horarios SET dia=?, id_horas=?, id_salones=? WHERE id=?')
+               ->execute([$b['dia'], (int)$b['id_horas'], (int)$b['id_salones'], (int)$id]);
+            ok(['updated'=>(int)$id]);
+        }
+        if ($method === 'DELETE' && $id) {
+            $db->prepare('DELETE FROM horarios WHERE id=?')->execute([(int)$id]);
+            ok(['deleted'=>(int)$id]);
+        }
+        err('Not found',404);
+
     // ── ALL ───────────────────────────────────────────────────
     case 'all':
         if ($method !== 'GET') err('Method not allowed', 405);
