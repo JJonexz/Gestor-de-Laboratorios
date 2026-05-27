@@ -16,6 +16,19 @@
 // ============================================================
 
 // ── Sidebar ──────────────────────────────────────────────────
+// Mapeo id_horas (BD) -> id modulo del gestor (sin recreos)
+var ID_HORAS_A_MODULO = {1:0, 2:1, 3:3, 4:4, 5:5, 6:6, 7:7, 8:9, 9:10, 10:11, 11:12, 12:14, 13:15};
+var DIA_STR_A_NUM = { 'LUN':0, 'MAR':1, 'MIE':2, 'JUE':3, 'VIE':4 };
+
+// Retorna horarios fijos (de cupof) para un slot dia+modulo
+function getHorariosFijosSlot(diaNum, moduloId) {
+  if (typeof HORARIOS_FIJOS === 'undefined' || !HORARIOS_FIJOS.length) return [];
+  return HORARIOS_FIJOS.filter(function(h) {
+    return DIA_STR_A_NUM[h.dia] === diaNum &&
+           ID_HORAS_A_MODULO[parseInt(h.id_horas)] === moduloId;
+  });
+}
+
 function renderSidebar() {
   // Lab cards
   var sl = document.getElementById('sidebar-labs');
@@ -249,7 +262,26 @@ function renderCalendario() {
       var rs   = reservasDia.filter(function(x) { return x.modulo === mid && x.lab === lab.id; });
       var s    = solicDia.find(function(x)       { return x.modulo === mid && x.lab === lab.id; });
       var maxG = getLabMaxGrupos(lab.id);
-      html += '<td class="at-event-cell">';
+      // Horarios fijos (cursos de BD) para este slot
+      var hf = getHorariosFijosSlot(diaActual, mid).filter(function(h) {
+        return String(h.id_salones) === String(lab.id);
+      });
+      var tdCls = hf.length > 0 && rs.length === 0 && !s ? ' at-cell-fijo' : '';
+      html += '<td class="at-event-cell' + tdCls + '">';
+
+      // Mostrar horarios fijos antes de las reservas
+      if (hf.length > 0) {
+        hf.forEach(function(h) {
+          var cursoLbl = h.curso_label || (h.curso_ano ? h.curso_ano + '° ' + (h.curso_division || '') : 'Curso');
+          var matAbrev = h.materia_abrev || h.materia_nombre || '';
+          var aulaCod  = h.aula_codigo  || h.aula_numero || h.id_salones;
+          html += '<div class="at-event ev-fijo" title="Horario fijo: ' + cursoLbl + ' — ' + (h.materia_nombre || '') + ' — Aula ' + aulaCod + '">' +
+            '<div class="at-ev-curso">' + cursoLbl + '</div>' +
+            (matAbrev ? '<div class="at-ev-prof at-ev-materia">' + matAbrev + '</div>' : '') +
+            '<div class="at-ev-aula">🏫 ' + aulaCod + '</div>' +
+          '</div>';
+        });
+      }
 
       if (rs.length > 0) {
         var rendered = 0;
@@ -294,7 +326,7 @@ function renderCalendario() {
           'onclick="' + action + '" title="Pendiente: ' + s.curso + '">' +
             '<div class="at-ev-curso">' + s.curso + ' ⏳</div>' +
           '</div>';
-      } else {
+      } else if (!hf.length) {
         html += _celdaLibre(diaActual, mid, lab.id);
       }
 

@@ -84,6 +84,7 @@ var RECREOS = [];
 var CURSOS = [];
 var MATERIAS = [];
 var GRUPOS = [];  // { id, nombre (int: 306, 312...), id_cursos }
+var HORARIOS_FIJOS = [];  // Horarios fijos desde tabla horarios+cupof
 
 // ── Clave de localStorage ───────────────────────────────────
 var LS_KEY = 'gestor_eest1_db';

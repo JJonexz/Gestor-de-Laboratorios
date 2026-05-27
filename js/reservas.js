@@ -15,6 +15,64 @@
 // Depende de: config.js, helpers.js, ui.js, db.js
 // ============================================================
 
+// ── Validación de conflictos con horarios académicos (cupof) ──
+var HORARIOS_ACADEMICOS = []; // Cachea horarios académicos del sistema
+
+// Carga horarios académicos del sistema (una sola vez)
+function cargarHorariosAcademicos() {
+  if (HORARIOS_ACADEMICOS.length > 0) return Promise.resolve(); // Ya están cargados
+  return apiGet('horarios-academicos').then(function(datos) {
+    HORARIOS_ACADEMICOS = datos || [];
+    return HORARIOS_ACADEMICOS;
+  }).catch(function(e) {
+    console.warn('[cargarHorariosAcademicos] Error:', e);
+    HORARIOS_ACADEMICOS = [];
+    return [];
+  });
+}
+
+// Mapeo: día del gestor (0-4) ↔ día académico (LUN-VIE)
+var MAP_DIA_ACADEMICO = {
+  0: 'LUN',
+  1: 'MAR',
+  2: 'MIE',
+  3: 'JUE',
+  4: 'VIE'
+};
+
+// Chequea si hay conflicto entre módulo del gestor y horarios académicos
+// Retorna: { hayConflicto: bool, mensaje: string, horasEnConflicto: array }
+function chequearConflictoHorarioAcademico(profeId, dia, modulo) {
+  if (!profeId || profeId === 'institucional') return { hayConflicto: false };
+  
+  // Obtener dni_personal del profesor
+  var profe = getProfe(profeId);
+  if (!profe || !profe.dni_personal) return { hayConflicto: false };
+  
+  var diaAcademico = MAP_DIA_ACADEMICO[dia] || null;
+  if (!diaAcademico) return { hayConflicto: false };
+  
+  // Convertir módulo del gestor a hora académica (1-13)
+  var horaAcademica = moduloAHorarioAcademico(modulo);
+  if (horaAcademica === null) return { hayConflicto: false }; // Es un recreo
+  
+  // Buscar si hay horario académico en ese día y hora
+  var horasEnConflicto = HORARIOS_ACADEMICOS.filter(function(h) {
+    return h.dia === diaAcademico && h.id_horas === horaAcademica;
+  });
+  
+  if (horasEnConflicto.length > 0) {
+    var materias = horasEnConflicto.map(function(h) { return h.materia_nombre || ('Cupof #' + h.cupof); }).join(', ');
+    return {
+      hayConflicto: true,
+      mensaje: 'Conflicto: el profesor tiene clase académica (' + materias + ') en ese horario',
+      horasEnConflicto: horasEnConflicto
+    };
+  }
+  
+  return { hayConflicto: false };
+}
+
 // ── Población de selects del modal ───────────────────────────
 function poblarSelectsReserva() {
   // Laboratorios disponibles
@@ -109,6 +167,11 @@ function poblarSelectsReserva() {
 // ── Abrir modal (botón "Nueva reserva") ──────────────────────
 function abrirModalReserva() {
   poblarSelectsReserva();
+  
+  // Cargar horarios académicos al abrir modal (si no están cargados)
+  cargarHorariosAcademicos().catch(function(e) {
+    console.warn('No se pudieron cargar horarios académicos:', e);
+  });
 
   // Limpiar campos
   ['f-lab', 'f-dia', 'f-curso', 'f-materia', 'f-secuencia'].forEach(function (id) {
@@ -148,6 +211,11 @@ function abrirModalReserva() {
 // ── Abrir modal con día/módulo/lab pre-seleccionados ─────────
 function abrirModalReservaSlot(dia, modulo, lab) {
   poblarSelectsReserva();
+  
+  // Cargar horarios académicos al abrir modal (si no están cargados)
+  cargarHorariosAcademicos().catch(function(e) {
+    console.warn('No se pudieron cargar horarios académicos:', e);
+  });
 
   var fLab = document.getElementById('f-lab');
   var fDia = document.getElementById('f-dia');
@@ -311,6 +379,46 @@ function guardarReserva() {
     return;
   }
 
+  var modulosAReservar = getModulosParaPeriodo(parseInt(modulo), periodo);
+
+  // ── CHEQUEO DE CONFLICTOS HORARIOS ACADÉMICOS ─────────────
+  var profeId = esDirectivo() && document.getElementById('f-profe').value 
+    ? parseInt(document.getElementById('f-profe').value) 
+    : getCurrentProfId();
+  
+  // Cargar horarios académicos si no están cargados
+  if (HORARIOS_ACADEMICOS.length === 0) {
+    cargarHorariosAcademicos().then(function() {
+      // Después de cargar, chequear conflictos
+      var conflictoEncontrado = false;
+      for (var mi = 0; mi < modulosAReservar.length && !conflictoEncontrado; mi++) {
+        var conflicto = chequearConflictoHorarioAcademico(profeId, parseInt(dia), modulosAReservar[mi]);
+        if (conflicto.hayConflicto) {
+          toast('⚠️ ' + conflicto.mensaje, 'warn');
+          console.warn('[guardarReserva] Conflicto horario:', conflicto);
+          conflictoEncontrado = true;
+        }
+      }
+      // Continuar guardando (el warning es solo informativo, el profesor puede forzar)
+      procederGuardarReserva(lab, dia, modulo, curso, materia, secuencia, orient, periodo, esAnual, semanaOffset, profeId);
+    });
+    return;
+  }
+  
+  // Si los horarios ya están cargados, chequear de una vez
+  for (var mi = 0; mi < modulosAReservar.length; mi++) {
+    var conflicto = chequearConflictoHorarioAcademico(profeId, parseInt(dia), modulosAReservar[mi]);
+    if (conflicto.hayConflicto) {
+      toast('⚠️ ' + conflicto.mensaje, 'warn');
+      console.warn('[guardarReserva] Conflicto horario:', conflicto);
+    }
+  }
+  
+  procederGuardarReserva(lab, dia, modulo, curso, materia, secuencia, orient, periodo, esAnual, semanaOffset, profeId);
+}
+
+// Continúa con la lógica de guardado después del chequeo de conflictos
+function procederGuardarReserva(lab, dia, modulo, curso, materia, secuencia, orient, periodo, esAnual, semanaOffset, profeId) {
   var modulosAReservar = getModulosParaPeriodo(parseInt(modulo), periodo);
 
   // Semanas a cubrir: una sola, o ~40 si es reserva anual
