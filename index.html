@@ -562,8 +562,19 @@
         </div>
       </div>
       
-      <!-- FILA DE CURSO, GRUPO Y MATERIA -->
-      <div class="form-row">
+      <!-- FILA DE CUPOF (vincula profe ↔ materia ↔ curso desde la BDD) -->
+      <div class="form-group" id="f-cupof-wrap">
+        <label class="form-label" for="f-cupof">📚 Materia / Curso <small style="color:var(--muted);font-weight:400;">(desde tu carga horaria)</small></label>
+        <select class="form-control" id="f-cupof" required>
+          <option value="">— Seleccioná materia y curso —</option>
+        </select>
+        <div id="f-cupof-hint" style="font-size:11px;color:var(--muted);margin-top:4px;display:none;">
+          ℹ️ No se encontraron materias vinculadas. Podés ingresar el curso y materia manualmente.
+        </div>
+      </div>
+
+      <!-- FILA DE CURSO, GRUPO Y MATERIA (se completan auto desde cupof; editables como fallback) -->
+      <div class="form-row" id="f-curso-materia-row">
         <div class="form-group">
           <label class="form-label" for="f-curso">Curso</label>
           <select class="form-control" id="f-curso" required>
@@ -571,7 +582,6 @@
           </select>
         </div>
         
-        <!-- AGREGADO: Campo Grupo (inmediatamente después de curso) -->
         <div class="form-group">
           <label class="form-label" for="reserva-grupo">Grupo</label>
           <select class="form-control" id="reserva-grupo" name="grupoId">

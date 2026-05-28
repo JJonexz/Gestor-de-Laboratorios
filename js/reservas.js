@@ -17,11 +17,87 @@
 
 // ── Validación de conflictos con horarios académicos (cupof) ──
 var HORARIOS_ACADEMICOS = []; // Cachea horarios académicos del sistema
+var _cupofsPorProfe = {};     // Cache: dni_personal → array de cupofs del profe
+
+// Carga los cupofs (materias/cursos) activos de un profesor desde la BDD
+// Retorna promise con array de { cupof, materia_nombre, materia_abrev, curso_label, curso_ano, division, cupof_turno }
+function cargarCupofsPorProfe(dniPersonal) {
+  if (!dniPersonal) {
+    console.warn('[cupofs] dniPersonal vacío — el profe no tiene dni_personal en gestor_profesores');
+    return Promise.resolve([]);
+  }
+  if (_cupofsPorProfe[dniPersonal]) return Promise.resolve(_cupofsPorProfe[dniPersonal]);
+  return apiGet('cupofs-por-profe?dni=' + dniPersonal).then(function(datos) {
+    _cupofsPorProfe[dniPersonal] = datos || [];
+    console.log('[cupofs] dni=' + dniPersonal + ' → ' + _cupofsPorProfe[dniPersonal].length + ' cupofs cargados', _cupofsPorProfe[dniPersonal]);
+    return _cupofsPorProfe[dniPersonal];
+  }).catch(function(e) {
+    console.warn('[cupofs] Error al cargar cupofs para dni=' + dniPersonal + ':', e);
+    _cupofsPorProfe[dniPersonal] = [];
+    return [];
+  });
+}
+
+// Puebla el select #f-cupof con los cupofs del profesor indicado
+// Si no tiene cupofs en la BDD, muestra fallback manual
+function poblarSelectCupof(dniPersonal, cupofSeleccionado) {
+  var sel = document.getElementById('f-cupof');
+  var hint = document.getElementById('f-cupof-hint');
+  var wrap = document.getElementById('f-cupof-wrap');
+  if (!sel) return;
+
+  sel.innerHTML = '<option value="">⌛ Cargando materias…</option>';
+  sel.disabled = true;
+
+  cargarCupofsPorProfe(dniPersonal).then(function(cupofs) {
+    sel.disabled = false;
+    if (!cupofs || cupofs.length === 0) {
+      // Sin cupofs en BDD → modo manual (f-curso-materia-row ya visible)
+      sel.innerHTML = '<option value="">— Sin carga horaria vinculada —</option>';
+      if (hint) hint.style.display = 'block';
+      return;
+    }
+    if (hint) hint.style.display = 'none';
+    var opts = '<option value="">— Seleccioná materia y curso —</option>';
+    cupofs.forEach(function(c) {
+      var label = (c.materia_nombre || 'Materia ?') + ' — ' + (c.curso_label || '?');
+      if (c.cupof_turno) label += ' (' + (c.cupof_turno === 'M' ? 'Mañana' : c.cupof_turno === 'T' ? 'Tarde' : c.cupof_turno === 'V' ? 'Vespertino' : c.cupof_turno) + ')';
+      var selected = String(c.cupof) === String(cupofSeleccionado) ? ' selected' : '';
+      opts += '<option value="' + c.cupof + '"' + selected +
+              ' data-materia="' + (c.materia_nombre || '') + '"' +
+              ' data-materia-abrev="' + (c.materia_abrev || '') + '"' +
+              ' data-curso="' + (c.curso_label || '') + '"' +
+              ' data-curso-ano="' + (c.curso_ano || '') + '"' +
+              ' data-curso-div="' + (c.curso_division || '') + '"' +
+              '>' + label + '</option>';
+    });
+    sel.innerHTML = opts;
+    // Si ya había un cupof seleccionado, disparar el change para sincronizar campos
+    if (cupofSeleccionado) sincronizarCampoDesdeCupof();
+  });
+}
+
+// Cuando el usuario elige un cupof, auto-completa curso y materia
+function sincronizarCampoDesdeCupof() {
+  var sel = document.getElementById('f-cupof');
+  if (!sel || !sel.value) return;
+  var opt = sel.options[sel.selectedIndex];
+  var curso = opt.getAttribute('data-curso') || '';
+  var materia = opt.getAttribute('data-materia') || '';
+  var fCurso = document.getElementById('f-curso');
+  var fMateria = document.getElementById('f-materia');
+  if (fCurso && curso) fCurso.value = curso;
+  if (fMateria && materia) fMateria.value = materia;
+  // Actualizar grupos según el curso
+  if (curso) poblarSelectorGrupo(curso, '');
+}
 
 // Carga horarios académicos del sistema (una sola vez)
-function cargarHorariosAcademicos() {
-  if (HORARIOS_ACADEMICOS.length > 0) return Promise.resolve(); // Ya están cargados
-  return apiGet('horarios-academicos').then(function(datos) {
+function cargarHorariosAcademicos(dniPersonal) {
+  if (HORARIOS_ACADEMICOS.length > 0) return Promise.resolve();
+  var _dni = dniPersonal || _getDniParaHorarios();
+  if (!_dni) return Promise.resolve();
+  return apiGet('horarios-academicos?dni=' + _dni).then(function(datos) {
     HORARIOS_ACADEMICOS = datos || [];
     return HORARIOS_ACADEMICOS;
   }).catch(function(e) {
@@ -29,6 +105,15 @@ function cargarHorariosAcademicos() {
     HORARIOS_ACADEMICOS = [];
     return [];
   });
+}
+
+function _getDniParaHorarios() {
+  var profeSel = document.getElementById('f-profe');
+  var profeId = (typeof esDirectivo === 'function' && esDirectivo() && profeSel && profeSel.value)
+    ? parseInt(profeSel.value)
+    : (typeof getCurrentProfId === 'function' ? getCurrentProfId() : null);
+  var profe = profeId ? getProfe(profeId) : null;
+  return profe && profe.dni_personal ? profe.dni_personal : null;
 }
 
 // Mapeo: día del gestor (0-4) ↔ día académico (LUN-VIE)
@@ -167,11 +252,6 @@ function poblarSelectsReserva() {
 // ── Abrir modal (botón "Nueva reserva") ──────────────────────
 function abrirModalReserva() {
   poblarSelectsReserva();
-  
-  // Cargar horarios académicos al abrir modal (si no están cargados)
-  cargarHorariosAcademicos().catch(function(e) {
-    console.warn('No se pudieron cargar horarios académicos:', e);
-  });
 
   // Limpiar campos
   ['f-lab', 'f-dia', 'f-curso', 'f-materia', 'f-secuencia'].forEach(function (id) {
@@ -205,17 +285,45 @@ function abrirModalReserva() {
     fCursoMain.dataset.grupoBind = '1';
   }
 
+  // ── Cargar cupofs del profe desde la BDD ────────────────────
+  // Para directivos: se carga al elegir docente; por ahora vacío hasta que elijan
+  // Para profesores: se carga con el dni propio al instante
+  var fCupof = document.getElementById('f-cupof');
+  if (fCupof && !fCupof.dataset.cupofBind) {
+    fCupof.addEventListener('change', sincronizarCampoDesdeCupof);
+    fCupof.dataset.cupofBind = '1';
+  }
+
+  if (!esDirectivo()) {
+    // Profe: cargar sus propios cupofs
+    var profeActual = getProfe(getCurrentProfId());
+    var dniActual = profeActual && profeActual.dni_personal ? profeActual.dni_personal : null;
+    poblarSelectCupof(dniActual, null);
+    cargarHorariosAcademicos(dniActual).catch(function(e) {
+      console.warn('No se pudieron cargar horarios académicos:', e);
+    });
+  } else {
+    // Directivo: placeholder vacío hasta que elija docente
+    if (fCupof) fCupof.innerHTML = '<option value="">— Primero elegí un docente —</option>';
+    // Escuchar cambio de docente
+    if (profeSel && !profeSel.dataset.cupofBind) {
+      profeSel.addEventListener('change', function() {
+        HORARIOS_ACADEMICOS = []; // forzar recarga para el nuevo profe
+        var profeElegido = getProfe(parseInt(this.value));
+        var dniElegido = profeElegido && profeElegido.dni_personal ? profeElegido.dni_personal : null;
+        poblarSelectCupof(dniElegido, null);
+        if (dniElegido) cargarHorariosAcademicos(dniElegido).catch(function(){});
+      });
+      profeSel.dataset.cupofBind = '1';
+    }
+  }
+
   abrirModal('modal-reserva');
 }
 
 // ── Abrir modal con día/módulo/lab pre-seleccionados ─────────
 function abrirModalReservaSlot(dia, modulo, lab) {
   poblarSelectsReserva();
-  
-  // Cargar horarios académicos al abrir modal (si no están cargados)
-  cargarHorariosAcademicos().catch(function(e) {
-    console.warn('No se pudieron cargar horarios académicos:', e);
-  });
 
   var fLab = document.getElementById('f-lab');
   var fDia = document.getElementById('f-dia');
@@ -262,6 +370,31 @@ function abrirModalReservaSlot(dia, modulo, lab) {
 
   if (profeWrap) profeWrap.style.display = esDirectivo() ? 'block' : 'none';
   if (profeSel) profeSel.value = '';
+
+  // ── Cargar cupofs del profe ──────────────────────────────────
+  var fCupof = document.getElementById('f-cupof');
+  if (fCupof && !fCupof.dataset.cupofBind) {
+    fCupof.addEventListener('change', sincronizarCampoDesdeCupof);
+    fCupof.dataset.cupofBind = '1';
+  }
+  if (!esDirectivo()) {
+    var profeActual = getProfe(getCurrentProfId());
+    var dniActual = profeActual && profeActual.dni_personal ? profeActual.dni_personal : null;
+    poblarSelectCupof(dniActual, null);
+    cargarHorariosAcademicos(dniActual).catch(function(){});
+  } else {
+    if (fCupof) fCupof.innerHTML = '<option value="">— Primero elegí un docente —</option>';
+    if (profeSel && !profeSel.dataset.cupofBind) {
+      profeSel.addEventListener('change', function() {
+        HORARIOS_ACADEMICOS = [];
+        var profeElegido = getProfe(parseInt(this.value));
+        var dniElegido = profeElegido && profeElegido.dni_personal ? profeElegido.dni_personal : null;
+        poblarSelectCupof(dniElegido, null);
+        if (dniElegido) cargarHorariosAcademicos(dniElegido).catch(function(){});
+      });
+      profeSel.dataset.cupofBind = '1';
+    }
+  }
 
   abrirModal('modal-reserva');
 }

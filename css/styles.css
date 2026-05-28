@@ -2660,3 +2660,17 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   margin-top: 1.5rem;
   padding-bottom: 1rem;
 }
+
+/* ── Select cupof (vinculado a BDD) ───────────────────────── */
+#f-cupof {
+  border-left: 3px solid var(--navy, #1a3a6b);
+  background-color: var(--navy-faint, #eef2f9);
+  font-weight: 500;
+}
+#f-cupof:focus {
+  border-left-color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37,99,235,.15);
+}
+#f-cupof-hint {
+  color: var(--amber, #d97706);
+}

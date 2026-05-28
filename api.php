@@ -141,6 +141,13 @@ function initSchema($pdo) {
     if (!$pdo->query("SHOW COLUMNS FROM gestor_reservas LIKE 'grupoId'")->fetch()) {
         $pdo->exec("ALTER TABLE gestor_reservas ADD COLUMN grupoId INT DEFAULT NULL");
     }
+    // cupofId en gestor_reservas y gestor_solicitudes (referencia a tabla cupof)
+    if (!$pdo->query("SHOW COLUMNS FROM gestor_reservas LIKE 'cupofId'")->fetch()) {
+        $pdo->exec("ALTER TABLE gestor_reservas ADD COLUMN cupofId INT DEFAULT NULL");
+    }
+    if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'cupofId'")->fetch()) {
+        $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN cupofId INT DEFAULT NULL");
+    }
     // grupoId en gestor_solicitudes (misma referencia para solicitudes pendientes)
     if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'grupoId'")->fetch()) {
         $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN grupoId INT DEFAULT NULL");
@@ -492,11 +499,12 @@ switch ($resource) {
             // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
 
-            $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+            $cupofId = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
+            $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),$dia,$modulo,
                            $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
-                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId]);
+                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId]);
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
@@ -505,11 +513,12 @@ switch ($resource) {
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
             // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
-            $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=? WHERE id=?')
+            $cupofId = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
+            $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=?,cupofId=? WHERE id=?')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
                            $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
-                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,(int)$id]);
+                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId,(int)$id]);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([(int)$id]); ok(castRow($s->fetch()));
         }
         if ($method === 'DELETE' && $id) {
@@ -543,13 +552,14 @@ switch ($resource) {
             // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
             
-            $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+            $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
                            $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            $b['estado']??'pendiente',(int)($b['esRenovacion']??0),
                            isset($b['reservaOriginalId'])?(int)$b['reservaOriginalId']:null,
-                           (int)($b['renovacionNum']??0),$grupoId]);
+                           (int)($b['renovacionNum']??0),$grupoId,
+                           isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null]);
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_solicitudes WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
@@ -615,15 +625,13 @@ switch ($resource) {
         if ($method !== 'GET') err('Method not allowed', 405);
         ok(castRows($db->query('SELECT id, nombre, abreviatura FROM materias ORDER BY nombre')->fetchAll()));
 
-    // ── HORARIOS ACADÉMICOS (cupof + horarios) ────────────────
+    // ── HORARIOS ACADÉMICOS (cupof + horarios vinculado a personal via revista) ─
     case 'horarios-academicos':
         if ($method !== 'GET') err('Method not allowed', 405);
         $dni_personal = isset($_GET['dni']) ? (int)$_GET['dni'] : null;
         if (!$dni_personal) ok([]);
-        
-        // Obtener todos los cupof y sus horarios
-        // Nota: cupof no vincula directamente a personal, así que retornamos todos
-        // El frontend manejará la lógica de mapeo
+
+        // Vinculación real: personal → revista → cupof → horarios + materias + cursos
         $s = $db->prepare("
             SELECT DISTINCT
                 h.dia,
@@ -631,14 +639,94 @@ switch ($resource) {
                 c.cupof,
                 c.id_cursos,
                 c.id_materias,
-                m.nombre as materia_nombre
-            FROM horarios h
-            JOIN cupof c ON h.cupof = c.cupof
-            LEFT JOIN materias m ON c.id_materias = m.id
+                m.nombre  AS materia_nombre,
+                m.abreviatura AS materia_abrev,
+                cu.ano         AS curso_ano,
+                cu.division    AS curso_division,
+                c.turno        AS cupof_turno
+            FROM revista r
+            JOIN cupof    c  ON r.cupof       = c.cupof
+            JOIN horarios h  ON h.cupof        = c.cupof
+            LEFT JOIN materias m  ON c.id_materias = m.id
+            LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
+            WHERE r.dni_personal = ?
+              AND (r.fh IS NULL OR YEAR(r.fh) = 0 OR r.fh >= CURDATE())
             ORDER BY h.dia, h.id_horas
         ");
-        $s->execute();
+        $s->execute([$dni_personal]);
         ok(castRows($s->fetchAll()));
+
+    // ── CUPOFS POR PROFE (materias y cursos del docente para el modal de reserva) ─
+    case 'cupofs-por-profe':
+        if ($method !== 'GET') err('Method not allowed', 405);
+        $dni_personal = isset($_GET['dni']) ? (int)$_GET['dni'] : null;
+        if (!$dni_personal) ok([]);
+
+        // Devuelve los cupofs activos del profesor con materia + curso + turno
+        // fh = '0000-00-00' significa sin fecha de baja (cargo activo)
+        // Cubrimos: NULL, '0000-00-00' (string), fecha futura, o fecha en blanco
+        $s = $db->prepare("
+            SELECT DISTINCT
+                c.cupof,
+                c.id_materias,
+                c.id_cursos,
+                c.turno        AS cupof_turno,
+                c.hsmodcar,
+                m.nombre       AS materia_nombre,
+                m.abreviatura  AS materia_abrev,
+                cu.ano         AS curso_ano,
+                cu.division    AS curso_division,
+                CONCAT(cu.ano, '°', cu.division,
+                    IF(cu.turno IS NOT NULL AND cu.turno <> '',
+                        CONCAT(' (', cu.turno, ')'), '')
+                ) AS curso_label
+            FROM revista r
+            JOIN cupof    c  ON r.cupof       = c.cupof
+            LEFT JOIN materias m  ON c.id_materias = m.id
+            LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
+            WHERE r.dni_personal = ?
+              AND (r.fh IS NULL OR YEAR(r.fh) = 0 OR r.fh >= CURDATE())
+            ORDER BY cu.ano, cu.division, m.nombre
+        ");
+        $s->execute([$dni_personal]);
+        $rows = $s->fetchAll();
+        // Si no hay resultados con el filtro de fecha, intentar sin filtro (fallback)
+        if (empty($rows)) {
+            $s2 = $db->prepare("
+                SELECT DISTINCT
+                    c.cupof,
+                    c.id_materias,
+                    c.id_cursos,
+                    c.turno        AS cupof_turno,
+                    c.hsmodcar,
+                    m.nombre       AS materia_nombre,
+                    m.abreviatura  AS materia_abrev,
+                    cu.ano         AS curso_ano,
+                    cu.division    AS curso_division,
+                    CONCAT(cu.ano, '°', cu.division,
+                        IF(cu.turno IS NOT NULL AND cu.turno <> '',
+                            CONCAT(' (', cu.turno, ')'), '')
+                    ) AS curso_label
+                FROM revista r
+                JOIN cupof    c  ON r.cupof = c.cupof
+                LEFT JOIN materias m  ON c.id_materias = m.id
+                LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
+                WHERE r.dni_personal = ?
+                ORDER BY cu.ano, cu.division, m.nombre
+            ");
+            $s2->execute([$dni_personal]);
+            $rows = $s2->fetchAll();
+        }
+        ok(castRows($rows));
+
+    // ── DEBUG: ver revista de un profe (solo GET, usar con ?dni=X) ──
+    case 'debug-revista':
+        if ($method !== 'GET') err('Method not allowed', 405);
+        $dni = isset($_GET['dni']) ? (int)$_GET['dni'] : null;
+        if (!$dni) err('Falta ?dni=', 400);
+        $r1 = castRows($db->query("SELECT id, cupof, fd, YEAR(fh) AS fh_year, dni_personal FROM revista WHERE dni_personal=$dni LIMIT 20")->fetchAll());
+        $r2 = castRows($db->query("SELECT cupof, id_materias, id_cursos, turno, funcion FROM cupof WHERE cupof IN (SELECT cupof FROM revista WHERE dni_personal=$dni) LIMIT 20")->fetchAll());
+        ok(['revista' => $r1, 'cupofs' => $r2, 'dni_buscado' => $dni]);
 
     // ── HORARIOS FIJOS (Drag & Drop) ──────────────────────────
     case 'horarios_fijos':
