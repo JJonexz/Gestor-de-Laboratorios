@@ -672,6 +672,7 @@ switch ($resource) {
                 c.id_cursos,
                 c.turno        AS cupof_turno,
                 c.hsmodcar,
+                c.id_grupos,
                 m.nombre       AS materia_nombre,
                 m.abreviatura  AS materia_abrev,
                 cu.ano         AS curso_ano,
@@ -679,11 +680,13 @@ switch ($resource) {
                 CONCAT(cu.ano, '°', cu.division,
                     IF(cu.turno IS NOT NULL AND cu.turno <> '',
                         CONCAT(' (', cu.turno, ')'), '')
-                ) AS curso_label
+                ) AS curso_label,
+                g.nombre       AS grupo_nombre
             FROM revista r
             JOIN cupof    c  ON r.cupof       = c.cupof
             LEFT JOIN materias m  ON c.id_materias = m.id
             LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
+            LEFT JOIN grupos   g  ON c.id_grupos   = g.id AND c.id_grupos > 0
             WHERE r.dni_personal = ?
               AND (r.fh IS NULL OR YEAR(r.fh) = 0 OR r.fh >= CURDATE())
             ORDER BY cu.ano, cu.division, m.nombre
@@ -699,6 +702,7 @@ switch ($resource) {
                     c.id_cursos,
                     c.turno        AS cupof_turno,
                     c.hsmodcar,
+                    c.id_grupos,
                     m.nombre       AS materia_nombre,
                     m.abreviatura  AS materia_abrev,
                     cu.ano         AS curso_ano,
@@ -706,11 +710,13 @@ switch ($resource) {
                     CONCAT(cu.ano, '°', cu.division,
                         IF(cu.turno IS NOT NULL AND cu.turno <> '',
                             CONCAT(' (', cu.turno, ')'), '')
-                    ) AS curso_label
+                    ) AS curso_label,
+                    g.nombre       AS grupo_nombre
                 FROM revista r
                 JOIN cupof    c  ON r.cupof = c.cupof
                 LEFT JOIN materias m  ON c.id_materias = m.id
                 LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
+                LEFT JOIN grupos   g  ON c.id_grupos   = g.id AND c.id_grupos > 0
                 WHERE r.dni_personal = ?
                 ORDER BY cu.ano, cu.division, m.nombre
             ");

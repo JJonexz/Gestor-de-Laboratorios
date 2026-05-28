@@ -56,6 +56,7 @@ function poblarSelectCupof(dniPersonal, cupofSeleccionado) {
       sel.innerHTML = '<option value="">— Sin carga horaria vinculada —</option>';
       if (hint) hint.style.display = 'block';
       _desbloquearCursoMateria();
+  _desbloquearGrupo();
       return;
     }
     if (hint) hint.style.display = 'none';
@@ -63,13 +64,16 @@ function poblarSelectCupof(dniPersonal, cupofSeleccionado) {
     cupofs.forEach(function(c) {
       var label = (c.materia_nombre || 'Materia ?') + ' — ' + (c.curso_label || '?');
       if (c.cupof_turno) label += ' (' + (c.cupof_turno === 'M' ? 'Mañana' : c.cupof_turno === 'T' ? 'Tarde' : c.cupof_turno === 'V' ? 'Vespertino' : c.cupof_turno) + ')';
+      if (c.id_grupos && parseInt(c.id_grupos) > 0) label += ' 👥 Grupo ' + (c.grupo_nombre || c.id_grupos);
       var selected = String(c.cupof) === String(cupofSeleccionado) ? ' selected' : '';
       opts += '<option value="' + c.cupof + '"' + selected +
-              ' data-materia="' + (c.materia_nombre || '') + '"' +
-              ' data-materia-abrev="' + (c.materia_abrev || '') + '"' +
-              ' data-curso="' + (c.curso_label || '') + '"' +
-              ' data-curso-ano="' + (c.curso_ano || '') + '"' +
-              ' data-curso-div="' + (c.curso_division || '') + '"' +
+              ' data-materia="'      + (c.materia_nombre   || '') + '"' +
+              ' data-materia-abrev="'+ (c.materia_abrev    || '') + '"' +
+              ' data-curso="'        + (c.curso_label      || '') + '"' +
+              ' data-curso-ano="'    + (c.curso_ano        || '') + '"' +
+              ' data-curso-div="'    + (c.curso_division   || '') + '"' +
+              ' data-id-grupos="'    + (c.id_grupos        || 0)  + '"' +
+              ' data-grupo-nombre="' + (c.grupo_nombre     || '') + '"' +
               '>' + label + '</option>';
     });
     sel.innerHTML = opts;
@@ -78,31 +82,42 @@ function poblarSelectCupof(dniPersonal, cupofSeleccionado) {
   });
 }
 
-// Cuando el usuario elige un cupof, auto-completa Y bloquea curso y materia
+// Cuando el usuario elige un cupof, auto-completa Y bloquea curso, materia y grupo
 function sincronizarCampoDesdeCupof() {
   var sel = document.getElementById('f-cupof');
   var fCurso   = document.getElementById('f-curso');
   var fMateria = document.getElementById('f-materia');
 
   if (!sel || !sel.value) {
-    // Sin cupof seleccionado → desbloquear para entrada manual
     _desbloquearCursoMateria();
+    _desbloquearGrupo();
     return;
   }
 
-  var opt     = sel.options[sel.selectedIndex];
-  var curso   = opt.getAttribute('data-curso')   || '';
-  var materia = opt.getAttribute('data-materia') || '';
+  var opt        = sel.options[sel.selectedIndex];
+  var curso      = opt.getAttribute('data-curso')      || '';
+  var materia    = opt.getAttribute('data-materia')    || '';
+  var idGrupos   = parseInt(opt.getAttribute('data-id-grupos') || '0');
+  var grupoNombre= opt.getAttribute('data-grupo-nombre') || '';
+  var cursoAno   = opt.getAttribute('data-curso-ano')  || '';
 
-  // Setear valores
+  // Setear curso y materia
   if (fCurso   && curso)   fCurso.value   = curso;
   if (fMateria && materia) fMateria.value = materia;
-
-  // Bloquear: el curso y la materia vienen fijos del cupof
   _bloquearCursoMateria();
 
-  // Actualizar grupos según el curso
-  if (curso) poblarSelectorGrupo(curso, '');
+  // Grupo: poblar según curso y luego auto-seleccionar o limpiar
+  poblarSelectorGrupo(cursoAno, idGrupos > 0 ? idGrupos : '');
+
+  if (idGrupos > 0) {
+    // Taller con grupo fijo → bloquear selector
+    _bloquearGrupo(idGrupos, grupoNombre);
+  } else {
+    // Materia sin grupo → limpiar y desbloquear
+    _desbloquearGrupo();
+    var selGrupo = document.getElementById('reserva-grupo');
+    if (selGrupo) selGrupo.value = '';
+  }
 }
 
 function _bloquearCursoMateria() {
@@ -142,6 +157,41 @@ function _desbloquearCursoMateria() {
     fMateria.title = '';
   }
   if (row) row.style.opacity = '';
+}
+
+function _bloquearGrupo(idGrupos, grupoNombre) {
+  var sel  = document.getElementById('reserva-grupo');
+  var wrap = sel ? sel.closest('.form-group') : null;
+  if (!sel) return;
+  sel.value    = idGrupos;
+  sel.disabled = true;
+  sel.style.opacity = '0.6';
+  sel.style.cursor  = 'not-allowed';
+  sel.title = 'Grupo fijo por taller (cupof ' + idGrupos + ')';
+  if (wrap) {
+    var lbl = wrap.querySelector('label');
+    if (lbl && !lbl.querySelector('.grupo-lock-hint')) {
+      var hint = document.createElement('small');
+      hint.className = 'grupo-lock-hint';
+      hint.style.cssText = 'color:var(--navy,#1a3a6b);font-weight:600;margin-left:6px;';
+      hint.textContent = '🔒 ' + (grupoNombre ? 'Grupo ' + grupoNombre : 'fijo');
+      lbl.appendChild(hint);
+    }
+  }
+}
+
+function _desbloquearGrupo() {
+  var sel  = document.getElementById('reserva-grupo');
+  var wrap = sel ? sel.closest('.form-group') : null;
+  if (!sel) return;
+  sel.disabled = false;
+  sel.style.opacity = '';
+  sel.style.cursor  = '';
+  sel.title = '';
+  if (wrap) {
+    var hint = wrap.querySelector('.grupo-lock-hint');
+    if (hint) hint.remove();
+  }
 }
 
 // Carga horarios académicos del sistema (una sola vez)

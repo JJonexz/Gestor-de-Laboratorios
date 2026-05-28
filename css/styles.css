@@ -2686,3 +2686,11 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 #f-curso-materia-row {
   transition: opacity .2s;
 }
+
+/* ── Grupo bloqueado por taller (cupof con id_grupos > 0) ─── */
+#reserva-grupo[disabled] {
+  background-color: var(--navy-faint, #eef2f9);
+  border-color: var(--navy-light, #4a6fa5);
+  color: var(--navy, #1a3a6b);
+  font-weight: 600;
+}
