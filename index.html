@@ -620,6 +620,23 @@
         ⚠️ Ese horario ya está ocupado o tiene una solicitud pendiente.
       </div>
 
+      <!-- SEMANAS SEGUIDAS — visible para todos -->
+      <div id="f-semanas-wrap" style="margin-top:10px;padding:10px 14px;background:var(--navy-faint,#eef2f9);border-radius:6px;border:1px solid #c7d4ee;">
+        <div style="font-size:13px;font-weight:600;color:var(--navy,#1a3a6b);margin-bottom:8px;">📅 ¿Cuántas semanas seguidas?</div>
+        <div id="f-semanas-btns" style="display:flex;gap:8px;">
+          <button type="button" class="semanas-btn active" data-val="1" onclick="elegirSemanas(1)">1 semana</button>
+          <button type="button" class="semanas-btn" data-val="2" onclick="elegirSemanas(2)">2 semanas</button>
+          <button type="button" class="semanas-btn" data-val="3" onclick="elegirSemanas(3)">3 semanas</button>
+        </div>
+        <div id="f-semanas-hint" style="font-size:11px;color:var(--muted,#6b7280);margin-top:6px;">
+          Reserva 1 semana a la vez. Después de 3 semanas seguidas, el slot queda en pausa 1 semana para otros docentes.
+        </div>
+        <div id="f-cooldown-warning" style="display:none;margin-top:8px;padding:7px 10px;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;font-size:12px;color:#856404;">
+          ⏸ Este slot estará en pausa esta semana (cooldown activo). Podés reservarlo la semana siguiente.
+        </div>
+      </div>
+      <input type="hidden" id="f-semanas" value="1">
+
       <!-- RESERVA ANUAL — solo visible para directivos (app.js controla display) -->
       <div id="f-anual-wrap" class="admin-only" style="display:none;margin-top:10px;padding:10px 14px;background:var(--navy-faint,#eef2f9);border-radius:6px;border:1px solid #c7d4ee;">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy,#1a3a6b);">

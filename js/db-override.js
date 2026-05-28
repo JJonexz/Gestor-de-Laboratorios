@@ -69,57 +69,84 @@ guardarReserva = function() {
   }
 
   var profeSel = document.getElementById('f-profe');
-  var profeId = esAnual 
-    ? 'institucional'  // Reservas anuales siempre son institucionales
+  var profeId = esAnual
+    ? 'institucional'
     : (esDirectivo() && profeSel && profeSel.value)
       ? parseInt(profeSel.value)
       : (window.SESSION ? window.SESSION.profeId : getCurrentProfId());
 
-  cerrarModal('modal-reserva');
+  // ── Semanas elegidas ─────────────────────────────────────────
+  var semanasInput = document.getElementById('f-semanas');
+  var semanasReservadas = semanasInput ? Math.max(1, Math.min(3, parseInt(semanasInput.value) || 1)) : 1;
 
-  if (esDirectivo()) {
-    var promises = [];
-    semanasAReservar.forEach(function(sem) {
-      modulosAReservar.forEach(function(m) {
-        var enSlotAnual = RESERVAS.filter(function(r) {
-          return r.semanaOffset === sem && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
+  var grupoIdEl = document.getElementById('reserva-grupo');
+  var grupoId   = grupoIdEl && grupoIdEl.value !== '' ? parseInt(grupoIdEl.value) : null;
+
+  // ── Verificar cooldown antes de guardar (solo para no-directivos y reserva puntual) ──
+  function _ejecutarGuardado() {
+    cerrarModal('modal-reserva');
+
+    if (esDirectivo()) {
+      var promises = [];
+      semanasAReservar.forEach(function(sem) {
+        modulosAReservar.forEach(function(m) {
+          var enSlotAnual = RESERVAS.filter(function(r) {
+            return r.semanaOffset === sem && r.dia === parseInt(dia) && r.modulo === m && r.lab === lab;
+          });
+          if (enSlotAnual.length >= getLabMaxGrupos(lab)) return;
+          promises.push(apiPost('reservas', {
+            semanaOffset: sem, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
+            orient: orient, profeId: profeId, secuencia: secuencia, cicloClases: 1,
+            renovaciones: 0, anual: esAnual ? 1 : 0, grupoId: grupoId, cupofId: cupofId,
+            semanasReservadas: esAnual ? 1 : semanasReservadas
+          }));
         });
-        var _labA   = getLab(lab);
-        var _maxA = getLabMaxGrupos(lab);
-        if (enSlotAnual.length >= _maxA) return;
-        var grupoIdEl = document.getElementById('reserva-grupo');
-        var grupoId   = grupoIdEl && grupoIdEl.value !== '' ? parseInt(grupoIdEl.value) : null;
-        promises.push(apiPost('reservas', {
-          semanaOffset: sem, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
-          orient: orient, profeId: profeId, secuencia: secuencia, cicloClases: 1,
-          renovaciones: 0, anual: esAnual ? 1 : 0, grupoId: grupoId, cupofId: cupofId
+      });
+      Promise.all(promises).then(function(nuevas) {
+        nuevas.forEach(function(r) { RESERVAS.push(r); });
+        toast(esAnual
+          ? 'Reserva anual creada: ' + nuevas.length + ' entradas.'
+          : 'Reserva creada (' + semanasReservadas + ' semana' + (semanasReservadas > 1 ? 's' : '') + ').', 'ok');
+        renderAll();
+      }).catch(function(e) { toast('Error al guardar: ' + e.message, 'err'); });
+    } else {
+      var promises2 = [];
+      modulosAReservar.forEach(function(m) {
+        promises2.push(apiPost('solicitudes', {
+          semanaOffset: semanaOffset, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
+          orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()),
+          secuencia: secuencia, cicloClases: 1, estado: 'pendiente',
+          esRenovacion: 0, renovacionNum: 0, grupoId: grupoId, cupofId: cupofId,
+          semanasReservadas: semanasReservadas
         }));
       });
+      Promise.all(promises2).then(function(nuevas) {
+        nuevas.forEach(function(s) { SOLICITUDES.push(s); });
+        var semMsg = semanasReservadas > 1 ? ' por ' + semanasReservadas + ' semanas' : '';
+        toast('Solicitud enviada' + semMsg + ' (' + nuevas.length + ' módulo' + (nuevas.length > 1 ? 's' : '') + ').', 'info');
+        renderAll();
+      }).catch(function(e) { toast('Error al enviar solicitud: ' + e.message, 'err'); });
+    }
+  }
+
+  // Para profesores (no directivos) verificar cooldown en MySQL
+  if (!esDirectivo() && !esAnual) {
+    verificarCooldown(lab, dia, modulo, semanaOffset, profeId).then(function(cd) {
+      if (cd.bloqueado) {
+        toast('⏸ Este slot está en pausa esta semana. Podés reservarlo desde la semana siguiente.', 'warn');
+        var cdWarn = document.getElementById('f-cooldown-warning');
+        if (cdWarn) cdWarn.style.display = 'block';
+        return;
+      }
+      // Advertir si está cerca del límite de 3 semanas
+      if (cd.semanasPrevias >= 2 && semanasReservadas + cd.semanasPrevias >= 3) {
+        toast('⚠️ Al reservar ' + semanasReservadas + ' semana' + (semanasReservadas > 1 ? 's' : '') +
+              ', este slot quedará en pausa 1 semana para otros docentes.', 'warn');
+      }
+      _ejecutarGuardado();
     });
-    Promise.all(promises).then(function(nuevas) {
-      nuevas.forEach(function(r) { RESERVAS.push(r); });
-      toast(esAnual
-        ? 'Reserva anual creada: ' + nuevas.length + ' entradas.'
-        : 'Reserva creada (' + nuevas.length + ' modulo' + (nuevas.length > 1 ? 's' : '') + ').', 'ok');
-      renderAll();
-    }).catch(function(e) { toast('Error al guardar: ' + e.message, 'err'); });
   } else {
-    var promises2 = [];
-    modulosAReservar.forEach(function(m) {
-      var grupoIdEl2 = document.getElementById('reserva-grupo');
-      var grupoId2   = grupoIdEl2 && grupoIdEl2.value !== '' ? parseInt(grupoIdEl2.value) : null;
-      promises2.push(apiPost('solicitudes', {
-        semanaOffset: semanaOffset, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
-        orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()),
-        secuencia: secuencia, cicloClases: 1, estado: 'pendiente',
-        esRenovacion: 0, renovacionNum: 0, grupoId: grupoId2, cupofId: cupofId
-      }));
-    });
-    Promise.all(promises2).then(function(nuevas) {
-      nuevas.forEach(function(s) { SOLICITUDES.push(s); });
-      toast('Solicitud enviada (' + nuevas.length + ' modulo' + (nuevas.length > 1 ? 's' : '') + ').', 'info');
-      renderAll();
-    }).catch(function(e) { toast('Error al enviar solicitud: ' + e.message, 'err'); });
+    _ejecutarGuardado();
   }
 };
 

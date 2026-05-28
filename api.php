@@ -148,6 +148,16 @@ function initSchema($pdo) {
     if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'cupofId'")->fetch()) {
         $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN cupofId INT DEFAULT NULL");
     }
+    // Semanas seguidas y cooldown
+    if (!$pdo->query("SHOW COLUMNS FROM gestor_reservas LIKE 'semanasReservadas'")->fetch()) {
+        $pdo->exec("ALTER TABLE gestor_reservas ADD COLUMN semanasReservadas TINYINT NOT NULL DEFAULT 1");
+    }
+    if (!$pdo->query("SHOW COLUMNS FROM gestor_reservas LIKE 'cooldownHasta'")->fetch()) {
+        $pdo->exec("ALTER TABLE gestor_reservas ADD COLUMN cooldownHasta INT DEFAULT NULL COMMENT 'semanaOffset hasta la que el slot está bloqueado (exclusive)'");
+    }
+    if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'semanasReservadas'")->fetch()) {
+        $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN semanasReservadas TINYINT NOT NULL DEFAULT 1");
+    }
     // grupoId en gestor_solicitudes (misma referencia para solicitudes pendientes)
     if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'grupoId'")->fetch()) {
         $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN grupoId INT DEFAULT NULL");
@@ -499,12 +509,41 @@ switch ($resource) {
             // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
 
-            $cupofId = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
-            $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-               ->execute([(int)($b['semanaOffset']??0),$dia,$modulo,
+            $cupofId         = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
+            $semanasRes      = max(1, min(3, (int)($b['semanasReservadas'] ?? 1)));
+            $semOff          = (int)($b['semanaOffset'] ?? 0);
+            // Calcular cicloClases: contar semanas consecutivas previas del mismo profe en ese slot
+            $rachaQ = $db->prepare("SELECT COUNT(*) FROM gestor_reservas WHERE lab=? AND dia=? AND modulo=? AND profeId=? AND semanaOffset >= ? AND semanaOffset < ?");
+            $rachaQ->execute([$b['lab'], $dia, $modulo, $profeIdVal, $semOff - 3, $semOff]);
+            $rachaActual = (int)$rachaQ->fetchColumn();
+            // cicloClases: posición dentro del ciclo de 3 (1-based, wraps after 3)
+            $cicloPos  = ($rachaActual % 3) + 1;
+            // cooldownHasta: si la última semana de este grupo llega al ciclo 3, activar pausa 1 semana
+            $cooldownHasta = null;
+            $ultimaSemana  = $semOff + $semanasRes - 1;
+            $cicloFinal    = (($rachaActual + $semanasRes - 1) % 3) + 1;
+            if ($cicloFinal >= 3) {
+                $cooldownHasta = $ultimaSemana + 1; // semana siguiente queda bloqueada
+            }
+            $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId,cupofId,semanasReservadas,cooldownHasta) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+               ->execute([$semOff,$dia,$modulo,
                            $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
-                           $b['secuencia']??'',(int)($b['cicloClases']??1),
-                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId]);
+                           $b['secuencia']??'',$cicloPos,
+                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId,
+                           $semanasRes,$cooldownHasta]);
+            // Si semanasReservadas > 1, crear entradas para las semanas siguientes
+            for ($sw = 1; $sw < $semanasRes; $sw++) {
+                $swOff    = $semOff + $sw;
+                $cicloSw  = (($rachaActual + $sw) % 3) + 1;
+                $cdHasta  = null;
+                if ($cicloSw >= 3) $cdHasta = $swOff + 1;
+                $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId,cupofId,semanasReservadas,cooldownHasta) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                   ->execute([$swOff,$dia,$modulo,
+                               $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
+                               $b['secuencia']??'',$cicloSw,
+                               0,(int)($b['anual']??0),$grupoId,$cupofId,
+                               $semanasRes,$cdHasta]);
+            }
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
@@ -552,14 +591,15 @@ switch ($resource) {
             // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
             
-            $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+            $solCupofId   = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
+            $solSemanas   = max(1, min(3, (int)($b['semanasReservadas'] ?? 1)));
+            $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId,cupofId,semanasReservadas) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
                            $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            $b['estado']??'pendiente',(int)($b['esRenovacion']??0),
                            isset($b['reservaOriginalId'])?(int)$b['reservaOriginalId']:null,
-                           (int)($b['renovacionNum']??0),$grupoId,
-                           isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null]);
+                           (int)($b['renovacionNum']??0),$grupoId,$solCupofId,$solSemanas]);
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_solicitudes WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
@@ -724,6 +764,57 @@ switch ($resource) {
             $rows = $s2->fetchAll();
         }
         ok(castRows($rows));
+
+    // ── COOLDOWN CHECK: ¿puede el profe reservar este slot esta semana? ──
+    case 'cooldown-check':
+        if ($method !== 'GET') err('Method not allowed', 405);
+        $lab          = $_GET['lab']          ?? null;
+        $dia          = isset($_GET['dia'])    ? (int)$_GET['dia']    : null;
+        $modulo       = isset($_GET['modulo']) ? (int)$_GET['modulo'] : null;
+        $semanaOffset = isset($_GET['semana']) ? (int)$_GET['semana'] : null;
+        if (!$lab || $dia === null || $modulo === null || $semanaOffset === null)
+            err('Faltan parámetros: lab, dia, modulo, semana', 400);
+
+        // ¿Existe alguna reserva cuyo cooldownHasta > semanaOffset en ese slot?
+        $s = $db->prepare("
+            SELECT id, profeId, semanaOffset, semanasReservadas, cooldownHasta
+            FROM gestor_reservas
+            WHERE lab=? AND dia=? AND modulo=?
+              AND cooldownHasta IS NOT NULL
+              AND cooldownHasta > ?
+            ORDER BY cooldownHasta DESC
+            LIMIT 1
+        ");
+        $s->execute([$lab, $dia, $modulo, $semanaOffset]);
+        $cooldown = $s->fetch();
+        if ($cooldown) {
+            ok(['bloqueado' => true,
+                'cooldownHasta' => (int)$cooldown['cooldownHasta'],
+                'semanaOffset'  => (int)$cooldown['semanaOffset'],
+                'mensaje' => 'Slot en pausa hasta semana ' . $cooldown['cooldownHasta'] . '. Podés reservarlo desde esa semana.']);
+        } else {
+            // También contar semanas seguidas previas del mismo profe en ese slot
+            // para informarle cuántas lleva (pero no bloquear)
+            $profeId = $_GET['profeId'] ?? null;
+            $semanasPrevias = 0;
+            if ($profeId) {
+                $sp = $db->prepare("
+                    SELECT COUNT(*) as n FROM gestor_reservas
+                    WHERE lab=? AND dia=? AND modulo=? AND profeId=?
+                      AND semanaOffset >= ? AND semanaOffset < ?
+                ");
+                // Buscar racha actual: semanas consecutivas terminando en semanaOffset-1
+                $racha = 0;
+                for ($sw = $semanaOffset - 1; $sw >= $semanaOffset - 3; $sw--) {
+                    $chk = $db->prepare("SELECT id FROM gestor_reservas WHERE lab=? AND dia=? AND modulo=? AND profeId=? AND semanaOffset=? LIMIT 1");
+                    $chk->execute([$lab, $dia, $modulo, $profeId, $sw]);
+                    if ($chk->fetch()) $racha++;
+                    else break;
+                }
+                $semanasPrevias = $racha;
+            }
+            ok(['bloqueado' => false, 'semanasPrevias' => $semanasPrevias]);
+        }
 
     // ── DEBUG: ver revista de un profe (solo GET, usar con ?dni=X) ──
     case 'debug-revista':

@@ -194,6 +194,32 @@ function _desbloquearGrupo() {
   }
 }
 
+// ── Selector de semanas seguidas ────────────────────────────
+function elegirSemanas(n) {
+  var input = document.getElementById('f-semanas');
+  if (input) input.value = n;
+  // Actualizar botones activos
+  document.querySelectorAll('.semanas-btn').forEach(function(btn) {
+    btn.classList.toggle('active', parseInt(btn.getAttribute('data-val')) === n);
+  });
+  // Actualizar hint
+  var hint = document.getElementById('f-semanas-hint');
+  if (hint) {
+    if (n === 1) hint.textContent = 'Reserva 1 semana a la vez. Después de 3 semanas seguidas, el slot queda en pausa 1 semana.';
+    else if (n === 2) hint.textContent = 'Se reservarán 2 semanas consecutivas a partir del día elegido.';
+    else if (n === 3) hint.textContent = '3 semanas seguidas (máximo). El slot quedará en pausa 1 semana para otros docentes.';
+  }
+}
+
+// Verifica cooldown del slot antes de guardar (consulta MySQL vía API)
+// Retorna Promise<{bloqueado, cooldownHasta, semanasPrevias}>
+function verificarCooldown(lab, dia, modulo, semanaOffset, profeId) {
+  var url = 'cooldown-check?lab=' + encodeURIComponent(lab) +
+            '&dia=' + dia + '&modulo=' + modulo +
+            '&semana=' + semanaOffset + '&profeId=' + profeId;
+  return apiGet(url).catch(function() { return { bloqueado: false, semanasPrevias: 0 }; });
+}
+
 // Carga horarios académicos del sistema (una sola vez)
 function cargarHorariosAcademicos(dniPersonal) {
   if (HORARIOS_ACADEMICOS.length > 0) return Promise.resolve();
@@ -361,6 +387,10 @@ function abrirModalReserva() {
     if (el) el.value = '';
   });
   _desbloquearCursoMateria();
+  _desbloquearGrupo();
+  elegirSemanas(1);
+  var cdWarn = document.getElementById('f-cooldown-warning');
+  if (cdWarn) cdWarn.style.display = 'none';
   UIHelper.setOrientValues('f-orient-group', 'bas');
   var fmod = document.getElementById('f-modulo'); if (fmod) fmod.value = '';
   var fper = document.getElementById('f-periodo'); if (fper) fper.value = '1';
@@ -792,8 +822,10 @@ function verDetalle(reservaId) {
       '<div style="margin-top:14px;">' +
         '<div class="ciclo-bar-label">' +
           '<span style="font-size:12px;font-weight:700;">Ciclo didáctico</span>' +
-          '<span style="font-size:11px;color:var(--muted);">Clase ' + r.cicloClases + ' de 3' +
+          '<span style="font-size:11px;color:var(--muted);">Semana ' + r.cicloClases + ' de 3' +
+          (r.semanasReservadas > 1 ? '&nbsp;·&nbsp;<strong>' + r.semanasReservadas + ' sem. reservadas</strong>' : '') +
           (r.renovaciones ? '&nbsp;&nbsp;<span style="font-weight:700;color:var(--navy);">Renovación ' + r.renovaciones + '/1</span>' : '') +
+          (r.cooldownHasta ? '&nbsp;&nbsp;<span style="color:#d97706;font-weight:700;">⏸ Pausa sem. ' + r.cooldownHasta + '</span>' : '') +
           '</span>' +
         '</div>' +
         '<div class="ciclo-bar"><div class="ciclo-bar-fill ' + barClass + '" style="width:' + pct + '%"></div></div>' +

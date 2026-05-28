@@ -2694,3 +2694,24 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   color: var(--navy, #1a3a6b);
   font-weight: 600;
 }
+
+/* ── Botones selector de semanas ─────────────────────────── */
+.semanas-btn {
+  padding: 6px 14px;
+  border: 2px solid var(--navy-light, #4a6fa5);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--navy, #1a3a6b);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+.semanas-btn:hover {
+  background: var(--navy-faint, #eef2f9);
+}
+.semanas-btn.active {
+  background: var(--navy, #1a3a6b);
+  color: #fff;
+  border-color: var(--navy, #1a3a6b);
+}
