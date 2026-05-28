@@ -52,9 +52,10 @@ function poblarSelectCupof(dniPersonal, cupofSeleccionado) {
   cargarCupofsPorProfe(dniPersonal).then(function(cupofs) {
     sel.disabled = false;
     if (!cupofs || cupofs.length === 0) {
-      // Sin cupofs en BDD → modo manual (f-curso-materia-row ya visible)
+      // Sin cupofs en BDD → modo manual: campos desbloqueados
       sel.innerHTML = '<option value="">— Sin carga horaria vinculada —</option>';
       if (hint) hint.style.display = 'block';
+      _desbloquearCursoMateria();
       return;
     }
     if (hint) hint.style.display = 'none';
@@ -77,19 +78,70 @@ function poblarSelectCupof(dniPersonal, cupofSeleccionado) {
   });
 }
 
-// Cuando el usuario elige un cupof, auto-completa curso y materia
+// Cuando el usuario elige un cupof, auto-completa Y bloquea curso y materia
 function sincronizarCampoDesdeCupof() {
   var sel = document.getElementById('f-cupof');
-  if (!sel || !sel.value) return;
-  var opt = sel.options[sel.selectedIndex];
-  var curso = opt.getAttribute('data-curso') || '';
-  var materia = opt.getAttribute('data-materia') || '';
-  var fCurso = document.getElementById('f-curso');
+  var fCurso   = document.getElementById('f-curso');
   var fMateria = document.getElementById('f-materia');
-  if (fCurso && curso) fCurso.value = curso;
+
+  if (!sel || !sel.value) {
+    // Sin cupof seleccionado → desbloquear para entrada manual
+    _desbloquearCursoMateria();
+    return;
+  }
+
+  var opt     = sel.options[sel.selectedIndex];
+  var curso   = opt.getAttribute('data-curso')   || '';
+  var materia = opt.getAttribute('data-materia') || '';
+
+  // Setear valores
+  if (fCurso   && curso)   fCurso.value   = curso;
   if (fMateria && materia) fMateria.value = materia;
+
+  // Bloquear: el curso y la materia vienen fijos del cupof
+  _bloquearCursoMateria();
+
   // Actualizar grupos según el curso
   if (curso) poblarSelectorGrupo(curso, '');
+}
+
+function _bloquearCursoMateria() {
+  var fCurso   = document.getElementById('f-curso');
+  var fMateria = document.getElementById('f-materia');
+  var row      = document.getElementById('f-curso-materia-row');
+  if (fCurso) {
+    fCurso.disabled = true;
+    fCurso.style.opacity = '0.6';
+    fCurso.style.cursor  = 'not-allowed';
+    fCurso.title = 'Determinado por el cupof seleccionado';
+  }
+  if (fMateria) {
+    fMateria.readOnly = true;
+    fMateria.style.opacity = '0.6';
+    fMateria.style.cursor  = 'not-allowed';
+    fMateria.title = 'Determinado por el cupof seleccionado';
+  }
+  // Indicador visual en la fila
+  if (row) row.style.opacity = '0.7';
+}
+
+function _desbloquearCursoMateria() {
+  var fCurso   = document.getElementById('f-curso');
+  var fMateria = document.getElementById('f-materia');
+  var row      = document.getElementById('f-curso-materia-row');
+  if (fCurso) {
+    fCurso.disabled = false;
+    fCurso.style.opacity = '';
+    fCurso.style.cursor  = '';
+    fCurso.title = '';
+  }
+  if (fMateria) {
+    fMateria.readOnly = false;
+    fMateria.style.opacity = '';
+    fMateria.style.cursor  = '';
+    fMateria.title = '';
+  }
+  if (row) row.style.opacity = '';
 }
 
 // Carga horarios académicos del sistema (una sola vez)
@@ -253,11 +305,12 @@ function poblarSelectsReserva() {
 function abrirModalReserva() {
   poblarSelectsReserva();
 
-  // Limpiar campos
+  // Limpiar campos y desbloquear curso/materia (por si quedaron bloqueados de antes)
   ['f-lab', 'f-dia', 'f-curso', 'f-materia', 'f-secuencia'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
+  _desbloquearCursoMateria();
   UIHelper.setOrientValues('f-orient-group', 'bas');
   var fmod = document.getElementById('f-modulo'); if (fmod) fmod.value = '';
   var fper = document.getElementById('f-periodo'); if (fper) fper.value = '1';

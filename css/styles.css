@@ -2674,3 +2674,15 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 #f-cupof-hint {
   color: var(--amber, #d97706);
 }
+
+/* ── Curso y materia bloqueados por cupof ─────────────────── */
+#f-curso[disabled],
+#f-materia[readonly] {
+  background-color: var(--navy-faint, #eef2f9);
+  border-color: var(--navy-light, #4a6fa5);
+  color: var(--navy, #1a3a6b);
+  font-weight: 600;
+}
+#f-curso-materia-row {
+  transition: opacity .2s;
+}
