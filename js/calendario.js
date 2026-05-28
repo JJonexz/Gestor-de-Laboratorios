@@ -180,6 +180,9 @@ function renderCalendario() {
     var matchLab = filtroLab === 'todos' || filtroLab === l.id;
     var matchSearch = filtroBusquedaLab === '' || l.nombre.toLowerCase().indexOf(filtroBusquedaLab) !== -1 || l.id.toString().toLowerCase().indexOf(filtroBusquedaLab) !== -1;
     return matchLab && matchSearch;
+  }).sort(function(a, b) {
+    // Ordenar por ID (alfanumérico)
+    return String(a.id).localeCompare(String(b.id));
   });
 
   // Filtro de turno
@@ -362,6 +365,53 @@ function renderCalendario() {
   renderSolicitudesBadge();
 }
 
+// Crea una solicitud de cambio para que el admin apruebe
+function crearSolicitudDeCambio(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
+  var r = RESERVAS.find(function(x) { return x.id === reservaId; });
+  if (!r) return;
+  
+  var modOrig  = getModulo(r.modulo);
+  var modDest  = getModulo(nuevoModulo);
+  var labOrig  = getLab(r.lab);
+  var labDest  = getLab(nuevoLab);
+
+  var desdeStr = DIAS_SEMANA[r.dia]   + ' · ' + modOrig.label + ' (' + modOrig.inicio + '–' + modOrig.fin + ')' + (r.lab !== nuevoLab ? ' · ' + labOrig.nombre : '');
+  var hastaStr = DIAS_SEMANA[nuevoDia] + ' · ' + modDest.label + ' (' + modDest.inicio + '–' + modDest.fin + ')' + (r.lab !== nuevoLab ? ' · ' + labDest.nombre : '');
+
+  confirmar(
+    '¿Solicitar cambio de <strong>' + r.curso + '</strong>?<br>' +
+    '<small style="color:var(--muted)">De: ' + desdeStr + '</small><br>' +
+    '<small style="color:var(--muted)">A:&nbsp;&nbsp; ' + hastaStr + '</small><br>' +
+    '<small style="color:var(--orange);font-weight:600;">⏳ Requiere aprobación del directivo</small>',
+    function() {
+      // Crear solicitud pendiente de cambio
+      if (typeof nextId === 'undefined') nextId = 0;
+      nextId++;
+      var nuevaSolicitud = {
+        id: nextId,
+        semanaOffset: r.semanaOffset,
+        dia: nuevoDia,
+        modulo: nuevoModulo,
+        lab: nuevoLab,
+        curso: r.curso,
+        orient: r.orient,
+        profeId: r.profeId,
+        secuencia: r.secuencia,
+        cicloClases: r.cicloClases,
+        estado: 'pendiente',
+        esRenovacion: false,
+        reservaOriginalId: reservaId,
+        renovacionNum: 0,
+        grupoId: r.grupoId || null
+      };
+      SOLICITUDES.push(nuevaSolicitud);
+      saveDB();
+      toast('Solicitud de cambio enviada. Aguardá la aprobación del directivo.', 'info');
+      renderAll();
+    }
+  );
+}
+
 // Genera el HTML de una celda libre (helper interno)
 function _celdaLibre(dia, modulo, labId) {
   return (
@@ -415,7 +465,17 @@ function dropReserva(event, nuevoDia, nuevoModulo, nuevoLab) {
     var fijoId = parseInt(reservaIdData.split('_')[1]);
     moverHorarioFijoASlot(fijoId, nuevoDia, nuevoModulo, nuevoLab);
   } else {
-    moverReservaASlot(parseInt(reservaIdData), nuevoDia, nuevoModulo, nuevoLab);
+    var reservaId = parseInt(reservaIdData);
+    var r = RESERVAS.find(function(x) { return x.id === reservaId; });
+    if (!r) return;
+    
+    // Si es profesor, crear solicitud de cambio en lugar de mover directamente
+    if (!esDirectivo()) {
+      crearSolicitudDeCambio(reservaId, nuevoDia, nuevoModulo, nuevoLab);
+    } else {
+      // Si es directivo, mover directamente
+      moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab);
+    }
   }
 }
 
