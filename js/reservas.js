@@ -941,6 +941,86 @@ function rechazarSolicitud(solId) {
   });
 }
 
+// ── Aprobar grupo de solicitudes ──────────────────────────────
+function aceptarSolicitudGrupo(ids) {
+  if (modoUsuario !== 'admin') { toast('Solo el directivo puede aprobar solicitudes.', 'err'); return; }
+
+  var processed = 0;
+  ids.forEach(function(solId) {
+    var s = SOLICITUDES.find(function (x) { return x.id === solId; });
+    if (!s) return;
+
+    var conflicto = RESERVAS.find(function (r) {
+      return r.semanaOffset === s.semanaOffset && r.dia === s.dia && r.modulo === s.modulo && r.lab === s.lab;
+    });
+    if (conflicto) { toast('El turno del módulo ' + s.modulo + ' fue ocupado mientras estaba pendiente.', 'warn'); return; }
+
+    if (s.esRenovacion && s.reservaOriginalId) {
+      var rOrig = RESERVAS.find(function (x) { return x.id === s.reservaOriginalId; });
+      if (rOrig) {
+        rOrig.cicloClases = 1;
+        rOrig.renovaciones = (rOrig.renovaciones || 0) + 1;
+      } else {
+        nextId++;
+        RESERVAS.push({
+          id: nextId, semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
+          curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
+          cicloClases: 1, renovaciones: s.renovacionNum || 1,
+        });
+      }
+    } else {
+      if (typeof validarConflicto === 'function') {
+        var conf = validarConflicto(s.lab, s.dia, s.modulo, s.semanaOffset, s.profeId, null);
+        if (conf) {
+          toast('Conflicto en módulo ' + s.modulo + ': ' + conf.mensaje, 'err');
+          if (typeof mostrarAlertaConflicto === 'function') mostrarAlertaConflicto(conf, s);
+          return;
+        }
+      }
+      nextId++;
+      var nuevaReserva = {
+        id: nextId, semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
+        curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
+        cicloClases: 1, renovaciones: 0,
+      };
+      RESERVAS.push(nuevaReserva);
+      if (typeof notifSolicitudAprobada === 'function') notifSolicitudAprobada(s);
+      if (typeof emitirSync === 'function') emitirSync('reserva_aprobada', { reservaId: nuevaReserva.id, lab: s.lab });
+    }
+    SOLICITUDES = SOLICITUDES.filter(function (x) { return x.id !== solId; });
+    processed++;
+  });
+
+  if (processed > 0) {
+    saveDB();
+    toast('Solicitudes aprobadas (' + processed + ' módulos). Reservas confirmadas.', 'ok');
+    renderAll();
+  }
+}
+
+// ── Rechazar grupo de solicitudes ─────────────────────────────
+function rechazarSolicitudGrupo(ids) {
+  if (modoUsuario !== 'admin') { toast('Solo el directivo puede rechazar solicitudes.', 'err'); return; }
+  
+  var primerS = SOLICITUDES.find(function (x) { return x.id === ids[0]; });
+  if (!primerS) return;
+
+  var p = getProfe(primerS.profeId);
+  confirmar('¿Rechazar la solicitud de <strong>Prof. ' + p.apellido + '</strong> — ' + primerS.curso + ' (' + ids.length + ' módulo/s)?', function () {
+    ids.forEach(function(solId) {
+      var s = SOLICITUDES.find(function(x) { return x.id === solId; });
+      if(s) {
+        SOLICITUDES = SOLICITUDES.filter(function (x) { return x.id !== solId; });
+        if (typeof notifSolicitudRechazada === 'function') notifSolicitudRechazada(s, '');
+        if (typeof emitirSync === 'function') emitirSync('solicitud_rechazada', { solicitudId: solId });
+      }
+    });
+    saveDB();
+    toast('Solicitudes rechazadas.', 'info');
+    renderAll();
+  });
+}
+
 // ── Editar reserva existente ─────────────────────────────────
 // Abre el modal de edición con los datos de la reserva pre-cargados.
 // El profe solo puede editar sus propias reservas; el admin puede editar cualquiera.
