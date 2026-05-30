@@ -561,11 +561,18 @@ function verDetalle_Pendiente(solId) {
 
 // ── Badge de notificaciones en el botón Admin ─────────────────
 function renderSolicitudesBadge() {
-  var pendientes = SOLICITUDES.filter(function (s) { return s.estado === 'pendiente'; }).length;
+  // Contar grupos (solicitudes agrupadas) en lugar de módulos individuales
+  var solic = SOLICITUDES.filter(function (s) { return s.estado === 'pendiente'; });
+  var keys = {};
+  solic.forEach(function(s) {
+    var key = [s.semanaOffset, s.dia, s.lab, s.curso, s.orient, s.profeId, s.secuencia, s.esRenovacion].join('|');
+    keys[key] = true;
+  });
+  var grupos = Object.keys(keys).length;
   var badge = document.getElementById('admin-badge');
   if (badge) {
-    badge.textContent = pendientes || '';
-    badge.style.display = pendientes ? 'flex' : 'none';
+    badge.textContent = grupos || '';
+    badge.style.display = grupos ? 'flex' : 'none';
   }
 }
 
