@@ -143,7 +143,7 @@
         <rect x="1" y="3" width="18" height="12" rx="2" />
         <rect x="5" y="17" width="10" height="2" rx="1" />
       </svg>
-      Informática
+      Programación
     </div>
     <div class="orient-tab const" role="tab" aria-selected="false" tabindex="0" onclick="selOrient(this,'const')"
       onkeydown="if(event.key==='Enter'||event.key===' ')selOrient(this,'const')">
@@ -397,7 +397,7 @@
             <select class="search-input" style="max-width:200px;padding:7px 10px;font-size:12px;"
               id="admin-filter-orient" onchange="renderAdminReservas()">
               <option value="all">Todas las orientaciones</option>
-              <option value="info">Informática</option>
+              <option value="info">Programación</option>
               <option value="const">Construcción</option>
               <option value="tur">Turismo</option>
               <option value="bas">Básico</option>
@@ -562,8 +562,19 @@
         </div>
       </div>
       
-      <!-- FILA DE CURSO, GRUPO Y MATERIA -->
-      <div class="form-row">
+      <!-- FILA DE CUPOF (vincula profe ↔ materia ↔ curso desde la BDD) -->
+      <div class="form-group" id="f-cupof-wrap">
+        <label class="form-label" for="f-cupof">📚 Materia / Curso <small style="color:var(--muted);font-weight:400;">(desde tu carga horaria)</small></label>
+        <select class="form-control" id="f-cupof" required>
+          <option value="">— Seleccioná materia y curso —</option>
+        </select>
+        <div id="f-cupof-hint" style="font-size:11px;color:var(--muted);margin-top:4px;display:none;">
+          ℹ️ No se encontraron materias vinculadas. Podés ingresar el curso y materia manualmente.
+        </div>
+      </div>
+
+      <!-- FILA DE CURSO, GRUPO Y MATERIA (se completan auto desde cupof; editables como fallback) -->
+      <div class="form-row" id="f-curso-materia-row">
         <div class="form-group">
           <label class="form-label" for="f-curso">Curso</label>
           <select class="form-control" id="f-curso" required>
@@ -571,7 +582,6 @@
           </select>
         </div>
         
-        <!-- AGREGADO: Campo Grupo (inmediatamente después de curso) -->
         <div class="form-group">
           <label class="form-label" for="reserva-grupo">Grupo</label>
           <select class="form-control" id="reserva-grupo" name="grupoId">
@@ -590,7 +600,7 @@
         <div class="form-group">
           <label class="form-label">Orientación (podés elegir varias)</label>
           <div class="orient-check-group" id="f-orient-group">
-            <label><input type="checkbox" value="info"> 💻 Info</label>
+            <label><input type="checkbox" value="info"> 💻 Prog</label>
             <label><input type="checkbox" value="const"> 🏗️ Const</label>
             <label><input type="checkbox" value="tur"> 🌐 Tur</label>
             <label><input type="checkbox" value="bas"> 📚 Bas</label>

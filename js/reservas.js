@@ -15,6 +15,251 @@
 // Depende de: config.js, helpers.js, ui.js, db.js
 // ============================================================
 
+// ── Validación de conflictos con horarios académicos (cupof) ──
+var HORARIOS_ACADEMICOS = []; // Cachea horarios académicos del sistema
+var _cupofsPorProfe = {};     // Cache: dni_personal → array de cupofs del profe
+
+// Carga los cupofs (materias/cursos) activos de un profesor desde la BDD
+// Retorna promise con array de { cupof, materia_nombre, materia_abrev, curso_label, curso_ano, division, cupof_turno }
+function cargarCupofsPorProfe(dniPersonal) {
+  if (!dniPersonal) {
+    console.warn('[cupofs] dniPersonal vacío — el profe no tiene dni_personal en gestor_profesores');
+    return Promise.resolve([]);
+  }
+  if (_cupofsPorProfe[dniPersonal]) return Promise.resolve(_cupofsPorProfe[dniPersonal]);
+  return apiGet('cupofs-por-profe?dni=' + dniPersonal).then(function(datos) {
+    _cupofsPorProfe[dniPersonal] = datos || [];
+    console.log('[cupofs] dni=' + dniPersonal + ' → ' + _cupofsPorProfe[dniPersonal].length + ' cupofs cargados', _cupofsPorProfe[dniPersonal]);
+    return _cupofsPorProfe[dniPersonal];
+  }).catch(function(e) {
+    console.warn('[cupofs] Error al cargar cupofs para dni=' + dniPersonal + ':', e);
+    _cupofsPorProfe[dniPersonal] = [];
+    return [];
+  });
+}
+
+// Puebla el select #f-cupof con los cupofs del profesor indicado
+// Si no tiene cupofs en la BDD, muestra fallback manual
+function poblarSelectCupof(dniPersonal, cupofSeleccionado) {
+  var sel = document.getElementById('f-cupof');
+  var hint = document.getElementById('f-cupof-hint');
+  var wrap = document.getElementById('f-cupof-wrap');
+  if (!sel) return;
+
+  sel.innerHTML = '<option value="">⌛ Cargando materias…</option>';
+  sel.disabled = true;
+
+  cargarCupofsPorProfe(dniPersonal).then(function(cupofs) {
+    sel.disabled = false;
+    if (!cupofs || cupofs.length === 0) {
+      // Sin cupofs en BDD → modo manual: campos desbloqueados
+      sel.innerHTML = '<option value="">— Sin carga horaria vinculada —</option>';
+      if (hint) hint.style.display = 'block';
+      _desbloquearCursoMateria();
+  _desbloquearGrupo();
+      return;
+    }
+    if (hint) hint.style.display = 'none';
+    var opts = '<option value="">— Seleccioná materia y curso —</option>';
+    cupofs.forEach(function(c) {
+      var label = (c.materia_nombre || 'Materia ?') + ' — ' + (c.curso_label || '?');
+      if (c.cupof_turno) label += ' (' + (c.cupof_turno === 'M' ? 'Mañana' : c.cupof_turno === 'T' ? 'Tarde' : c.cupof_turno === 'V' ? 'Vespertino' : c.cupof_turno) + ')';
+      if (c.id_grupos && parseInt(c.id_grupos) > 0) label += ' 👥 Grupo ' + (c.grupo_nombre || c.id_grupos);
+      var selected = String(c.cupof) === String(cupofSeleccionado) ? ' selected' : '';
+      opts += '<option value="' + c.cupof + '"' + selected +
+              ' data-materia="'      + (c.materia_nombre   || '') + '"' +
+              ' data-materia-abrev="'+ (c.materia_abrev    || '') + '"' +
+              ' data-curso="'        + (c.curso_label      || '') + '"' +
+              ' data-curso-ano="'    + (c.curso_ano        || '') + '"' +
+              ' data-curso-div="'    + (c.curso_division   || '') + '"' +
+              ' data-id-grupos="'    + (c.id_grupos        || 0)  + '"' +
+              ' data-grupo-nombre="' + (c.grupo_nombre     || '') + '"' +
+              '>' + label + '</option>';
+    });
+    sel.innerHTML = opts;
+    // Si ya había un cupof seleccionado, disparar el change para sincronizar campos
+    if (cupofSeleccionado) sincronizarCampoDesdeCupof();
+  });
+}
+
+// Cuando el usuario elige un cupof, auto-completa Y bloquea curso, materia y grupo
+function sincronizarCampoDesdeCupof() {
+  var sel = document.getElementById('f-cupof');
+  var fCurso   = document.getElementById('f-curso');
+  var fMateria = document.getElementById('f-materia');
+
+  if (!sel || !sel.value) {
+    _desbloquearCursoMateria();
+    _desbloquearGrupo();
+    return;
+  }
+
+  var opt        = sel.options[sel.selectedIndex];
+  var curso      = opt.getAttribute('data-curso')      || '';
+  var materia    = opt.getAttribute('data-materia')    || '';
+  var idGrupos   = parseInt(opt.getAttribute('data-id-grupos') || '0');
+  var grupoNombre= opt.getAttribute('data-grupo-nombre') || '';
+  var cursoAno   = opt.getAttribute('data-curso-ano')  || '';
+
+  // Setear curso y materia
+  if (fCurso   && curso)   fCurso.value   = curso;
+  if (fMateria && materia) fMateria.value = materia;
+  _bloquearCursoMateria();
+
+  // Grupo: poblar según curso y luego auto-seleccionar o limpiar
+  poblarSelectorGrupo(cursoAno, idGrupos > 0 ? idGrupos : '');
+
+  if (idGrupos > 0) {
+    // Taller con grupo fijo → bloquear selector
+    _bloquearGrupo(idGrupos, grupoNombre);
+  } else {
+    // Materia sin grupo → limpiar y desbloquear
+    _desbloquearGrupo();
+    var selGrupo = document.getElementById('reserva-grupo');
+    if (selGrupo) selGrupo.value = '';
+  }
+}
+
+function _bloquearCursoMateria() {
+  var fCurso   = document.getElementById('f-curso');
+  var fMateria = document.getElementById('f-materia');
+  var row      = document.getElementById('f-curso-materia-row');
+  if (fCurso) {
+    fCurso.disabled = true;
+    fCurso.style.opacity = '0.6';
+    fCurso.style.cursor  = 'not-allowed';
+    fCurso.title = 'Determinado por el cupof seleccionado';
+  }
+  if (fMateria) {
+    fMateria.readOnly = true;
+    fMateria.style.opacity = '0.6';
+    fMateria.style.cursor  = 'not-allowed';
+    fMateria.title = 'Determinado por el cupof seleccionado';
+  }
+  // Indicador visual en la fila
+  if (row) row.style.opacity = '0.7';
+}
+
+function _desbloquearCursoMateria() {
+  var fCurso   = document.getElementById('f-curso');
+  var fMateria = document.getElementById('f-materia');
+  var row      = document.getElementById('f-curso-materia-row');
+  if (fCurso) {
+    fCurso.disabled = false;
+    fCurso.style.opacity = '';
+    fCurso.style.cursor  = '';
+    fCurso.title = '';
+  }
+  if (fMateria) {
+    fMateria.readOnly = false;
+    fMateria.style.opacity = '';
+    fMateria.style.cursor  = '';
+    fMateria.title = '';
+  }
+  if (row) row.style.opacity = '';
+}
+
+function _bloquearGrupo(idGrupos, grupoNombre) {
+  var sel  = document.getElementById('reserva-grupo');
+  var wrap = sel ? sel.closest('.form-group') : null;
+  if (!sel) return;
+  sel.value    = idGrupos;
+  sel.disabled = true;
+  sel.style.opacity = '0.6';
+  sel.style.cursor  = 'not-allowed';
+  sel.title = 'Grupo fijo por taller (cupof ' + idGrupos + ')';
+  if (wrap) {
+    var lbl = wrap.querySelector('label');
+    if (lbl && !lbl.querySelector('.grupo-lock-hint')) {
+      var hint = document.createElement('small');
+      hint.className = 'grupo-lock-hint';
+      hint.style.cssText = 'color:var(--navy,#1a3a6b);font-weight:600;margin-left:6px;';
+      hint.textContent = '🔒 ' + (grupoNombre ? 'Grupo ' + grupoNombre : 'fijo');
+      lbl.appendChild(hint);
+    }
+  }
+}
+
+function _desbloquearGrupo() {
+  var sel  = document.getElementById('reserva-grupo');
+  var wrap = sel ? sel.closest('.form-group') : null;
+  if (!sel) return;
+  sel.disabled = false;
+  sel.style.opacity = '';
+  sel.style.cursor  = '';
+  sel.title = '';
+  if (wrap) {
+    var hint = wrap.querySelector('.grupo-lock-hint');
+    if (hint) hint.remove();
+  }
+}
+
+// Carga horarios académicos del sistema (una sola vez)
+function cargarHorariosAcademicos(dniPersonal) {
+  if (HORARIOS_ACADEMICOS.length > 0) return Promise.resolve();
+  var _dni = dniPersonal || _getDniParaHorarios();
+  if (!_dni) return Promise.resolve();
+  return apiGet('horarios-academicos?dni=' + _dni).then(function(datos) {
+    HORARIOS_ACADEMICOS = datos || [];
+    return HORARIOS_ACADEMICOS;
+  }).catch(function(e) {
+    console.warn('[cargarHorariosAcademicos] Error:', e);
+    HORARIOS_ACADEMICOS = [];
+    return [];
+  });
+}
+
+function _getDniParaHorarios() {
+  var profeSel = document.getElementById('f-profe');
+  var profeId = (typeof esDirectivo === 'function' && esDirectivo() && profeSel && profeSel.value)
+    ? parseInt(profeSel.value)
+    : (typeof getCurrentProfId === 'function' ? getCurrentProfId() : null);
+  var profe = profeId ? getProfe(profeId) : null;
+  return profe && profe.dni_personal ? profe.dni_personal : null;
+}
+
+// Mapeo: día del gestor (0-4) ↔ día académico (LUN-VIE)
+var MAP_DIA_ACADEMICO = {
+  0: 'LUN',
+  1: 'MAR',
+  2: 'MIE',
+  3: 'JUE',
+  4: 'VIE'
+};
+
+// Chequea si hay conflicto entre módulo del gestor y horarios académicos
+// Retorna: { hayConflicto: bool, mensaje: string, horasEnConflicto: array }
+function chequearConflictoHorarioAcademico(profeId, dia, modulo) {
+  if (!profeId || profeId === 'institucional') return { hayConflicto: false };
+  
+  // Obtener dni_personal del profesor
+  var profe = getProfe(profeId);
+  if (!profe || !profe.dni_personal) return { hayConflicto: false };
+  
+  var diaAcademico = MAP_DIA_ACADEMICO[dia] || null;
+  if (!diaAcademico) return { hayConflicto: false };
+  
+  // Convertir módulo del gestor a hora académica (1-13)
+  var horaAcademica = moduloAHorarioAcademico(modulo);
+  if (horaAcademica === null) return { hayConflicto: false }; // Es un recreo
+  
+  // Buscar si hay horario académico en ese día y hora
+  var horasEnConflicto = HORARIOS_ACADEMICOS.filter(function(h) {
+    return h.dia === diaAcademico && h.id_horas === horaAcademica;
+  });
+  
+  if (horasEnConflicto.length > 0) {
+    var materias = horasEnConflicto.map(function(h) { return h.materia_nombre || ('Cupof #' + h.cupof); }).join(', ');
+    return {
+      hayConflicto: true,
+      mensaje: 'Conflicto: el profesor tiene clase académica (' + materias + ') en ese horario',
+      horasEnConflicto: horasEnConflicto
+    };
+  }
+  
+  return { hayConflicto: false };
+}
+
 // ── Población de selects del modal ───────────────────────────
 function poblarSelectsReserva() {
   // Laboratorios disponibles
@@ -110,11 +355,12 @@ function poblarSelectsReserva() {
 function abrirModalReserva() {
   poblarSelectsReserva();
 
-  // Limpiar campos
+  // Limpiar campos y desbloquear curso/materia (por si quedaron bloqueados de antes)
   ['f-lab', 'f-dia', 'f-curso', 'f-materia', 'f-secuencia'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
+  _desbloquearCursoMateria();
   UIHelper.setOrientValues('f-orient-group', 'bas');
   var fmod = document.getElementById('f-modulo'); if (fmod) fmod.value = '';
   var fper = document.getElementById('f-periodo'); if (fper) fper.value = '1';
@@ -140,6 +386,39 @@ function abrirModalReserva() {
       poblarSelectorGrupo(this.value, '');
     });
     fCursoMain.dataset.grupoBind = '1';
+  }
+
+  // ── Cargar cupofs del profe desde la BDD ────────────────────
+  // Para directivos: se carga al elegir docente; por ahora vacío hasta que elijan
+  // Para profesores: se carga con el dni propio al instante
+  var fCupof = document.getElementById('f-cupof');
+  if (fCupof && !fCupof.dataset.cupofBind) {
+    fCupof.addEventListener('change', sincronizarCampoDesdeCupof);
+    fCupof.dataset.cupofBind = '1';
+  }
+
+  if (!esDirectivo()) {
+    // Profe: cargar sus propios cupofs
+    var profeActual = getProfe(getCurrentProfId());
+    var dniActual = profeActual && profeActual.dni_personal ? profeActual.dni_personal : null;
+    poblarSelectCupof(dniActual, null);
+    cargarHorariosAcademicos(dniActual).catch(function(e) {
+      console.warn('No se pudieron cargar horarios académicos:', e);
+    });
+  } else {
+    // Directivo: placeholder vacío hasta que elija docente
+    if (fCupof) fCupof.innerHTML = '<option value="">— Primero elegí un docente —</option>';
+    // Escuchar cambio de docente
+    if (profeSel && !profeSel.dataset.cupofBind) {
+      profeSel.addEventListener('change', function() {
+        HORARIOS_ACADEMICOS = []; // forzar recarga para el nuevo profe
+        var profeElegido = getProfe(parseInt(this.value));
+        var dniElegido = profeElegido && profeElegido.dni_personal ? profeElegido.dni_personal : null;
+        poblarSelectCupof(dniElegido, null);
+        if (dniElegido) cargarHorariosAcademicos(dniElegido).catch(function(){});
+      });
+      profeSel.dataset.cupofBind = '1';
+    }
   }
 
   abrirModal('modal-reserva');
@@ -194,6 +473,31 @@ function abrirModalReservaSlot(dia, modulo, lab) {
 
   if (profeWrap) profeWrap.style.display = esDirectivo() ? 'block' : 'none';
   if (profeSel) profeSel.value = '';
+
+  // ── Cargar cupofs del profe ──────────────────────────────────
+  var fCupof = document.getElementById('f-cupof');
+  if (fCupof && !fCupof.dataset.cupofBind) {
+    fCupof.addEventListener('change', sincronizarCampoDesdeCupof);
+    fCupof.dataset.cupofBind = '1';
+  }
+  if (!esDirectivo()) {
+    var profeActual = getProfe(getCurrentProfId());
+    var dniActual = profeActual && profeActual.dni_personal ? profeActual.dni_personal : null;
+    poblarSelectCupof(dniActual, null);
+    cargarHorariosAcademicos(dniActual).catch(function(){});
+  } else {
+    if (fCupof) fCupof.innerHTML = '<option value="">— Primero elegí un docente —</option>';
+    if (profeSel && !profeSel.dataset.cupofBind) {
+      profeSel.addEventListener('change', function() {
+        HORARIOS_ACADEMICOS = [];
+        var profeElegido = getProfe(parseInt(this.value));
+        var dniElegido = profeElegido && profeElegido.dni_personal ? profeElegido.dni_personal : null;
+        poblarSelectCupof(dniElegido, null);
+        if (dniElegido) cargarHorariosAcademicos(dniElegido).catch(function(){});
+      });
+      profeSel.dataset.cupofBind = '1';
+    }
+  }
 
   abrirModal('modal-reserva');
 }
@@ -313,6 +617,46 @@ function guardarReserva() {
 
   var modulosAReservar = getModulosParaPeriodo(parseInt(modulo), periodo);
 
+  // ── CHEQUEO DE CONFLICTOS HORARIOS ACADÉMICOS ─────────────
+  var profeId = esDirectivo() && document.getElementById('f-profe').value 
+    ? parseInt(document.getElementById('f-profe').value) 
+    : getCurrentProfId();
+  
+  // Cargar horarios académicos si no están cargados
+  if (HORARIOS_ACADEMICOS.length === 0) {
+    cargarHorariosAcademicos().then(function() {
+      // Después de cargar, chequear conflictos
+      var conflictoEncontrado = false;
+      for (var mi = 0; mi < modulosAReservar.length && !conflictoEncontrado; mi++) {
+        var conflicto = chequearConflictoHorarioAcademico(profeId, parseInt(dia), modulosAReservar[mi]);
+        if (conflicto.hayConflicto) {
+          toast('⚠️ ' + conflicto.mensaje, 'warn');
+          console.warn('[guardarReserva] Conflicto horario:', conflicto);
+          conflictoEncontrado = true;
+        }
+      }
+      // Continuar guardando (el warning es solo informativo, el profesor puede forzar)
+      procederGuardarReserva(lab, dia, modulo, curso, materia, secuencia, orient, periodo, esAnual, semanaOffset, profeId);
+    });
+    return;
+  }
+  
+  // Si los horarios ya están cargados, chequear de una vez
+  for (var mi = 0; mi < modulosAReservar.length; mi++) {
+    var conflicto = chequearConflictoHorarioAcademico(profeId, parseInt(dia), modulosAReservar[mi]);
+    if (conflicto.hayConflicto) {
+      toast('⚠️ ' + conflicto.mensaje, 'warn');
+      console.warn('[guardarReserva] Conflicto horario:', conflicto);
+    }
+  }
+  
+  procederGuardarReserva(lab, dia, modulo, curso, materia, secuencia, orient, periodo, esAnual, semanaOffset, profeId);
+}
+
+// Continúa con la lógica de guardado después del chequeo de conflictos
+function procederGuardarReserva(lab, dia, modulo, curso, materia, secuencia, orient, periodo, esAnual, semanaOffset, profeId) {
+  var modulosAReservar = getModulosParaPeriodo(parseInt(modulo), periodo);
+
   // Semanas a cubrir: una sola, o ~40 si es reserva anual
   var semanaBase = parseInt(semanaOffset, 10);
   var semanasAReservar = [semanaBase];
@@ -418,8 +762,17 @@ function guardarReserva() {
 
 // ── Modal de detalle de reserva ──────────────────────────────
 function verDetalle(reservaId) {
-  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  verDetalleGrupo([reservaId]);
+}
+
+function verDetalleGrupo(ids) {
+  var r = RESERVAS.find(function (x) { return x.id === ids[0]; });
   if (!r) return;
+
+  var modulos = ids.map(function(id) { 
+    var res = RESERVAS.find(function(x){ return x.id === id; });
+    return res ? res.modulo : r.modulo;
+  });
 
   var p = getProfe(r.profeId);
   var oris = (r.orient || 'bas').split(',');
@@ -429,7 +782,11 @@ function verDetalle(reservaId) {
   }).join(' ');
 
   var fecha = getDiaDate(r.semanaOffset, r.dia);
-  var mod   = getModulo(r.modulo);
+  
+  var modInicio = getModulo(Math.min.apply(null, modulos)).inicio;
+  var modFin = getModulo(Math.max.apply(null, modulos)).fin;
+  var labelModulos = modulos.length > 1 ? modulos.length + ' módulos' : getModulo(r.modulo).label;
+
   var pct   = (r.cicloClases / 3) * 100;
   var barClass = r.cicloClases >= 3 ? 'full' : (r.cicloClases >= 2 ? 'mid' : 'low');
 
@@ -438,7 +795,7 @@ function verDetalle(reservaId) {
     body.innerHTML =
       '<div class="detail-row"><div class="detail-label">Docente</div><div class="detail-value">Prof. ' + p.apellido + ', ' + p.nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">' + getLab(r.lab).nombre + '</div></div>' +
-      '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[r.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +
+      '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[r.dia] + ' ' + formatFecha(fecha) + ' · ' + labelModulos + ' (' + modInicio + '–' + modFin + ')</div></div>' +
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + r.curso + '</div></div>' +
       (r.grupoId
       ? '<div class="detail-row"><div class="detail-label">Grupo</div><div class="detail-value">Grupo ' + getNombreGrupo(r.grupoId) + '</div></div>'
@@ -460,18 +817,19 @@ function verDetalle(reservaId) {
   if (footer) {
     var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
     var renovBtn = '';
+    var jsonIds = JSON.stringify(ids);
     if (isOwn && r.cicloClases >= 3 && esDirectivo()) {
       var renov = r.renovaciones || 0;
       renovBtn = renov >= 1
-        ? '<button class="btn-ok" onclick="cerrarModal(\'modal-detalle\');renovarReserva(' + r.id + ')">🔄 Nueva reserva</button>'
-        : '<button class="btn-ok" onclick="renovarReserva(' + r.id + ');cerrarModal(\'modal-detalle\')">↻ Solicitar renovación</button>';
+        ? '<button class="btn-ok" onclick=\'cerrarModal("modal-detalle");renovarReservaGrupo(' + jsonIds + ')\'>🔄 Nueva reserva</button>'
+        : '<button class="btn-ok" onclick=\'renovarReservaGrupo(' + jsonIds + ');cerrarModal("modal-detalle")\'>↻ Solicitar renovación</button>';
     }
     footer.innerHTML =
       '<button class="btn-cancel" onclick="cerrarModal(\'modal-detalle\')">Cerrar</button>' +
       renovBtn +
-      (isOwn ? '<button class="btn-ok" style="background:var(--navy-light);" onclick="cerrarModal(\'modal-detalle\');editarReserva(' + r.id + ')">✎ Editar</button>' : '') +
+      (isOwn ? '<button class="btn-ok" style="background:var(--navy-light);" onclick=\'cerrarModal("modal-detalle");editarReservaGrupo(' + jsonIds + ')\'>✎ Editar</button>' : '') +
       (isOwn ? '<button class="btn-ok" style="background:var(--amber);color:#333;" onclick="cerrarModal(\'modal-detalle\');abrirModalReasignar(' + r.id + ')">🔀 Reasignar</button>' : '') +
-      (isOwn ? '<button class="btn-danger" onclick="cerrarModal(\'modal-detalle\');cancelarReserva(' + r.id + ')">Cancelar reserva</button>' : '');
+      (isOwn ? '<button class="btn-danger" onclick=\'cerrarModal("modal-detalle");cancelarReservaGrupo(' + jsonIds + ')\'>Cancelar reserva</button>' : '');
   }
 
   abrirModal('modal-detalle');
@@ -597,29 +955,151 @@ function rechazarSolicitud(solId) {
   });
 }
 
+// ── Aprobar grupo de solicitudes ──────────────────────────────
+function aceptarSolicitudGrupo(ids) {
+  if (modoUsuario !== 'admin') { toast('Solo el directivo puede aprobar solicitudes.', 'err'); return; }
+
+  // Pre-validar conflictos antes de empezar
+  for (var i = 0; i < ids.length; i++) {
+    var s = SOLICITUDES.find(function (x) { return x.id === ids[i]; });
+    if (!s) continue;
+    var conflicto = RESERVAS.find(function (r) {
+      return r.semanaOffset === s.semanaOffset && r.dia === s.dia && r.modulo === s.modulo && r.lab === s.lab;
+    });
+    if (conflicto) {
+      toast('El turno del módulo ' + getModulo(s.modulo).label + ' fue ocupado mientras estaba pendiente.', 'warn');
+      return;
+    }
+    if (!s.esRenovacion && typeof validarConflicto === 'function') {
+      var conf = validarConflicto(s.lab, s.dia, s.modulo, s.semanaOffset, s.profeId, null);
+      if (conf) {
+        toast('Conflicto en módulo ' + getModulo(s.modulo).label + ': ' + conf.mensaje, 'err');
+        return;
+      }
+    }
+  }
+
+  // Procesar cada solicitud vía API
+  var pending = ids.length;
+  var processed = 0;
+  var firstSol = SOLICITUDES.find(function(x) { return x.id === ids[0]; });
+
+  ids.forEach(function(solId) {
+    (function(solId) {
+      var s = SOLICITUDES.find(function (x) { return x.id === solId; });
+      if (!s) { pending--; if (pending <= 0) _finalizarAprobacionGrupo(processed, firstSol); return; }
+
+      if (s.esRenovacion && s.reservaOriginalId) {
+        var rOrig = RESERVAS.find(function (x) { return x.id === s.reservaOriginalId; });
+        if (rOrig) {
+          dbEditarReserva(rOrig.id, { cicloClases: 1, renovaciones: (rOrig.renovaciones || 0) + 1 }, function() {
+            dbEliminarSolicitud(solId, function() {
+              processed++;
+              pending--;
+              if (pending <= 0) _finalizarAprobacionGrupo(processed, firstSol);
+            });
+          });
+        } else {
+          dbCrearReserva({
+            semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
+            curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
+            cicloClases: 1, renovaciones: s.renovacionNum || 1
+          }, function() {
+            dbEliminarSolicitud(solId, function() {
+              processed++;
+              pending--;
+              if (pending <= 0) _finalizarAprobacionGrupo(processed, firstSol);
+            });
+          });
+        }
+      } else {
+        var labCapturado = s.lab;
+        dbCrearReserva({
+          semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
+          curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
+          cicloClases: 1, renovaciones: 0
+        }, function(nuevaReserva) {
+          if (typeof emitirSync === 'function') emitirSync('reserva_aprobada', { reservaId: nuevaReserva.id, lab: labCapturado });
+          dbEliminarSolicitud(solId, function() {
+            processed++;
+            pending--;
+            if (pending <= 0) _finalizarAprobacionGrupo(processed, firstSol);
+          });
+        });
+      }
+    })(solId);
+  });
+}
+
+function _finalizarAprobacionGrupo(processed, solicitudRef) {
+  if (processed > 0) {
+    // Una sola notificación por grupo, pasando la cantidad de módulos aprobados
+    if (solicitudRef && typeof notifSolicitudAprobada === 'function') {
+      notifSolicitudAprobada(solicitudRef, processed);
+    }
+    toast('Solicitudes aprobadas (' + processed + ' módulo/s). Reservas confirmadas.', 'ok');
+    renderAll();
+  }
+}
+
+// ── Rechazar grupo de solicitudes ─────────────────────────────
+function rechazarSolicitudGrupo(ids) {
+  if (modoUsuario !== 'admin') { toast('Solo el directivo puede rechazar solicitudes.', 'err'); return; }
+  
+  var primerS = SOLICITUDES.find(function (x) { return x.id === ids[0]; });
+  if (!primerS) return;
+
+  var p = getProfe(primerS.profeId);
+  confirmar('¿Rechazar la solicitud de <strong>Prof. ' + p.apellido + '</strong> — ' + primerS.curso + ' (' + ids.length + ' módulo/s)?', function () {
+    var pending = ids.length;
+    ids.forEach(function(solId) {
+      dbEliminarSolicitud(solId, function() {
+        if (typeof emitirSync === 'function') emitirSync('solicitud_rechazada', { solicitudId: solId });
+        pending--;
+        if (pending <= 0) {
+          // Una sola notificación por grupo
+          if (typeof notifSolicitudRechazada === 'function') notifSolicitudRechazada(primerS, '');
+          toast('Solicitudes rechazadas.', 'info');
+          renderAll();
+        }
+      });
+    });
+  });
+}
+
 // ── Editar reserva existente ─────────────────────────────────
-// Abre el modal de edición con los datos de la reserva pre-cargados.
-// El profe solo puede editar sus propias reservas; el admin puede editar cualquiera.
 function editarReserva(reservaId) {
-  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  editarReservaGrupo([reservaId]);
+}
+
+function editarReservaGrupo(ids) {
+  var r = RESERVAS.find(function (x) { return x.id === ids[0]; });
   if (!r) return;
 
   var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
   if (!isOwn) { toast('No tenés permiso para editar esta reserva.', 'err'); return; }
 
   // Llenar los campos del modal de edición
-  document.getElementById('edit-reserva-id').value = reservaId;
+  // Guardamos el JSON de IDs en el campo
+  document.getElementById('edit-reserva-id').value = JSON.stringify(ids);
   document.getElementById('edit-curso').value = r.curso;
   document.getElementById('edit-secuencia').value = r.secuencia;
   UIHelper.setOrientValues('edit-orient-group', r.orient);
 
   // Info de contexto (solo lectura)
-  var mod = getModulo(r.modulo);
+  var modulos = ids.map(function(id) { 
+    var res = RESERVAS.find(function(x){ return x.id === id; });
+    return res ? res.modulo : r.modulo;
+  });
+  var modInicio = getModulo(Math.min.apply(null, modulos)).inicio;
+  var modFin = getModulo(Math.max.apply(null, modulos)).fin;
+  var labelModulos = modulos.length > 1 ? modulos.length + ' módulos' : getModulo(r.modulo).label;
+
   var lab = getLab(r.lab);
   var p = getProfe(r.profeId);
   document.getElementById('edit-info-contexto').innerHTML =
-    '<strong>' + lab.nombre + '</strong> · ' + DIAS_LARGO[r.dia] + ' · ' + mod.label +
-    ' (' + mod.inicio + '–' + mod.fin + ')' +
+    '<strong>' + lab.nombre + '</strong> · ' + DIAS_LARGO[r.dia] + ' · ' + labelModulos +
+    ' (' + modInicio + '–' + modFin + ')' +
     (esDirectivo() ? ' · Prof. ' + p.apellido : '');
 
   // Selector de docente (solo para directivos)
@@ -643,17 +1123,19 @@ function editarReserva(reservaId) {
       if (scopeSel) scopeSel.value = 'puntual'; // default
     }
   }
- poblarSelectorGrupo(r.curso, r.grupoId || null);
+  poblarSelectorGrupo(r.curso, r.grupoId || null);
 
-abrirModal('modal-editar-reserva');
-
+  abrirModal('modal-editar-reserva');
 }
 
 // Guarda los cambios del modal de edición.
-// El scope ('puntual' o 'siguientes') determina cuántas reservas se actualizan.
 function guardarEdicionReserva() {
-  var reservaId = parseInt(document.getElementById('edit-reserva-id').value);
-  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  var idVal = document.getElementById('edit-reserva-id').value;
+  var ids = [];
+  try { ids = JSON.parse(idVal); } catch(e) { ids = [parseInt(idVal)]; }
+  if(!ids.length) return;
+
+  var r = RESERVAS.find(function (x) { return x.id === ids[0]; });
   if (!r) return;
 
   var nuevoCurso = document.getElementById('edit-curso').value.trim();
@@ -675,15 +1157,10 @@ function guardarEdicionReserva() {
     return;
   }
 
-  // Buscar todas las reservas "hermanas" del mismo bloque horario
-  // @Julian_Jonexz
-  // (mismo día, lab, profe, semana y curso original → forman un bloque multi-hora)
-  // Guardar valores originales ANTES de mutar (r puede ser parte del array)
   var cursoOriginal = r.curso;
   var profeIdOriginal = r.profeId;
 
   if (scope === 'anual' && esDirectivo()) {
-    // Actualiza esta reserva, sus hermanas de bloque, y todas las anuales del año
     var actualizadas = 0;
     RESERVAS.forEach(function (x) {
       if (
@@ -697,7 +1174,6 @@ function guardarEdicionReserva() {
         x.secuencia = nuevaSecuencia;
         x.orient = nuevaOrient;
         if (nuevoProfeId) x.profeId = nuevoProfeId;
-        // (línea eliminada — grupoId no se usa)
         actualizadas++;
       }
     });
@@ -705,7 +1181,6 @@ function guardarEdicionReserva() {
     cerrarModal('modal-editar-reserva');
     toast(actualizadas + ' reserva(s) anual(es) actualizada(s).', 'ok');
   } else if (scope === 'siguientes' && esDirectivo()) {
-    // Actualiza esta reserva, sus hermanas de bloque, y todas las futuras del mismo lab+dia+profe
     var actualizadas = 0;
     RESERVAS.forEach(function (x) {
       if (
@@ -889,15 +1364,16 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
   // Mismo slot: no hacer nada
   if (r.dia === nuevoDia && r.modulo === nuevoModulo && r.lab === nuevoLab) return;
 
-  // Verificar que el destino esté libre
-  var ocupado = RESERVAS.find(function(x) {
+  // Verificar que el destino tenga espacio (máx. grupos)
+  var maxG = getLabMaxGrupos(nuevoLab);
+  var enSlot = RESERVAS.filter(function(x) {
     return x.semanaOffset === semanaOffset &&
       x.dia === nuevoDia &&
       x.modulo === nuevoModulo &&
       x.lab === nuevoLab &&
       x.id !== reservaId;
   });
-  if (ocupado) { toast('Ese horario ya está ocupado. No se puede mover.', 'warn'); return; }
+  if (enSlot.length >= maxG) { toast('Ese horario ya alcanzó el máximo de ' + maxG + ' grupo(s).', 'warn'); return; }
 
   var solicPendiente = SOLICITUDES.find(function(s) {
     return s.semanaOffset === semanaOffset &&
