@@ -220,16 +220,13 @@ function checkCiclosVencimiento() {
 // ── Hooks para disparar notificaciones desde otros módulos ───
 // Llamar desde reservas.js al aprobar/rechazar solicitudes
 
-function notifSolicitudAprobada(solicitud, cantModulos) {
+function notifSolicitudAprobada(solicitud) {
   var p = getProfe(solicitud.profeId);
   var mod = getModulo(solicitud.modulo);
-  var modLabel = cantModulos && cantModulos > 1
-    ? cantModulos + ' módulos (' + mod.inicio + '–…)'
-    : mod.label;
   crearNotificacion(
     'aprobada',
     'Turno aprobado',
-    'Lab.' + solicitud.lab + ' · ' + DIAS_LARGO[solicitud.dia] + ' ' + modLabel,
+    'Lab.' + solicitud.lab + ' · ' + DIAS_LARGO[solicitud.dia] + ' ' + mod.label,
     solicitud.profeId,
     { reservaId: solicitud.id, labId: solicitud.lab }
   );

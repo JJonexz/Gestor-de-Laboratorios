@@ -12,21 +12,10 @@ guardarReserva = function() {
   var lab      = document.getElementById('f-lab').value;
   var dia      = document.getElementById('f-dia').value;
   var modulo   = document.getElementById('f-modulo').value;
+  var curso    = document.getElementById('f-curso').value.trim();
+  var materia  = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
   var secuencia = document.getElementById('f-secuencia').value.trim();
   var orient   = UIHelper.getOrientValues('f-orient-group');
-
-  // ── Leer curso y materia desde cupof seleccionado (BDD) o campos manuales ──
-  var fCupof = document.getElementById('f-cupof');
-  var cupofId = fCupof && fCupof.value ? parseInt(fCupof.value) : null;
-  var curso = '', materia = '';
-  if (cupofId && fCupof.selectedIndex > 0) {
-    var opt = fCupof.options[fCupof.selectedIndex];
-    curso   = opt.getAttribute('data-curso') || document.getElementById('f-curso').value.trim();
-    materia = opt.getAttribute('data-materia') || (document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '');
-  } else {
-    curso   = document.getElementById('f-curso').value.trim();
-    materia = document.getElementById('f-materia') ? document.getElementById('f-materia').value.trim() : '';
-  }
 
   if (materia) secuencia = '[' + materia + '] ' + secuencia;
   var periodoEl = document.getElementById('f-periodo');
@@ -69,11 +58,9 @@ guardarReserva = function() {
   }
 
   var profeSel = document.getElementById('f-profe');
-  var profeId = esAnual 
-    ? 'institucional'  // Reservas anuales siempre son institucionales
-    : (esDirectivo() && profeSel && profeSel.value)
-      ? parseInt(profeSel.value)
-      : (window.SESSION ? window.SESSION.profeId : getCurrentProfId());
+  var profeId = (esDirectivo() && profeSel && profeSel.value)
+    ? parseInt(profeSel.value)
+    : (window.SESSION ? window.SESSION.profeId : getCurrentProfId());
 
   cerrarModal('modal-reserva');
 
@@ -92,7 +79,7 @@ guardarReserva = function() {
         promises.push(apiPost('reservas', {
           semanaOffset: sem, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
           orient: orient, profeId: profeId, secuencia: secuencia, cicloClases: 1,
-          renovaciones: 0, anual: esAnual ? 1 : 0, grupoId: grupoId, cupofId: cupofId
+          renovaciones: 0, anual: esAnual ? 1 : 0, grupoId: grupoId
         }));
       });
     });
@@ -112,7 +99,7 @@ guardarReserva = function() {
         semanaOffset: semanaOffset, dia: parseInt(dia), modulo: m, lab: lab, curso: curso,
         orient: orient, profeId: (window.SESSION ? window.SESSION.profeId : getCurrentProfId()),
         secuencia: secuencia, cicloClases: 1, estado: 'pendiente',
-        esRenovacion: 0, renovacionNum: 0, grupoId: grupoId2, cupofId: cupofId
+        esRenovacion: 0, renovacionNum: 0, grupoId: grupoId2
       }));
     });
     Promise.all(promises2).then(function(nuevas) {

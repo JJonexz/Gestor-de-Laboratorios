@@ -53,35 +53,13 @@ function renderMisReservas() {
   }
   if (empty) empty.style.display = 'none';
 
-  // Función auxiliar para agrupar
-  function agrupar(lista) {
-    var groups = [];
-    lista.forEach(function(item) {
-      var key = [item.semanaOffset, item.dia, item.lab, item.curso, item.orient, item.profeId, item.secuencia].join('|');
-      var group = groups.find(function(g) { return g.key === key; });
-      if (group) {
-        group.items.push(item);
-        group.modulos.push(item.modulo);
-      } else {
-        groups.push({
-          key: key,
-          items: [item],
-          modulos: [item.modulo],
-          first: item
-        });
-      }
-    });
-    return groups;
-  }
-
   // ── Sección de solicitudes pendientes ──────────────────────
   var solHtml = '';
   if (misSols.length) {
     solHtml =
       '<div class="section-label-strip">⏳ Solicitudes pendientes de aprobación</div>' +
       '<div class="reservas-grid">' +
-      agrupar(misSols).map(function(g) {
-        var s = g.first;
+      misSols.map(function(s) {
         var oris = (s.orient || 'bas').split(',');
         var firstOri = ORIENTACIONES[oris[0]] || ORIENTACIONES.bas;
         var orientBadges = oris.map(function(o) {
@@ -89,12 +67,7 @@ function renderMisReservas() {
           return '<span class="meta-tag orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
         }).join('');
         var lab = getLab(s.lab);
-        var modInicio = getModulo(Math.min.apply(null, g.modulos)).inicio;
-        var modFin = getModulo(Math.max.apply(null, g.modulos)).fin;
-        var modString = g.modulos.length + ' mod(s) (' + modInicio + '–' + modFin + ')';
-        var modTooltip = g.modulos.map(function(m) { return getModulo(m).label; }).join(', ');
-        var jsonIds = JSON.stringify(g.items.map(function(x) { return x.id; }));
-
+        var mod = getModulo(s.modulo);
         return (
           '<div class="reserva-card reserva-card-pending">' +
             '<div class="reserva-card-stripe ' + oris[0] + '"></div>' +
@@ -103,7 +76,7 @@ function renderMisReservas() {
                 '<div>' +
                   '<div class="reserva-card-title">' + lab.nombre + '</div>' +
                   '<div class="reserva-meta">' +
-                    '<span class="meta-tag" title="' + modTooltip + '">' + DIAS_LARGO[s.dia] + ' ' + modString + '</span>' +
+                    '<span class="meta-tag">' + DIAS_LARGO[s.dia] + ' ' + mod.inicio + '</span>' +
                     orientBadges +
                   '</div>' +
                 '</div>' +
@@ -113,7 +86,7 @@ function renderMisReservas() {
               '<div class="pending-status-bar">⏳ Pendiente de aprobación directiva</div>' +
             '</div>' +
             '<div class="reserva-card-footer">' +
-              '<button class="btn-action btn-cancel-r" onclick=\'cancelarSolicitudGrupo(' + jsonIds + ')\'>Cancelar solicitud</button>' +
+              '<button class="btn-action btn-cancel-r" onclick="cancelarSolicitud(' + s.id + ')">Cancelar solicitud</button>' +
             '</div>' +
           '</div>'
         );
@@ -126,8 +99,7 @@ function renderMisReservas() {
   if (misRes.length) {
     reservasHtml =
       '<div class="reservas-grid">' +
-      agrupar(misRes).map(function(g) {
-        var r          = g.first;
+      misRes.map(function(r) {
         var p          = getProfe(r.profeId);
         var oris       = (r.orient || 'bas').split(',');
         var firstOri   = ORIENTACIONES[oris[0]] || ORIENTACIONES.bas;
@@ -136,12 +108,7 @@ function renderMisReservas() {
           return '<span class="meta-tag orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>';
         }).join('');
         var lab        = getLab(r.lab);
-        var modInicio  = getModulo(Math.min.apply(null, g.modulos)).inicio;
-        var modFin     = getModulo(Math.max.apply(null, g.modulos)).fin;
-        var modString  = g.modulos.length + ' mod(s) (' + modInicio + '–' + modFin + ')';
-        var modTooltip = g.modulos.map(function(m) { return getModulo(m).label; }).join(', ');
-        var jsonIds    = JSON.stringify(g.items.map(function(x) { return x.id; }));
-        
+        var mod        = getModulo(r.modulo);
         var needsRenew = r.cicloClases >= 3;
         var dots = [1, 2, 3].map(function(i) {
           var cls = 'empty';
@@ -163,7 +130,7 @@ function renderMisReservas() {
                 '<div>' +
                   '<div class="reserva-card-title">' + lab.nombre + '</div>' +
                   '<div class="reserva-meta">' +
-                    '<span class="meta-tag" title="' + modTooltip + '">' + DIAS_LARGO[r.dia] + ' ' + modString + '</span>' +
+                    '<span class="meta-tag">' + DIAS_LARGO[r.dia] + ' ' + mod.inicio + '</span>' +
                     orientBadges +
                     (isAdmin ? '<span class="meta-tag">Prof. ' + p.apellido + '</span>' : '') +
                   '</div>' +
@@ -177,12 +144,12 @@ function renderMisReservas() {
               '</div>' +
             '</div>' +
             '<div class="reserva-card-footer">' +
-              '<button class="btn-action btn-detail" onclick=\'verDetalleGrupo(' + jsonIds + ')\'>Ver</button>' +
-              '<button class="btn-action btn-detail" style="background:var(--navy-faint);border-color:var(--navy-light);" onclick=\'editarReservaGrupo(' + jsonIds + ')\'>✎ Editar</button>' +
+              '<button class="btn-action btn-detail" onclick="verDetalle(' + r.id + ')">Ver</button>' +
+              '<button class="btn-action btn-detail" style="background:var(--navy-faint);border-color:var(--navy-light);" onclick="editarReserva(' + r.id + ')">✎ Editar</button>' +
               (needsRenew && esDirectivo()
-                ? '<button class="btn-action btn-renew" onclick=\'renovarReservaGrupo(' + jsonIds + ')\'>↻ Renovar</button>'
+                ? '<button class="btn-action btn-renew" onclick="renovarReserva(' + r.id + ')">↻ Renovar</button>'
                 : '') +
-              '<button class="btn-action btn-cancel-r" onclick=\'cancelarReservaGrupo(' + jsonIds + ')\'>Cancelar</button>' +
+              '<button class="btn-action btn-cancel-r" onclick="cancelarReserva(' + r.id + ')">Cancelar</button>' +
             '</div>' +
           '</div>'
         );
@@ -194,11 +161,11 @@ function renderMisReservas() {
 }
 
 // ── Cancelar solicitud propia ─────────────────────────────────
-function cancelarSolicitudGrupo(ids) {
-  var s = SOLICITUDES.find(function(x) { return x.id === ids[0]; });
+function cancelarSolicitud(solId) {
+  var s = SOLICITUDES.find(function(x) { return x.id === solId; });
   if (!s) return;
-  confirmar('¿Cancelar esta solicitud pendiente (' + ids.length + ' módulo/s)?', function() {
-    SOLICITUDES = SOLICITUDES.filter(function(x) { return ids.indexOf(x.id) === -1; });
+  confirmar('¿Cancelar esta solicitud pendiente?', function() {
+    SOLICITUDES = SOLICITUDES.filter(function(x) { return x.id !== solId; });
     saveDB();
     toast('Solicitud cancelada.', 'info');
     renderAll();
@@ -206,37 +173,27 @@ function cancelarSolicitudGrupo(ids) {
 }
 
 // ── Renovar ciclo de una reserva ──────────────────────────────
-function renovarReservaGrupo(ids) {
-  var r = RESERVAS.find(function(x) { return x.id === ids[0]; });
+function renovarReserva(id) {
+  var r = RESERVAS.find(function(x) { return x.id === id; });
   if (!r) return;
 
   if (modoUsuario === 'admin') {
     // Directivo: aprueba directamente
     var puedeNueva = (r.renovaciones || 0) >= 1;
     if (puedeNueva) {
-      confirmar('Han pasado 1 semana de renovaciones. ¿Iniciar nuevo ciclo completo de 3 clases para ' + ids.length + ' módulo/s?', function() {
-        ids.forEach(function(id) {
-          var res = RESERVAS.find(function(x) { return x.id === id; });
-          if(res) {
-            res.cicloClases  = 1;
-            res.renovaciones = 0;
-          }
-        });
+      confirmar('Han pasado 1 semana de renovaciones. ¿Iniciar nuevo ciclo completo de 3 clases?', function() {
+        r.cicloClases  = 1;
+        r.renovaciones = 0;
         saveDB();
         toast('Nuevo ciclo completo iniciado.', 'ok');
         renderAll();
       });
     } else {
-      confirmar('¿Aprobar renovación por 1 día para ' + getLab(r.lab).nombre + ' — ' + r.curso + ' (' + ids.length + ' módulo/s)?', function() {
-        ids.forEach(function(id) {
-          var res = RESERVAS.find(function(x) { return x.id === id; });
-          if(res) {
-            res.cicloClases  = 1;
-            res.renovaciones = (res.renovaciones || 0) + 1;
-          }
-        });
+      confirmar('¿Aprobar renovación por 1 día para ' + getLab(r.lab).nombre + ' — ' + r.curso + '?', function() {
+        r.cicloClases  = 1;
+        r.renovaciones = (r.renovaciones || 0) + 1;
         saveDB();
-        toast('Renovación aprobada.', 'ok');
+        toast('Renovación aprobada (semana ' + r.renovaciones + '/1).', 'ok');
         renderAll();
       });
     }
@@ -250,29 +207,24 @@ function renovarReservaGrupo(ids) {
   }
   var semLabel = (r.renovaciones || 0) + 1;
   confirmar(
-    '¿Solicitar renovación semanal ' + semLabel + '/1 para <strong>' + getLab(r.lab).nombre + ' — ' + r.curso + '</strong> (' + ids.length + ' módulo/s)?',
+    '¿Solicitar renovación semanal ' + semLabel + '/1 para <strong>' + getLab(r.lab).nombre + ' — ' + r.curso + '</strong>?',
     function() {
-      ids.forEach(function(id) {
-        var res = RESERVAS.find(function(x) { return x.id === id; });
-        if(res) {
-          nextId++;
-          SOLICITUDES.push({
-            id:               nextId,
-            semanaOffset:     semanaOffset,
-            dia:              res.dia,
-            modulo:           res.modulo,
-            lab:              res.lab,
-            curso:            res.curso,
-            orient:           res.orient,
-            profeId:          res.profeId,
-            secuencia:        res.secuencia,
-            cicloClases:      1,
-            estado:           'pendiente',
-            esRenovacion:     true,
-            reservaOriginalId: res.id,
-            renovacionNum:    semLabel,
-          });
-        }
+      nextId++;
+      SOLICITUDES.push({
+        id:               nextId,
+        semanaOffset:     semanaOffset,
+        dia:              r.dia,
+        modulo:           r.modulo,
+        lab:              r.lab,
+        curso:            r.curso,
+        orient:           r.orient,
+        profeId:          r.profeId,
+        secuencia:        r.secuencia,
+        cicloClases:      1,
+        estado:           'pendiente',
+        esRenovacion:     true,
+        reservaOriginalId: r.id,
+        renovacionNum:    semLabel,
       });
       saveDB();
       toast('Solicitud de renovación semana ' + semLabel + '/1 enviada.', 'info');
@@ -282,21 +234,21 @@ function renovarReservaGrupo(ids) {
 }
 
 // ── Cancelar reserva confirmada ───────────────────────────────
-function cancelarReservaGrupo(ids) {
-  var r = RESERVAS.find(function(x) { return x.id === ids[0]; });
+function cancelarReserva(id) {
+  var r = RESERVAS.find(function(x) { return x.id === id; });
   if (!r) return;
 
   var p = getProfe(r.profeId);
-  var msg = '¿Cancelar la reserva de <strong>Prof. ' + p.apellido + '</strong> — ' + r.curso + ' el ' + DIAS_LARGO[r.dia] + ' (' + ids.length + ' módulo/s)?';
+  var msg = '¿Cancelar la reserva de <strong>Prof. ' + p.apellido + '</strong> — ' + r.curso + ' el ' + DIAS_LARGO[r.dia] + '?';
 
   // Si es anual y somos directivos, damos opción de borrar todo
   if (r.anual && esDirectivo()) {
     confirmarOpciones(
-      'Esta es una <strong>reserva anual</strong>. ¿Deseas eliminar solo esta fecha (' + ids.length + ' módulo/s) o toda la serie del año?',
+      'Esta es una <strong>reserva anual</strong>. ¿Deseas eliminar solo esta fecha o toda la serie del año?',
       {
         ok: {
           texto: 'Solo esta fecha',
-          callback: function() { ejecutarCancelacionGrupo(ids); }
+          callback: function() { ejecutarCancelacion(id); }
         },
         extra: {
           texto: 'Toda la serie anual',
@@ -306,32 +258,25 @@ function cancelarReservaGrupo(ids) {
       }
     );
   } else {
-    confirmar(msg, function() { ejecutarCancelacionGrupo(ids); });
+    confirmar(msg, function() { ejecutarCancelacion(id); });
   }
 }
 
-function ejecutarCancelacionGrupo(ids) {
-  var primerR = RESERVAS.find(function(x) { return x.id === ids[0]; });
-  if (!primerR) return;
+function ejecutarCancelacion(id) {
+  var r = RESERVAS.find(function(x) { return x.id === id; });
+  if (!r) return;
 
-  RESERVAS = RESERVAS.filter(function(x) { return ids.indexOf(x.id) === -1; });
+  RESERVAS = RESERVAS.filter(function(x) { return x.id !== id; });
   saveDB();
-  toast('Reservas canceladas.', 'info');
+  toast('Reserva cancelada.', 'info');
 
   // Avisar si hay docentes en espera para ese turno
   var waiting = LISTA_ESPERA.filter(function(e) {
-    // simplificado: si coincide el dia y lab, revisamos si coincide algun modulo
-    if (e.lab === primerR.lab && e.dia === primerR.dia) {
-      // Necesitamos el modulo original de los cancelados
-      // Lamentablemente ya los borramos, pero podemos buscar en primerR si al menos uno coincide
-      // Como solo es un aviso, avisaremos si el modulo de espera coincide con el de la primera reserva cancelada o si simplificamos:
-      return true; // Simplificado para avisar si hay espera el mismo dia/lab
-    }
-    return false;
+    return e.lab === r.lab && e.dia === r.dia && e.modulo === r.modulo;
   });
   if (waiting.length) {
     setTimeout(function() {
-      toast('Hay ' + waiting.length + ' docente(s) en espera para ese día/lab.', 'warn');
+      toast('Hay ' + waiting.length + ' docente(s) en espera para ese turno.', 'warn');
     }, 400);
   }
   renderAll();

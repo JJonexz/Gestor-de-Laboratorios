@@ -86,7 +86,7 @@ function initSchema($pdo) {
             lab          VARCHAR(10) NOT NULL,
             curso        VARCHAR(20) NOT NULL,
             orient       VARCHAR(50) NOT NULL DEFAULT 'bas',
-            profeId      VARCHAR(50) NOT NULL,
+            profeId      INT NOT NULL,
             secuencia    VARCHAR(500) NOT NULL DEFAULT '',
             cicloClases  TINYINT NOT NULL DEFAULT 1,
             renovaciones TINYINT NOT NULL DEFAULT 0,
@@ -104,7 +104,7 @@ function initSchema($pdo) {
             lab               VARCHAR(10) NOT NULL,
             curso             VARCHAR(20) NOT NULL,
             orient            VARCHAR(50) NOT NULL DEFAULT 'bas',
-            profeId           VARCHAR(50) NOT NULL,
+            profeId           INT NOT NULL,
             secuencia         VARCHAR(500) NOT NULL DEFAULT '',
             cicloClases       TINYINT NOT NULL DEFAULT 1,
             estado            VARCHAR(20) NOT NULL DEFAULT 'pendiente',
@@ -117,7 +117,7 @@ function initSchema($pdo) {
 
         CREATE TABLE IF NOT EXISTS gestor_espera (
             id           INT NOT NULL AUTO_INCREMENT,
-            profeId      VARCHAR(50) NOT NULL,
+            profeId      INT NOT NULL,
             lab          VARCHAR(10) NOT NULL,
             dia          TINYINT NOT NULL,
             modulo       TINYINT NOT NULL,
@@ -141,30 +141,9 @@ function initSchema($pdo) {
     if (!$pdo->query("SHOW COLUMNS FROM gestor_reservas LIKE 'grupoId'")->fetch()) {
         $pdo->exec("ALTER TABLE gestor_reservas ADD COLUMN grupoId INT DEFAULT NULL");
     }
-    // cupofId en gestor_reservas y gestor_solicitudes (referencia a tabla cupof)
-    if (!$pdo->query("SHOW COLUMNS FROM gestor_reservas LIKE 'cupofId'")->fetch()) {
-        $pdo->exec("ALTER TABLE gestor_reservas ADD COLUMN cupofId INT DEFAULT NULL");
-    }
-    if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'cupofId'")->fetch()) {
-        $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN cupofId INT DEFAULT NULL");
-    }
     // grupoId en gestor_solicitudes (misma referencia para solicitudes pendientes)
     if (!$pdo->query("SHOW COLUMNS FROM gestor_solicitudes LIKE 'grupoId'")->fetch()) {
         $pdo->exec("ALTER TABLE gestor_solicitudes ADD COLUMN grupoId INT DEFAULT NULL");
-    }
-    
-    // Migración: cambiar profeId de INT a VARCHAR para soportar 'institucional'
-    $reservasProfeCheck = $pdo->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='gestor_reservas' AND COLUMN_NAME='profeId' AND TABLE_SCHEMA=DATABASE()")->fetch();
-    if ($reservasProfeCheck && stripos($reservasProfeCheck['COLUMN_TYPE'], 'INT') !== false) {
-        $pdo->exec("ALTER TABLE gestor_reservas MODIFY COLUMN profeId VARCHAR(50) NOT NULL");
-    }
-    $solicProfeCheck = $pdo->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='gestor_solicitudes' AND COLUMN_NAME='profeId' AND TABLE_SCHEMA=DATABASE()")->fetch();
-    if ($solicProfeCheck && stripos($solicProfeCheck['COLUMN_TYPE'], 'INT') !== false) {
-        $pdo->exec("ALTER TABLE gestor_solicitudes MODIFY COLUMN profeId VARCHAR(50) NOT NULL");
-    }
-    $esperaProfeCheck = $pdo->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='gestor_espera' AND COLUMN_NAME='profeId' AND TABLE_SCHEMA=DATABASE()")->fetch();
-    if ($esperaProfeCheck && stripos($esperaProfeCheck['COLUMN_TYPE'], 'INT') !== false) {
-        $pdo->exec("ALTER TABLE gestor_espera MODIFY COLUMN profeId VARCHAR(50) NOT NULL");
     }
 
     syncFromMaster($pdo);
@@ -256,45 +235,6 @@ function castRow($r) {
     return $r;
 }
 function castRows($rows) { return array_map('castRow', $rows); }
-
-// ── Validación de conflictos horarios ─────────────────────────
-// Obtiene horarios académicos de un profesor (de tabla cupof + horarios)
-function getHorariosAcademicos($pdo, $dniPersonal, $diaLiteral) {
-    // diaLiteral: 'LUN', 'MAR', 'MIE', 'JUE', 'VIE'
-    // Retorna array de id_horas académicos (1-13)
-    if (!$dniPersonal) return [];
-    
-    $s = $pdo->prepare("
-        SELECT DISTINCT h.id_horas
-        FROM horarios h
-        JOIN cupof c ON h.cupof = c.cupof
-        WHERE c.id_materias IS NOT NULL AND h.dia = ?
-          AND c.cupof IN (
-            SELECT cupof FROM cupof WHERE id_materias IS NOT NULL
-          )
-    ");
-    // Pero necesitamos vincular con el profesor... El problema es que cupof no tiene dni
-    // Usamos tabla personal para obtener los cupof del profesor
-    $s = $pdo->prepare("
-        SELECT DISTINCT h.id_horas
-        FROM horarios h
-        WHERE h.dia = ? AND h.cupof IN (
-            SELECT cupof FROM cupof 
-            WHERE id_materias IS NOT NULL
-              AND cupof IN (
-                SELECT c.cupof FROM cupof c
-                WHERE EXISTS (
-                  SELECT 1 FROM personal p 
-                  WHERE p.dni = ? 
-                )
-              )
-        )
-    ");
-    // En realidad, cupof no tiene dni_personal. Usamos que varios cupof pueden ser del mismo profe
-    // Por ahora, hacemos una búsqueda simple: todos los cupof que coincidan con la estructura
-    // Esto es aproximado porque cupof no vincula directamente a personal
-    return [];
-}
 
 // ── Router ───────────────────────────────────────────────────
 $method   = $_SERVER['REQUEST_METHOD'];
@@ -455,11 +395,7 @@ switch ($resource) {
         if ($method === 'GET') {
             $where='1=1'; $p=[];
             if (isset($_GET['semanaOffset'])) { $where.=' AND semanaOffset=?'; $p[]=(int)$_GET['semanaOffset']; }
-            if (isset($_GET['profeId'])) { 
-                // Soportar búsqueda tanto de IDs númericos como de 'institucional'
-                $where.=' AND profeId=?'; 
-                $p[]=($_GET['profeId'] === 'institucional') ? 'institucional' : $_GET['profeId'];
-            }
+            if (isset($_GET['profeId']))      { $where.=' AND profeId=?';      $p[]=(int)$_GET['profeId']; }
             $s=$db->prepare("SELECT * FROM gestor_reservas WHERE $where ORDER BY semanaOffset,dia,modulo");
             $s->execute($p); ok(castRows($s->fetchAll()));
         }
@@ -467,58 +403,26 @@ switch ($resource) {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
 
-            // --- VALIDACIÓN BÁSICA ---
-            // Validar que profeId exista (si no es 'institucional')
-            if (isset($b['profeId']) && $b['profeId'] !== 'institucional') {
-                $checkProfe = $db->prepare('SELECT id FROM gestor_profesores WHERE id=?');
-                $checkProfe->execute([(int)$b['profeId']]);
-                if (!$checkProfe->fetch()) {
-                    err('El docente no existe', 400);
-                }
-            }
-            
-            // Validar que lab exista
-            $checkLab = $db->prepare('SELECT id FROM gestor_labs WHERE id=?');
-            $checkLab->execute([$b['lab']]);
-            if (!$checkLab->fetch()) {
-                err('El laboratorio no existe', 400);
-            }
-            
-            // Validar rango de módulo y día
-            $modulo = (int)$b['modulo'];
-            $dia = (int)$b['dia'];
-            if ($modulo < 0 || $modulo > 15) err('Módulo inválido (0-15)', 400);
-            if ($dia < 0 || $dia > 4) err('Día inválido (0-4)', 400);
-
             // --- VALIDACIÓN DE LÍMITE DE GRUPOS ---
             // Límite de grupos manejado exclusivamente por el frontend (LABS_CONFIG)
-            // La validación de conflictos horarios se hace en el frontend
-            // (requeriría JOIN complejo con tabla cupof que no tiene dni_personal)
-            // -----------------------------------------------------------------------
+            // --------------------------------------
 
-            // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
-            $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
-
-            $cupofId = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
-            $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-               ->execute([(int)($b['semanaOffset']??0),$dia,$modulo,
-                           $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
+            $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+               ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
+                           $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
-                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId]);
+                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId]);
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
         if ($method === 'PUT' && $id) {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
-            // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
-            $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
-            $cupofId = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
-            $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=?,cupofId=? WHERE id=?')
+            $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=? WHERE id=?')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
-                           $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
+                           $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
-                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId,(int)$id]);
+                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,(int)$id]);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([(int)$id]); ok(castRow($s->fetch()));
         }
         if ($method === 'DELETE' && $id) {
@@ -537,29 +441,20 @@ switch ($resource) {
         if ($method === 'GET') {
             $where='1=1'; $p=[];
             if (isset($_GET['estado']))  { $where.=' AND estado=?';  $p[]=$_GET['estado']; }
-            if (isset($_GET['profeId'])) { 
-                // Soportar búsqueda tanto de IDs numéricos como de 'institucional'
-                $where.=' AND profeId=?'; 
-                $p[]=($_GET['profeId'] === 'institucional') ? 'institucional' : $_GET['profeId'];
-            }
+            if (isset($_GET['profeId'])) { $where.=' AND profeId=?'; $p[]=(int)$_GET['profeId']; }
             $s=$db->prepare("SELECT * FROM gestor_solicitudes WHERE $where ORDER BY id");
             $s->execute($p); ok(castRows($s->fetchAll()));
         }
         if ($method === 'POST') {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
-            
-            // Preparar profeId: si es 'institucional' dejarlo como string, si no convertir a int
-            $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
-            
-            $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+            $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
-                           $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
+                           $b['lab'],$b['curso'],$b['orient']??'bas',(int)$b['profeId'],
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            $b['estado']??'pendiente',(int)($b['esRenovacion']??0),
                            isset($b['reservaOriginalId'])?(int)$b['reservaOriginalId']:null,
-                           (int)($b['renovacionNum']??0),$grupoId,
-                           isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null]);
+                           (int)($b['renovacionNum']??0),$grupoId]);
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_solicitudes WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
@@ -625,132 +520,6 @@ switch ($resource) {
         if ($method !== 'GET') err('Method not allowed', 405);
         ok(castRows($db->query('SELECT id, nombre, abreviatura FROM materias ORDER BY nombre')->fetchAll()));
 
-    // ── HORARIOS ACADÉMICOS (cupof + horarios vinculado a personal via revista) ─
-    case 'horarios-academicos':
-        if ($method !== 'GET') err('Method not allowed', 405);
-        $dni_personal = isset($_GET['dni']) ? (int)$_GET['dni'] : null;
-        if (!$dni_personal) ok([]);
-
-        // Vinculación real: personal → revista → cupof → horarios + materias + cursos
-        $s = $db->prepare("
-            SELECT DISTINCT
-                h.dia,
-                h.id_horas,
-                c.cupof,
-                c.id_cursos,
-                c.id_materias,
-                m.nombre  AS materia_nombre,
-                m.abreviatura AS materia_abrev,
-                cu.ano         AS curso_ano,
-                cu.division    AS curso_division,
-                c.turno        AS cupof_turno
-            FROM revista r
-            JOIN cupof    c  ON r.cupof       = c.cupof
-            JOIN horarios h  ON h.cupof        = c.cupof
-            LEFT JOIN materias m  ON c.id_materias = m.id
-            LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
-            WHERE r.dni_personal = ?
-              AND (r.fh IS NULL OR YEAR(r.fh) = 0 OR r.fh >= CURDATE())
-            ORDER BY h.dia, h.id_horas
-        ");
-        $s->execute([$dni_personal]);
-        ok(castRows($s->fetchAll()));
-
-    // ── CUPOFS POR PROFE (materias y cursos del docente para el modal de reserva) ─
-    case 'cupofs-por-profe':
-        if ($method !== 'GET') err('Method not allowed', 405);
-        $dni_personal = isset($_GET['dni']) ? (int)$_GET['dni'] : null;
-        if (!$dni_personal) ok([]);
-
-        // Devuelve los cupofs activos del profesor con materia + curso + turno
-        // fh = '0000-00-00' significa sin fecha de baja (cargo activo)
-        // Cubrimos: NULL, '0000-00-00' (string), fecha futura, o fecha en blanco
-        $s = $db->prepare("
-            SELECT DISTINCT
-                c.cupof,
-                c.id_materias,
-                c.id_cursos,
-                c.turno        AS cupof_turno,
-                c.hsmodcar,
-                c.id_grupos,
-                m.nombre       AS materia_nombre,
-                m.abreviatura  AS materia_abrev,
-                cu.ano         AS curso_ano,
-                cu.division    AS curso_division,
-                CONCAT(cu.ano, '°', cu.division,
-                    IF(cu.turno IS NOT NULL AND cu.turno <> '',
-                        CONCAT(' (', cu.turno, ')'), '')
-                ) AS curso_label,
-                g.nombre       AS grupo_nombre
-            FROM revista r
-            JOIN cupof    c  ON r.cupof       = c.cupof
-            LEFT JOIN materias m  ON c.id_materias = m.id
-            LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
-            LEFT JOIN grupos   g  ON c.id_grupos   = g.id AND c.id_grupos > 0
-            WHERE r.dni_personal = ?
-              AND (r.fh IS NULL OR YEAR(r.fh) = 0 OR r.fh >= CURDATE())
-            ORDER BY cu.ano, cu.division, m.nombre
-        ");
-        $s->execute([$dni_personal]);
-        $rows = $s->fetchAll();
-        // Si no hay resultados con el filtro de fecha, intentar sin filtro (fallback)
-        if (empty($rows)) {
-            $s2 = $db->prepare("
-                SELECT DISTINCT
-                    c.cupof,
-                    c.id_materias,
-                    c.id_cursos,
-                    c.turno        AS cupof_turno,
-                    c.hsmodcar,
-                    c.id_grupos,
-                    m.nombre       AS materia_nombre,
-                    m.abreviatura  AS materia_abrev,
-                    cu.ano         AS curso_ano,
-                    cu.division    AS curso_division,
-                    CONCAT(cu.ano, '°', cu.division,
-                        IF(cu.turno IS NOT NULL AND cu.turno <> '',
-                            CONCAT(' (', cu.turno, ')'), '')
-                    ) AS curso_label,
-                    g.nombre       AS grupo_nombre
-                FROM revista r
-                JOIN cupof    c  ON r.cupof = c.cupof
-                LEFT JOIN materias m  ON c.id_materias = m.id
-                LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
-                LEFT JOIN grupos   g  ON c.id_grupos   = g.id AND c.id_grupos > 0
-                WHERE r.dni_personal = ?
-                ORDER BY cu.ano, cu.division, m.nombre
-            ");
-            $s2->execute([$dni_personal]);
-            $rows = $s2->fetchAll();
-        }
-        ok(castRows($rows));
-
-    // ── DEBUG: ver revista de un profe (solo GET, usar con ?dni=X) ──
-    case 'debug-revista':
-        if ($method !== 'GET') err('Method not allowed', 405);
-        $dni = isset($_GET['dni']) ? (int)$_GET['dni'] : null;
-        if (!$dni) err('Falta ?dni=', 400);
-        $r1 = castRows($db->query("SELECT id, cupof, fd, YEAR(fh) AS fh_year, dni_personal FROM revista WHERE dni_personal=$dni LIMIT 20")->fetchAll());
-        $r2 = castRows($db->query("SELECT cupof, id_materias, id_cursos, turno, funcion FROM cupof WHERE cupof IN (SELECT cupof FROM revista WHERE dni_personal=$dni) LIMIT 20")->fetchAll());
-        ok(['revista' => $r1, 'cupofs' => $r2, 'dni_buscado' => $dni]);
-
-    // ── HORARIOS FIJOS (Drag & Drop) ──────────────────────────
-    case 'horarios_fijos':
-        if ($method === 'PUT' && $id) {
-            $b = body();
-            if (!isset($b['dia'], $b['id_horas'], $b['id_salones'])) {
-                err('Faltan datos requeridos: dia, id_horas, id_salones', 400);
-            }
-            $db->prepare('UPDATE horarios SET dia=?, id_horas=?, id_salones=? WHERE id=?')
-               ->execute([$b['dia'], (int)$b['id_horas'], (int)$b['id_salones'], (int)$id]);
-            ok(['updated'=>(int)$id]);
-        }
-        if ($method === 'DELETE' && $id) {
-            $db->prepare('DELETE FROM horarios WHERE id=?')->execute([(int)$id]);
-            ok(['deleted'=>(int)$id]);
-        }
-        err('Not found',404);
-
     // ── ALL ───────────────────────────────────────────────────
     case 'all':
         if ($method !== 'GET') err('Method not allowed', 405);
@@ -780,37 +549,6 @@ switch ($resource) {
 
         $hasGrupos = $db->query("SHOW TABLES LIKE 'grupos'")->fetch();
         if ($hasGrupos) $res['grupos'] = castRows($db->query('SELECT id, nombre, id_cursos FROM grupos ORDER BY id_cursos, nombre')->fetchAll());
-
-        // —— HORARIOS FIJOS (cupof + horarios + salones + materias + cursos) ——
-        $hasHorarios = $db->query("SHOW TABLES LIKE 'horarios'")->fetch();
-        $hasCupof    = $db->query("SHOW TABLES LIKE 'cupof'")->fetch();
-        if ($hasHorarios && $hasCupof) {
-            $res['horarios_fijos'] = castRows($db->query("
-                SELECT
-                    h.id,
-                    h.dia,
-                    h.id_horas,
-                    h.id_salones,
-                    h.cupof,
-                    c.id_materias,
-                    c.id_cursos,
-                    c.turno       AS cupof_turno,
-                    m.abreviatura AS materia_abrev,
-                    m.nombre      AS materia_nombre,
-                    cu.ano        AS curso_ano,
-                    cu.division   AS curso_division,
-                    CONCAT(cu.ano, 'u00b0 ', cu.division) AS curso_label,
-                    CONCAT(s.piso, '-', LPAD(s.numero, 2, '0')) AS aula_codigo,
-                    s.numero      AS aula_numero,
-                    s.tipo        AS aula_tipo
-                FROM horarios h
-                JOIN cupof c  ON h.cupof     = c.cupof
-                LEFT JOIN materias m   ON c.id_materias = m.id
-                LEFT JOIN cursos   cu  ON c.id_cursos   = cu.id
-                LEFT JOIN salones  s   ON h.id_salones  = s.id_salones
-                ORDER BY h.dia, h.id_horas
-            ")->fetchAll());
-        }
 
         ok($res);
 
