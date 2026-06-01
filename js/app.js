@@ -49,7 +49,7 @@ const TURNOS_CONFIG = [
   { label: 'Vespertino', icon: '🌆', modulos: [11, 12, 13, 14, 15] },
 ];
 const ORIENTACIONES = {
-  info: { nombre: 'Programación', ev: 'ev-info', emoji: '💻', ob: 'ob-info' },
+  info: { nombre: 'Informática', ev: 'ev-info', emoji: '💻', ob: 'ob-info' },
   const: { nombre: 'Construcción', ev: 'ev-const', emoji: '🏗️', ob: 'ob-const' },
   tur: { nombre: 'Turismo', ev: 'ev-tur', emoji: '🌐', ob: 'ob-tur' },
   bas: { nombre: 'Básico', ev: 'ev-bas', emoji: '📚', ob: 'ob-bas' },
@@ -526,16 +526,9 @@ function guardarRecreo() {
 function verDetalle_Pendiente(solId) { toast('Esa solicitud está pendiente de aprobación del directivo.', 'info'); }
 
 function renderSolicitudesBadge() {
-  // Contar grupos (solicitudes agrupadas) en lugar de módulos individuales
-  var solic = SOLICITUDES.filter(function (s) { return s.estado === 'pendiente'; });
-  var keys = {};
-  solic.forEach(function(s) {
-    var key = [s.semanaOffset, s.dia, s.lab, s.curso, s.orient, s.profeId, s.secuencia, s.esRenovacion].join('|');
-    keys[key] = true;
-  });
-  var grupos = Object.keys(keys).length;
+  var pendientes = SOLICITUDES.filter(function (s) { return s.estado === 'pendiente'; }).length;
   var badge = document.getElementById('admin-badge');
-  if (badge) { badge.textContent = grupos || ''; badge.style.display = grupos ? 'flex' : 'none'; }
+  if (badge) { badge.textContent = pendientes || ''; badge.style.display = pendientes ? 'flex' : 'none'; }
 }
 
 function renderEsperaCalendario() {
@@ -892,8 +885,47 @@ function promoverEspera(id) {
 // ============================================================
 // MIS RESERVAS
 // ============================================================
-// renderMisReservas() está definida en misReservas.js (versión con agrupación).
-// NO definir aquí para evitar sobrescritura.
+function renderMisReservas() {
+  var isAdmin = modoUsuario === 'admin';
+  var profId = getCurrentProfId();
+  var titleEl = document.getElementById('mis-reservas-title');
+  var subEl = document.getElementById('mis-reservas-sub');
+  if (titleEl) titleEl.textContent = isAdmin ? 'Todas las reservas' : 'Mis reservas';
+  if (subEl) subEl.textContent = isAdmin ? 'Vista directiva · todos los docentes' : (window.SESSION ? window.SESSION.display : '');
+  var misRes = isAdmin ? [].concat(RESERVAS).sort(function (a, b) { return a.dia - b.dia || a.modulo - b.modulo; }) : RESERVAS.filter(function (r) { return r.profeId === profId; }).sort(function (a, b) { return a.dia - b.dia || a.modulo - b.modulo; });
+  var misSols = isAdmin ? [] : SOLICITUDES.filter(function (s) { return s.profeId === profId && s.estado === 'pendiente'; });
+  var strip = document.getElementById('mis-stats-strip');
+  if (strip) {
+    strip.innerHTML =
+      '<div class="stat-card az"><div class="stat-card-n">' + misRes.length + '</div><div class="stat-card-l">' + (isAdmin ? 'Reservas totales' : 'Activas') + '</div></div>' +
+      (!isAdmin ? '<div class="stat-card am"><div class="stat-card-n">' + misSols.length + '</div><div class="stat-card-l">Pendientes</div></div>' : '') +
+      '<div class="stat-card rj"><div class="stat-card-n">' + misRes.filter(function (r) { return r.cicloClases >= 3; }).length + '</div><div class="stat-card-l">A renovar</div></div>' +
+      (isAdmin ? '<div class="stat-card vd"><div class="stat-card-n">' + PROFESORES.length + '</div><div class="stat-card-l">Docentes</div></div>' : '');
+  }
+  var list = document.getElementById('mis-reservas-list');
+  var empty = document.getElementById('mis-reservas-empty');
+  if (!list) return;
+  if (!misRes.length && !misSols.length) { list.innerHTML = ''; if (empty) empty.style.display = 'block'; return; }
+  if (empty) empty.style.display = 'none';
+  var solHtml = '';
+  if (misSols.length) {
+    solHtml = '<div class="section-label-strip">⏳ Solicitudes pendientes de aprobación</div><div class="reservas-grid">' + misSols.map(function (s) {
+      var ori = ORIENTACIONES[s.orient]; var lab = getLab(s.lab); var mod = getModulo(s.modulo);
+      return '<div class="reserva-card reserva-card-pending"><div class="reserva-card-stripe ' + s.orient + '"></div><div class="reserva-card-body"><div class="reserva-card-header"><div><div class="reserva-card-title">' + lab.nombre + '</div><div class="reserva-meta"><span class="meta-tag">' + DIAS_LARGO[s.dia] + ' ' + mod.inicio + '</span><span class="meta-tag orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span></div></div><div class="reserva-curso-badge">' + s.curso + '</div></div><div class="reserva-secuencia">"' + s.secuencia + '"</div><div class="pending-status-bar">⏳ Pendiente de aprobación directiva</div></div><div class="reserva-card-footer"><button class="btn-action btn-cancel-r" onclick="cancelarSolicitud(' + s.id + ')">Cancelar solicitud</button></div></div>';
+    }).join('') + '</div>';
+  }
+  var reservasHtml = '';
+  if (misRes.length) {
+    reservasHtml = '<div class="reservas-grid">' + misRes.map(function (r) {
+      var p = getProfe(r.profeId); var ori = ORIENTACIONES[r.orient]; var lab = getLab(r.lab); var mod = getModulo(r.modulo);
+      var needsRenew = r.cicloClases >= 3;
+      var dots = [1, 2, 3].map(function (i) { var cls = 'empty'; if (i < r.cicloClases) cls = 'done'; else if (i === r.cicloClases) cls = needsRenew ? 'warn' : 'current'; return '<div class="ciclo-dot ' + cls + '"></div>'; }).join('');
+      return '<div class="reserva-card"><div class="reserva-card-stripe ' + r.orient + '"></div><div class="reserva-card-body"><div class="reserva-card-header"><div><div class="reserva-card-title">' + lab.nombre + '</div><div class="reserva-meta"><span class="meta-tag">' + DIAS_LARGO[r.dia] + ' ' + mod.inicio + '</span><span class="meta-tag orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span>' + (isAdmin ? '<span class="meta-tag">Prof. ' + p.apellido + '</span>' : '') + '</div></div><div class="reserva-curso-badge">' + r.curso + '</div></div><div class="reserva-secuencia">"' + r.secuencia + '"</div><div class="ciclo-wrap"><div class="ciclo-dots">' + dots + '</div><span class="ciclo-text ' + (needsRenew ? 'renew' : '') + '">Clase ' + r.cicloClases + '/3' + (needsRenew ? ((r.renovaciones || 0) >= 1 ? ' · ¡Nueva reserva!' : ' · Renovar ' + ((r.renovaciones || 0) + 1) + '/1') : '') + '</span></div></div><div class="reserva-card-footer"><button class="btn-action btn-detail" onclick="verDetalle(' + r.id + ')">Ver detalle</button>'// DESPUÉS: botón Renovar solo visible para directivos
+        + (needsRenew && esDirectivo() ? '<button class="btn-action btn-renew" onclick="renovarReserva(' + r.id + ')">↻ Renovar</button>' : '') + '<button class="btn-action btn-cancel-r" onclick="cancelarReserva(' + r.id + ')">Cancelar</button></div></div>';
+    }).join('') + '</div>';
+  }
+  list.innerHTML = solHtml + reservasHtml;
+}
 
 function cancelarSolicitud(solId) {
   var s = SOLICITUDES.find(function (x) { return x.id === solId; }); if (!s) return;

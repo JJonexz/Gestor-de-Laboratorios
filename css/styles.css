@@ -968,13 +968,6 @@ a { text-decoration: none; }
 .ev-const { background: var(--red-dim);   color: #991b1b; } .ev-const::before { background: var(--red);   } .ev-const:hover { background: #fee2e2; }
 .ev-tur   { background: var(--green-dim); color: #14532d; } .ev-tur::before   { background: var(--green); } .ev-tur:hover   { background: #dcfce7; }
 .ev-bas   { background: var(--amber-dim); color: #78350f; } .ev-bas::before   { background: var(--amber); } .ev-bas:hover   { background: #fef3c7; }
-/* Horario fijo (cargado desde tabla cupof+horarios) */
-.ev-fijo  { background: #ede9fe; color: #4c1d95; border: 1px dashed #7c3aed; cursor: default; }
-.ev-fijo::before  { background: #7c3aed; }
-.ev-fijo:hover  { background: #ddd6fe; opacity: 1; }
-.ev-fijo .at-ev-aula { font-size: 0.62rem; color: #6d28d9; margin-top: 2px; }
-.ev-fijo .at-ev-materia { font-size: 0.63rem; color: #5b21b6; font-style: italic; }
-.at-cell-fijo { background: #faf5ff; }
 
 /* Estado: libre (disponible para reservar) */
 .ev-libre {
@@ -2659,38 +2652,4 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   gap: 1.5rem;
   margin-top: 1.5rem;
   padding-bottom: 1rem;
-}
-
-/* ── Select cupof (vinculado a BDD) ───────────────────────── */
-#f-cupof {
-  border-left: 3px solid var(--navy, #1a3a6b);
-  background-color: var(--navy-faint, #eef2f9);
-  font-weight: 500;
-}
-#f-cupof:focus {
-  border-left-color: var(--accent, #2563eb);
-  box-shadow: 0 0 0 2px rgba(37,99,235,.15);
-}
-#f-cupof-hint {
-  color: var(--amber, #d97706);
-}
-
-/* ── Curso y materia bloqueados por cupof ─────────────────── */
-#f-curso[disabled],
-#f-materia[readonly] {
-  background-color: var(--navy-faint, #eef2f9);
-  border-color: var(--navy-light, #4a6fa5);
-  color: var(--navy, #1a3a6b);
-  font-weight: 600;
-}
-#f-curso-materia-row {
-  transition: opacity .2s;
-}
-
-/* ── Grupo bloqueado por taller (cupof con id_grupos > 0) ─── */
-#reserva-grupo[disabled] {
-  background-color: var(--navy-faint, #eef2f9);
-  border-color: var(--navy-light, #4a6fa5);
-  color: var(--navy, #1a3a6b);
-  font-weight: 600;
 }
