@@ -49,7 +49,7 @@ const TURNOS_CONFIG = [
   { label: 'Vespertino', icon: '🌆', modulos: [11, 12, 13, 14, 15] },
 ];
 const ORIENTACIONES = {
-  info: { nombre: 'Informática', ev: 'ev-info', emoji: '💻', ob: 'ob-info' },
+  info: { nombre: 'Programación', ev: 'ev-info', emoji: '💻', ob: 'ob-info' },
   const: { nombre: 'Construcción', ev: 'ev-const', emoji: '🏗️', ob: 'ob-const' },
   tur: { nombre: 'Turismo', ev: 'ev-tur', emoji: '🌐', ob: 'ob-tur' },
   bas: { nombre: 'Básico', ev: 'ev-bas', emoji: '📚', ob: 'ob-bas' },

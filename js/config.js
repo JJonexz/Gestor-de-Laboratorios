@@ -67,7 +67,7 @@ var TURNOS_CONFIG = [
 // ev = clase CSS del evento en el calendario
 // ob = clase CSS del badge de orientación
 var ORIENTACIONES = {
-  info: { nombre: 'Informática', ev: 'ev-info', emoji: '💻', ob: 'ob-info' },
+  info: { nombre: 'Programación', ev: 'ev-info', emoji: '💻', ob: 'ob-info' },
   const: { nombre: 'Construcción', ev: 'ev-const', emoji: '🏗️', ob: 'ob-const' },
   tur: { nombre: 'Turismo', ev: 'ev-tur', emoji: '🌐', ob: 'ob-tur' },
   bas: { nombre: 'Básico', ev: 'ev-bas', emoji: '📚', ob: 'ob-bas' },
