@@ -182,7 +182,7 @@ function renderBarrasLabs(stats) {
 
 function renderBarrasOrient(stats) {
   var orientArr = [
-    { key:'info',  label:'Informática',  color:'var(--blue)'  },
+    { key:'info',  label:'Programación',  color:'var(--blue)'  },
     { key:'const', label:'Construcción', color:'var(--red)'   },
     { key:'tur',   label:'Turismo',      color:'var(--green)' },
     { key:'bas',   label:'Básico',       color:'var(--amber)' }
