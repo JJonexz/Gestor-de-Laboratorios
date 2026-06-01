@@ -47,34 +47,68 @@ function renderSolicitudesAdmin() {
 
   var solic = SOLICITUDES.filter(function(s) { return s.estado === 'pendiente'; });
   var count = document.getElementById('solicitudes-count');
-  if (count) count.textContent = solic.length ? '(' + solic.length + ')' : '';
 
   if (!solic.length) {
+    if (count) count.textContent = '';
     el.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">No hay solicitudes pendientes.</td></tr>';
     return;
   }
 
-  el.innerHTML = solic.map(function(s) {
+  // Agrupar solicitudes
+  var groups = [];
+  solic.sort(function(a, b) {
+    return a.modulo - b.modulo; // Asegurar orden para consecutivos
+  });
+
+  solic.forEach(function(s) {
+    var key = [s.semanaOffset, s.dia, s.lab, s.curso, s.orient, s.profeId, s.secuencia, s.esRenovacion].join('|');
+    var group = groups.find(function(g) { return g.key === key; });
+
+    if (group) {
+      group.solicitudes.push(s);
+      group.modulos.push(s.modulo);
+    } else {
+      groups.push({
+        key: key,
+        solicitudes: [s],
+        modulos: [s.modulo],
+        s: s // reference to first one for rendering
+      });
+    }
+  });
+
+  if (count) count.textContent = groups.length ? '(' + groups.length + ')' : '';
+
+  el.innerHTML = groups.map(function(g) {
+    var s = g.s;
     var p     = getProfe(s.profeId);
     var ori   = ORIENTACIONES[s.orient];
     var fecha = getDiaDate(s.semanaOffset, s.dia);
-    var mod   = getModulo(s.modulo);
+    
+    // Mostrar modulos combinados
+    var modString = g.modulos.map(function(m) { return getModulo(m).label; }).join(', ');
+    var modInicio = getModulo(Math.min.apply(null, g.modulos)).inicio;
+    var modFin = getModulo(Math.max.apply(null, g.modulos)).fin;
+
     var renovBadge = s.esRenovacion
       ? '&nbsp;<span style="font-size:9px;font-weight:700;background:var(--navy);color:#fff;padding:1px 4px;border-radius:3px;">RENOV ' + s.renovacionNum + '/1</span>'
       : '';
     var rowStyle = s.esRenovacion ? ' style="background:#eff6ff"' : '';
+    
+    var jsonIds = JSON.stringify(g.solicitudes.map(function(x) { return x.id; }));
+
     return (
       '<tr' + rowStyle + '>' +
         '<td>Prof. ' + p.apellido + '</td>' +
         '<td>Lab.' + s.lab + renovBadge + '</td>' +
         '<td>' + DIAS_SEMANA[s.dia] + ' ' + formatFecha(fecha) + '</td>' +
-        '<td>' + mod.label + ' (' + mod.inicio + ')</td>' +
+        '<td><div title="' + modString + '">' + g.modulos.length + ' mod(s) (' + modInicio + '–' + modFin + ')</div></td>' +
         '<td>' + s.curso + '</td>' +
         '<td><span class="orient-badge ' + ori.ob + '">' + ori.emoji + ' ' + ori.nombre + '</span></td>' +
         '<td>' +
           '<div class="table-actions">' +
-            '<button class="tbl-btn ok" onclick="aceptarSolicitud(' + s.id + ')">✓ Aprobar</button>' +
-            '<button class="tbl-btn danger" onclick="rechazarSolicitud(' + s.id + ')">✕ Rechazar</button>' +
+            '<button class="tbl-btn ok" onclick=\'aceptarSolicitudGrupo(' + jsonIds + ')\'>✓ Aprobar</button>' +
+            '<button class="tbl-btn danger" onclick=\'rechazarSolicitudGrupo(' + jsonIds + ')\'>✕ Rechazar</button>' +
           '</div>' +
         '</td>' +
       '</tr>'
