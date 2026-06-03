@@ -792,8 +792,17 @@ function procederGuardarReserva(lab, dia, modulo, curso, materia, secuencia, ori
 
 // ── Modal de detalle de reserva ──────────────────────────────
 function verDetalle(reservaId) {
-  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  verDetalleGrupo([reservaId]);
+}
+
+function verDetalleGrupo(ids) {
+  var r = RESERVAS.find(function (x) { return x.id === ids[0]; });
   if (!r) return;
+
+  var modulos = ids.map(function(id) { 
+    var res = RESERVAS.find(function(x){ return x.id === id; });
+    return res ? res.modulo : r.modulo;
+  });
 
   var p = getProfe(r.profeId);
   var oris = (r.orient || 'bas').split(',');
@@ -803,7 +812,11 @@ function verDetalle(reservaId) {
   }).join(' ');
 
   var fecha = getDiaDate(r.semanaOffset, r.dia);
-  var mod   = getModulo(r.modulo);
+  
+  var modInicio = getModulo(Math.min.apply(null, modulos)).inicio;
+  var modFin = getModulo(Math.max.apply(null, modulos)).fin;
+  var labelModulos = modulos.length > 1 ? modulos.length + ' módulos' : getModulo(r.modulo).label;
+
   var pct   = (r.cicloClases / 3) * 100;
   var barClass = r.cicloClases >= 3 ? 'full' : (r.cicloClases >= 2 ? 'mid' : 'low');
 
@@ -812,7 +825,7 @@ function verDetalle(reservaId) {
     body.innerHTML =
       '<div class="detail-row"><div class="detail-label">Docente</div><div class="detail-value">Prof. ' + p.apellido + ', ' + p.nombre + '</div></div>' +
       '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">' + getLab(r.lab).nombre + '</div></div>' +
-      '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[r.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')</div></div>' +
+      '<div class="detail-row"><div class="detail-label">Fecha / Módulo</div><div class="detail-value">' + DIAS_LARGO[r.dia] + ' ' + formatFecha(fecha) + ' · ' + labelModulos + ' (' + modInicio + '–' + modFin + ')</div></div>' +
       '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + r.curso + '</div></div>' +
       (r.grupoId
       ? '<div class="detail-row"><div class="detail-label">Grupo</div><div class="detail-value">Grupo ' + getNombreGrupo(r.grupoId) + '</div></div>'
@@ -836,18 +849,19 @@ function verDetalle(reservaId) {
   if (footer) {
     var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
     var renovBtn = '';
+    var jsonIds = JSON.stringify(ids);
     if (isOwn && r.cicloClases >= 3 && esDirectivo()) {
       var renov = r.renovaciones || 0;
       renovBtn = renov >= 1
-        ? '<button class="btn-ok" onclick="cerrarModal(\'modal-detalle\');renovarReserva(' + r.id + ')">🔄 Nueva reserva</button>'
-        : '<button class="btn-ok" onclick="renovarReserva(' + r.id + ');cerrarModal(\'modal-detalle\')">↻ Solicitar renovación</button>';
+        ? '<button class="btn-ok" onclick=\'cerrarModal("modal-detalle");renovarReservaGrupo(' + jsonIds + ')\'>🔄 Nueva reserva</button>'
+        : '<button class="btn-ok" onclick=\'renovarReservaGrupo(' + jsonIds + ');cerrarModal("modal-detalle")\'>↻ Solicitar renovación</button>';
     }
     footer.innerHTML =
       '<button class="btn-cancel" onclick="cerrarModal(\'modal-detalle\')">Cerrar</button>' +
       renovBtn +
-      (isOwn ? '<button class="btn-ok" style="background:var(--navy-light);" onclick="cerrarModal(\'modal-detalle\');editarReserva(' + r.id + ')">✎ Editar</button>' : '') +
+      (isOwn ? '<button class="btn-ok" style="background:var(--navy-light);" onclick=\'cerrarModal("modal-detalle");editarReservaGrupo(' + jsonIds + ')\'>✎ Editar</button>' : '') +
       (isOwn ? '<button class="btn-ok" style="background:var(--amber);color:#333;" onclick="cerrarModal(\'modal-detalle\');abrirModalReasignar(' + r.id + ')">🔀 Reasignar</button>' : '') +
-      (isOwn ? '<button class="btn-danger" onclick="cerrarModal(\'modal-detalle\');cancelarReserva(' + r.id + ')">Cancelar reserva</button>' : '');
+      (isOwn ? '<button class="btn-danger" onclick=\'cerrarModal("modal-detalle");cancelarReservaGrupo(' + jsonIds + ')\'>Cancelar reserva</button>' : '');
   }
 
   abrirModal('modal-detalle');
@@ -973,29 +987,151 @@ function rechazarSolicitud(solId) {
   });
 }
 
+// ── Aprobar grupo de solicitudes ──────────────────────────────
+function aceptarSolicitudGrupo(ids) {
+  if (modoUsuario !== 'admin') { toast('Solo el directivo puede aprobar solicitudes.', 'err'); return; }
+
+  // Pre-validar conflictos antes de empezar
+  for (var i = 0; i < ids.length; i++) {
+    var s = SOLICITUDES.find(function (x) { return x.id === ids[i]; });
+    if (!s) continue;
+    var conflicto = RESERVAS.find(function (r) {
+      return r.semanaOffset === s.semanaOffset && r.dia === s.dia && r.modulo === s.modulo && r.lab === s.lab;
+    });
+    if (conflicto) {
+      toast('El turno del módulo ' + getModulo(s.modulo).label + ' fue ocupado mientras estaba pendiente.', 'warn');
+      return;
+    }
+    if (!s.esRenovacion && typeof validarConflicto === 'function') {
+      var conf = validarConflicto(s.lab, s.dia, s.modulo, s.semanaOffset, s.profeId, null);
+      if (conf) {
+        toast('Conflicto en módulo ' + getModulo(s.modulo).label + ': ' + conf.mensaje, 'err');
+        return;
+      }
+    }
+  }
+
+  // Procesar cada solicitud vía API
+  var pending = ids.length;
+  var processed = 0;
+  var firstSol = SOLICITUDES.find(function(x) { return x.id === ids[0]; });
+
+  ids.forEach(function(solId) {
+    (function(solId) {
+      var s = SOLICITUDES.find(function (x) { return x.id === solId; });
+      if (!s) { pending--; if (pending <= 0) _finalizarAprobacionGrupo(processed, firstSol); return; }
+
+      if (s.esRenovacion && s.reservaOriginalId) {
+        var rOrig = RESERVAS.find(function (x) { return x.id === s.reservaOriginalId; });
+        if (rOrig) {
+          dbEditarReserva(rOrig.id, { cicloClases: 1, renovaciones: (rOrig.renovaciones || 0) + 1 }, function() {
+            dbEliminarSolicitud(solId, function() {
+              processed++;
+              pending--;
+              if (pending <= 0) _finalizarAprobacionGrupo(processed, firstSol);
+            });
+          });
+        } else {
+          dbCrearReserva({
+            semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
+            curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
+            cicloClases: 1, renovaciones: s.renovacionNum || 1
+          }, function() {
+            dbEliminarSolicitud(solId, function() {
+              processed++;
+              pending--;
+              if (pending <= 0) _finalizarAprobacionGrupo(processed, firstSol);
+            });
+          });
+        }
+      } else {
+        var labCapturado = s.lab;
+        dbCrearReserva({
+          semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
+          curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
+          cicloClases: 1, renovaciones: 0
+        }, function(nuevaReserva) {
+          if (typeof emitirSync === 'function') emitirSync('reserva_aprobada', { reservaId: nuevaReserva.id, lab: labCapturado });
+          dbEliminarSolicitud(solId, function() {
+            processed++;
+            pending--;
+            if (pending <= 0) _finalizarAprobacionGrupo(processed, firstSol);
+          });
+        });
+      }
+    })(solId);
+  });
+}
+
+function _finalizarAprobacionGrupo(processed, solicitudRef) {
+  if (processed > 0) {
+    // Una sola notificación por grupo, pasando la cantidad de módulos aprobados
+    if (solicitudRef && typeof notifSolicitudAprobada === 'function') {
+      notifSolicitudAprobada(solicitudRef, processed);
+    }
+    toast('Solicitudes aprobadas (' + processed + ' módulo/s). Reservas confirmadas.', 'ok');
+    renderAll();
+  }
+}
+
+// ── Rechazar grupo de solicitudes ─────────────────────────────
+function rechazarSolicitudGrupo(ids) {
+  if (modoUsuario !== 'admin') { toast('Solo el directivo puede rechazar solicitudes.', 'err'); return; }
+  
+  var primerS = SOLICITUDES.find(function (x) { return x.id === ids[0]; });
+  if (!primerS) return;
+
+  var p = getProfe(primerS.profeId);
+  confirmar('¿Rechazar la solicitud de <strong>Prof. ' + p.apellido + '</strong> — ' + primerS.curso + ' (' + ids.length + ' módulo/s)?', function () {
+    var pending = ids.length;
+    ids.forEach(function(solId) {
+      dbEliminarSolicitud(solId, function() {
+        if (typeof emitirSync === 'function') emitirSync('solicitud_rechazada', { solicitudId: solId });
+        pending--;
+        if (pending <= 0) {
+          // Una sola notificación por grupo
+          if (typeof notifSolicitudRechazada === 'function') notifSolicitudRechazada(primerS, '');
+          toast('Solicitudes rechazadas.', 'info');
+          renderAll();
+        }
+      });
+    });
+  });
+}
+
 // ── Editar reserva existente ─────────────────────────────────
-// Abre el modal de edición con los datos de la reserva pre-cargados.
-// El profe solo puede editar sus propias reservas; el admin puede editar cualquiera.
 function editarReserva(reservaId) {
-  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  editarReservaGrupo([reservaId]);
+}
+
+function editarReservaGrupo(ids) {
+  var r = RESERVAS.find(function (x) { return x.id === ids[0]; });
   if (!r) return;
 
   var isOwn = esDirectivo() || r.profeId === getCurrentProfId();
   if (!isOwn) { toast('No tenés permiso para editar esta reserva.', 'err'); return; }
 
   // Llenar los campos del modal de edición
-  document.getElementById('edit-reserva-id').value = reservaId;
+  // Guardamos el JSON de IDs en el campo
+  document.getElementById('edit-reserva-id').value = JSON.stringify(ids);
   document.getElementById('edit-curso').value = r.curso;
   document.getElementById('edit-secuencia').value = r.secuencia;
   UIHelper.setOrientValues('edit-orient-group', r.orient);
 
   // Info de contexto (solo lectura)
-  var mod = getModulo(r.modulo);
+  var modulos = ids.map(function(id) { 
+    var res = RESERVAS.find(function(x){ return x.id === id; });
+    return res ? res.modulo : r.modulo;
+  });
+  var modInicio = getModulo(Math.min.apply(null, modulos)).inicio;
+  var modFin = getModulo(Math.max.apply(null, modulos)).fin;
+  var labelModulos = modulos.length > 1 ? modulos.length + ' módulos' : getModulo(r.modulo).label;
+
   var lab = getLab(r.lab);
   var p = getProfe(r.profeId);
   document.getElementById('edit-info-contexto').innerHTML =
-    '<strong>' + lab.nombre + '</strong> · ' + DIAS_LARGO[r.dia] + ' · ' + mod.label +
-    ' (' + mod.inicio + '–' + mod.fin + ')' +
+    '<strong>' + lab.nombre + '</strong> · ' + DIAS_LARGO[r.dia] + ' · ' + labelModulos +
+    ' (' + modInicio + '–' + modFin + ')' +
     (esDirectivo() ? ' · Prof. ' + p.apellido : '');
 
   // Selector de docente (solo para directivos)
@@ -1019,17 +1155,19 @@ function editarReserva(reservaId) {
       if (scopeSel) scopeSel.value = 'puntual'; // default
     }
   }
- poblarSelectorGrupo(r.curso, r.grupoId || null);
+  poblarSelectorGrupo(r.curso, r.grupoId || null);
 
-abrirModal('modal-editar-reserva');
-
+  abrirModal('modal-editar-reserva');
 }
 
 // Guarda los cambios del modal de edición.
-// El scope ('puntual' o 'siguientes') determina cuántas reservas se actualizan.
 function guardarEdicionReserva() {
-  var reservaId = parseInt(document.getElementById('edit-reserva-id').value);
-  var r = RESERVAS.find(function (x) { return x.id === reservaId; });
+  var idVal = document.getElementById('edit-reserva-id').value;
+  var ids = [];
+  try { ids = JSON.parse(idVal); } catch(e) { ids = [parseInt(idVal)]; }
+  if(!ids.length) return;
+
+  var r = RESERVAS.find(function (x) { return x.id === ids[0]; });
   if (!r) return;
 
   var nuevoCurso = document.getElementById('edit-curso').value.trim();
@@ -1051,15 +1189,10 @@ function guardarEdicionReserva() {
     return;
   }
 
-  // Buscar todas las reservas "hermanas" del mismo bloque horario
-  // @Julian_Jonexz
-  // (mismo día, lab, profe, semana y curso original → forman un bloque multi-hora)
-  // Guardar valores originales ANTES de mutar (r puede ser parte del array)
   var cursoOriginal = r.curso;
   var profeIdOriginal = r.profeId;
 
   if (scope === 'anual' && esDirectivo()) {
-    // Actualiza esta reserva, sus hermanas de bloque, y todas las anuales del año
     var actualizadas = 0;
     RESERVAS.forEach(function (x) {
       if (
@@ -1073,7 +1206,6 @@ function guardarEdicionReserva() {
         x.secuencia = nuevaSecuencia;
         x.orient = nuevaOrient;
         if (nuevoProfeId) x.profeId = nuevoProfeId;
-        // (línea eliminada — grupoId no se usa)
         actualizadas++;
       }
     });
@@ -1081,7 +1213,6 @@ function guardarEdicionReserva() {
     cerrarModal('modal-editar-reserva');
     toast(actualizadas + ' reserva(s) anual(es) actualizada(s).', 'ok');
   } else if (scope === 'siguientes' && esDirectivo()) {
-    // Actualiza esta reserva, sus hermanas de bloque, y todas las futuras del mismo lab+dia+profe
     var actualizadas = 0;
     RESERVAS.forEach(function (x) {
       if (
