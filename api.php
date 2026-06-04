@@ -533,33 +533,18 @@ switch ($resource) {
         err('Not found',404);
 
     // ── SOLICITUDES ───────────────────────────────────────────
-    case 'reservas':
-    if ($method === 'GET') {
-        $where = '1=1';
-        $p = [];
-
-        if (isset($_GET['semanaOffset'])) {
-            $where .= ' AND semanaOffset = ?';
-            $p[] = (int)$_GET['semanaOffset'];
+    case 'solicitudes':
+        if ($method === 'GET') {
+            $where='1=1'; $p=[];
+            if (isset($_GET['estado']))  { $where.=' AND estado=?';  $p[]=$_GET['estado']; }
+            if (isset($_GET['profeId'])) { 
+                // Soportar búsqueda tanto de IDs numéricos como de 'institucional'
+                $where.=' AND profeId=?'; 
+                $p[]=($_GET['profeId'] === 'institucional') ? 'institucional' : $_GET['profeId'];
+            }
+            $s=$db->prepare("SELECT * FROM gestor_solicitudes WHERE $where ORDER BY id");
+            $s->execute($p); ok(castRows($s->fetchAll()));
         }
-
-        if (isset($_GET['lab'])) {
-            $where .= ' AND lab = ?';
-            $p[] = $_GET['lab'];           // normalmente es string (ej: "A0", "A6", etc.)
-        } else {
-            // Opcional: si no mandan lab, devolver error o solo las de un aula por defecto
-            // err('Parámetro lab es requerido', 400);
-        }
-
-        if (isset($_GET['profeId'])) {
-            $where .= ' AND profeId = ?';
-            $p[] = ($_GET['profeId'] === 'institucional') ? 'institucional' : $_GET['profeId'];
-        }
-
-        $s = $db->prepare("SELECT * FROM gestor_reservas WHERE $where ORDER BY semanaOffset, dia, modulo");
-        $s->execute($p);
-        ok(castRows($s->fetchAll()));
-    }
         if ($method === 'POST') {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
