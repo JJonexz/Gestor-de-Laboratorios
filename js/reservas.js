@@ -145,18 +145,21 @@ function _desbloquearCursoMateria() {
   var fMateria = document.getElementById('f-materia');
   var row      = document.getElementById('f-curso-materia-row');
   if (fCurso) {
-    fCurso.disabled = false;
-    fCurso.style.opacity = '';
-    fCurso.style.cursor  = '';
+    fCurso.value = '';
+    fCurso.disabled = true;
+    fCurso.style.opacity = '0.6';
+    fCurso.style.cursor  = 'not-allowed';
     fCurso.title = '';
   }
   if (fMateria) {
-    fMateria.readOnly = false;
-    fMateria.style.opacity = '';
-    fMateria.style.cursor  = '';
+    fMateria.value = '';
+    fMateria.disabled = true;
+    fMateria.readOnly = true;
+    fMateria.style.opacity = '0.6';
+    fMateria.style.cursor  = 'not-allowed';
     fMateria.title = '';
   }
-  if (row) row.style.opacity = '';
+  if (row) row.style.opacity = '0.7';
 }
 
 function _bloquearGrupo(idGrupos, grupoNombre) {
@@ -184,9 +187,10 @@ function _desbloquearGrupo() {
   var sel  = document.getElementById('reserva-grupo');
   var wrap = sel ? sel.closest('.form-group') : null;
   if (!sel) return;
-  sel.disabled = false;
-  sel.style.opacity = '';
-  sel.style.cursor  = '';
+  sel.value = '';
+  sel.disabled = true;
+  sel.style.opacity = '0.6';
+  sel.style.cursor  = 'not-allowed';
   sel.title = '';
   if (wrap) {
     var hint = wrap.querySelector('.grupo-lock-hint');

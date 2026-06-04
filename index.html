@@ -577,21 +577,21 @@
       <div class="form-row" id="f-curso-materia-row">
         <div class="form-group">
           <label class="form-label" for="f-curso">Curso</label>
-          <select class="form-control" id="f-curso" required>
+          <select class="form-control" id="f-curso" disabled>
             <option value="">Seleccionar curso…</option>
           </select>
         </div>
         
         <div class="form-group">
           <label class="form-label" for="reserva-grupo">Grupo</label>
-          <select class="form-control" id="reserva-grupo" name="grupoId">
+          <select class="form-control" id="reserva-grupo" name="grupoId" disabled>
             <option value="">-- Sin grupo --</option>
           </select>
         </div>
         
         <div class="form-group">
           <label class="form-label" for="f-materia">Materia / Tema</label>
-          <input type="text" class="form-control" id="f-materia" list="materias-list" placeholder="Ej: Programación" required>
+          <input type="text" class="form-control" id="f-materia" list="materias-list" placeholder="Ej: Programación" disabled readonly>
           <datalist id="materias-list"></datalist>
         </div>
       </div>
