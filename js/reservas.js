@@ -1407,6 +1407,36 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
       var moduloOriginal = r.modulo;
       var labOriginal    = r.lab;
 
+      if (!esDirectivo()) {
+        apiDelete('reservas/' + r.id).then(function() {
+          RESERVAS = RESERVAS.filter(function(x) { return x.id !== r.id; });
+          return apiPost('solicitudes', {
+            semanaOffset: r.semanaOffset, 
+            dia: nuevoDia, 
+            modulo: nuevoModulo, 
+            lab: nuevoLab, 
+            curso: r.curso,
+            orient: r.orient || 'bas', 
+            profeId: r.profeId, 
+            secuencia: r.secuencia || '', 
+            cicloClases: r.cicloClases || 1, 
+            estado: 'pendiente',
+            esRenovacion: 0, 
+            renovacionNum: 0, 
+            grupoId: r.grupoId || null
+          });
+        }).then(function(nuevaSolicitud) {
+          SOLICITUDES.push(nuevaSolicitud);
+          saveDB();
+          toast('Reserva cancelada. Solicitud enviada a ' + hastaStr + '.', 'info');
+          renderAll();
+        }).catch(function(e) {
+          toast('Error al mover: ' + e.message, 'err');
+          renderAll();
+        });
+        return;
+      }
+
       // Actualizar en memoria primero (respuesta optimista)
       r.dia    = nuevoDia;
       r.modulo = nuevoModulo;
