@@ -400,7 +400,10 @@ switch ($resource) {
 
     // ── LABS ──────────────────────────────────────────────────
     case 'labs':
-        if ($method === 'GET') ok(castRows($db->query('SELECT * FROM gestor_labs ORDER BY id')->fetchAll()));
+        if ($method === 'GET') {
+            $sql = "SELECT CAST(id_salones AS CHAR) AS id, CONCAT(tipo, ' ', numero) AS nombre, 0 AS ocupado, capacidad, CONCAT('Ubicación: ', ubicacion) AS notas, 1 AS max_grupos FROM salones ORDER BY tipo, numero";
+            ok(castRows($db->query($sql)->fetchAll()));
+        }
         if ($method === 'POST') {
             $b = body();
             $db->prepare('INSERT INTO gestor_labs(id,nombre,ocupado,capacidad,notas,max_grupos) VALUES(?,?,?,?,?,?)')
@@ -762,8 +765,10 @@ switch ($resource) {
             $profs = $expanded;
         }
 
+        $sql_labs = "SELECT CAST(id_salones AS CHAR) AS id, CONCAT(tipo, ' ', numero) AS nombre, 0 AS ocupado, capacidad, CONCAT('Ubicación: ', ubicacion) AS notas, 1 AS max_grupos FROM salones ORDER BY tipo, numero";
+
         $res = [
-            'labs'        => castRows($db->query('SELECT * FROM gestor_labs ORDER BY id')->fetchAll()),
+            'labs'        => castRows($db->query($sql_labs)->fetchAll()),
             'profesores'  => $profs,
             'reservas'    => castRows($db->query('SELECT * FROM gestor_reservas ORDER BY semanaOffset,dia,modulo')->fetchAll()),
             'solicitudes' => castRows($db->query('SELECT * FROM gestor_solicitudes ORDER BY id')->fetchAll()),
