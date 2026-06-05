@@ -476,3 +476,70 @@ if (typeof solicitarRenovacion !== 'undefined') {
 
 
 console.log('[DB Override] Funciones SQL activas.');
+// ── guardarDocente — DESHABILITADO (docentes vienen de `personal`) ──────────
+guardarDocente = function() {
+  toast('Los docentes se gestionan directamente desde la base de datos (tabla personal). No es posible agregar o editar desde aquí.', 'warn');
+  cerrarModal('modal-docente');
+};
+
+// ── eliminarDocente — solo elimina de la vista local + reservas ───────────
+eliminarDocente = function(id) {
+  var p = PROFESORES.find(function(x) { return x.id === id; });
+  if (!p) return;
+  confirmar(
+    'Eliminar las reservas de Prof. ' + p.apellido + '?<br><small>El docente permanece en la base de datos escolar.</small>',
+    function() {
+      // Solo eliminamos sus reservas y solicitudes de los arreglos locales + API
+      var promesas = [];
+      RESERVAS.filter(function(r) { return r.profeId === id; }).forEach(function(r) {
+        promesas.push(apiDelete('reservas/' + r.id));
+      });
+      SOLICITUDES.filter(function(s) { return s.profeId === id; }).forEach(function(s) {
+        promesas.push(apiDelete('solicitudes/' + s.id));
+      });
+      Promise.all(promesas).then(function() {
+        RESERVAS    = RESERVAS.filter(function(r)    { return r.profeId !== id; });
+        SOLICITUDES = SOLICITUDES.filter(function(s) { return s.profeId !== id; });
+        toast('Reservas del docente eliminadas.', 'info');
+        renderAdmin();
+      }).catch(function(e) { toast('Error: ' + e.message, 'err'); });
+    }
+  );
+};
+
+// ── guardarLab — solo PUT (ocupado/max_grupos), sin POST ──────────────────
+guardarLab = function() {
+  var estado      = document.getElementById('lab-estado').value;
+  var maxGruposEl = document.getElementById('lab-max-grupos');
+  var maxGrupos   = maxGruposEl ? parseInt(maxGruposEl.value || '2') : 2;
+
+  if (!editLabId) {
+    toast('Los laboratorios se gestionan desde la tabla salones. Solo se puede editar estado y capacidad de grupos.', 'warn');
+    cerrarModal('modal-lab');
+    return;
+  }
+
+  setLabMaxGrupos(editLabId, maxGrupos);
+
+  var l = LABS.find(function(x) { return x.id === editLabId; });
+  var datos = Object.assign({}, l || {}, {
+    ocupado: estado === 'ocupado' ? 1 : 0,
+    max_grupos: maxGrupos
+  });
+
+  apiPut('labs/' + editLabId, datos).then(function(actualizado) {
+    var idx = LABS.findIndex(function(x) { return x.id === editLabId; });
+    if (idx >= 0) LABS[idx] = actualizado;
+    cerrarModal('modal-lab');
+    editLabId = null;
+    toast('Laboratorio actualizado.', 'ok');
+    renderAdmin();
+  }).catch(function(e) { toast('Error: ' + e.message, 'err'); });
+};
+
+// ── eliminarLab — deshabilitado ───────────────────────────────────────────
+eliminarLab = function(id) {
+  toast('Los laboratorios se gestionan desde la tabla salones. Para eliminar un laboratorio, modificá la tabla salones en la base de datos.', 'warn');
+};
+
+console.log('[DB Override v2] Personal como fuente de docentes activo.');
