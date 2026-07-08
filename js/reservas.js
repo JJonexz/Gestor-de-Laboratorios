@@ -72,6 +72,7 @@ function poblarSelectCupof(dniPersonal, cupofSeleccionado) {
               ' data-curso="'        + (c.curso_label      || '') + '"' +
               ' data-curso-ano="'    + (c.curso_ano        || '') + '"' +
               ' data-curso-div="'    + (c.curso_division   || '') + '"' +
+              ' data-orientacion="'  + (c.orientacion      || '') + '"' +
               ' data-id-grupos="'    + (c.id_grupos        || 0)  + '"' +
               ' data-grupo-nombre="' + (c.grupo_nombre     || '') + '"' +
               '>' + label + '</option>';
@@ -91,18 +92,23 @@ function sincronizarCampoDesdeCupof() {
   if (!sel || !sel.value) {
     _desbloquearCursoMateria();
     _desbloquearGrupo();
+    if (typeof setOrientacionPorCurso === 'function') setOrientacionPorCurso('');
     return;
   }
 
   var opt        = sel.options[sel.selectedIndex];
   var curso      = opt.getAttribute('data-curso')      || '';
   var materia    = opt.getAttribute('data-materia')    || '';
+  var orientacion= opt.getAttribute('data-orientacion')|| '';
   var idGrupos   = parseInt(opt.getAttribute('data-id-grupos') || '0');
   var grupoNombre= opt.getAttribute('data-grupo-nombre') || '';
   var cursoAno   = opt.getAttribute('data-curso-ano')  || '';
 
   // Setear curso y materia
-  if (fCurso   && curso)   fCurso.value   = curso;
+  if (fCurso   && curso) {
+    fCurso.value   = curso;
+    if (typeof setOrientacionPorCurso === 'function') setOrientacionPorCurso(curso, orientacion);
+  }
   if (fMateria && materia) fMateria.value = materia;
   _bloquearCursoMateria();
 
@@ -365,7 +371,7 @@ function abrirModalReserva() {
     if (el) el.value = '';
   });
   _desbloquearCursoMateria();
-  UIHelper.setOrientValues('f-orient-group', 'bas');
+  setOrientacionPorCurso('');
   var fmod = document.getElementById('f-modulo'); if (fmod) fmod.value = '';
   var fper = document.getElementById('f-periodo'); if (fper) fper.value = '1';
   var fsem = document.getElementById('f-semanas'); if (fsem) fsem.value = '1';
@@ -389,6 +395,7 @@ function abrirModalReserva() {
   if (fCursoMain && !fCursoMain.dataset.grupoBind) {
     fCursoMain.addEventListener('change', function() {
       poblarSelectorGrupo(this.value, '');
+      if (typeof setOrientacionPorCurso === 'function') setOrientacionPorCurso(this.value);
     });
     fCursoMain.dataset.grupoBind = '1';
   }
@@ -455,13 +462,14 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   if (fCurso && !fCurso.dataset.grupoBind) {
     fCurso.addEventListener('change', function() {
       poblarSelectorGrupo(this.value, '');
+      if (typeof setOrientacionPorCurso === 'function') setOrientacionPorCurso(this.value);
     });
 
     // evita múltiples listeners al abrir el modal varias veces
     fCurso.dataset.grupoBind = '1';
   }
 
-  UIHelper.setOrientValues('f-orient-group', 'bas');
+  setOrientacionPorCurso('');
 
   checkConflict();
 
@@ -509,6 +517,62 @@ function abrirModalReservaSlot(dia, modulo, lab) {
   abrirModal('modal-reserva');
 }
 
+
+function normalizarOrientacion(valor) {
+  if (!valor && valor !== 0) return 'bas';
+  var texto = String(valor).trim().toLowerCase();
+  if (!texto) return 'bas';
+
+  var mapa = {
+    'programacion': 'info',
+    'programación': 'info',
+    'prog': 'info',
+    'info': 'info',
+    'construccion': 'const',
+    'construcción': 'const',
+    'const': 'const',
+    'turismo': 'tur',
+    'tur': 'tur',
+    'basico': 'bas',
+    'básico': 'bas',
+    'bas': 'bas',
+    'atr': 'bas'
+  };
+
+  return mapa[texto] || (ORIENTACIONES[texto] ? texto : 'bas');
+}
+
+// Helper selector orientacion
+function setOrientacionPorCurso(cursoLabel, orientacion) {
+  var orientKey = 'bas';
+  var curso = null;
+
+  if (orientacion) {
+    orientKey = normalizarOrientacion(orientacion);
+  } else if (cursoLabel) {
+    curso = (window.CURSOS || []).find(function(c) {
+      var label = c.ano + '°' + c.division + (c.turno ? ' (' + c.turno + ')' : '');
+      return label === cursoLabel;
+    });
+
+    if (curso && curso.orientacion) {
+      orientKey = normalizarOrientacion(curso.orientacion);
+    } else {
+      orientKey = normalizarOrientacion(cursoLabel);
+    }
+  }
+
+  UIHelper.setOrientValues('f-orient-group', orientKey);
+
+  var group = document.getElementById('f-orient-group');
+  if (group) {
+    group.querySelectorAll('input[type="checkbox"]').forEach(function(chk) {
+      chk.disabled = true;
+    });
+    group.style.opacity = '0.6';
+    group.style.pointerEvents = 'none';
+  }
+}
 
 // Helper selector grupos
 function poblarSelectorGrupo(cursoId, grupoIdActual) {

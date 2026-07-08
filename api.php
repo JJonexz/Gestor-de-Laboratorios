@@ -487,7 +487,17 @@ switch ($resource) {
 
     case 'cursos':
         if ($method !== 'GET') err('Method not allowed', 405);
-        ok(castRows($db->query('SELECT id, division, ano, turno FROM cursos ORDER BY ano, division')->fetchAll()));
+        $hasCs = $db->query("SHOW TABLES LIKE 'ciclosuperior'")->fetch();
+        $hasO = $db->query("SHOW TABLES LIKE 'orientaciones'")->fetch();
+        if ($hasCs && $hasO) {
+            ok(castRows($db->query("SELECT c.id, c.division, c.ano, c.turno,
+                                   COALESCE(o.nombre, 'bas') AS orientacion
+                            FROM cursos c
+                            LEFT JOIN ciclosuperior cs ON c.id = cs.id_cursos
+                            LEFT JOIN orientaciones o ON cs.id_orientaciones = o.id
+                            ORDER BY c.ano, c.division")->fetchAll()));
+        }
+        ok(castRows($db->query('SELECT id, division, ano, turno, "bas" AS orientacion FROM cursos ORDER BY ano, division')->fetchAll()));
 
     // ── MATERIAS ──────────────────────────────────────────────
     case 'materias':
@@ -534,6 +544,7 @@ switch ($resource) {
                 m.abreviatura AS materia_abrev,
                 cu.ano        AS curso_ano,
                 cu.division   AS curso_division,
+                COALESCE(o.nombre, 'bas') AS orientacion,
                 CONCAT(cu.ano, '°', cu.division,
                     IF(cu.turno IS NOT NULL AND cu.turno <> '',
                         CONCAT(' (', cu.turno, ')'), '')
@@ -543,6 +554,8 @@ switch ($resource) {
             JOIN cupof    c  ON r.cupof = c.cupof
             LEFT JOIN materias m  ON c.id_materias = m.id
             LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
+            LEFT JOIN ciclosuperior cs ON cu.id = cs.id_cursos
+            LEFT JOIN orientaciones o ON cs.id_orientaciones = o.id
             LEFT JOIN grupos   g  ON c.id_grupos   = g.id AND c.id_grupos > 0
             WHERE r.dni_personal = ?
               AND (r.fh IS NULL OR YEAR(r.fh) = 0 OR r.fh >= CURDATE())
@@ -560,6 +573,7 @@ switch ($resource) {
                     m.abreviatura AS materia_abrev,
                     cu.ano        AS curso_ano,
                     cu.division   AS curso_division,
+                    COALESCE(o.nombre, 'bas') AS orientacion,
                     CONCAT(cu.ano, '°', cu.division,
                         IF(cu.turno IS NOT NULL AND cu.turno <> '',
                             CONCAT(' (', cu.turno, ')'), '')
@@ -569,6 +583,8 @@ switch ($resource) {
                 JOIN cupof    c  ON r.cupof = c.cupof
                 LEFT JOIN materias m  ON c.id_materias = m.id
                 LEFT JOIN cursos   cu ON c.id_cursos   = cu.id
+                LEFT JOIN ciclosuperior cs ON cu.id = cs.id_cursos
+                LEFT JOIN orientaciones o ON cs.id_orientaciones = o.id
                 LEFT JOIN grupos   g  ON c.id_grupos   = g.id AND c.id_grupos > 0
                 WHERE r.dni_personal = ?
                 ORDER BY cu.ano, cu.division, m.nombre
@@ -641,8 +657,22 @@ switch ($resource) {
         ];
 
         // Tablas maestras opcionales
-        if ($db->query("SHOW TABLES LIKE 'cursos'")->fetch())
-            $res['cursos'] = castRows($db->query('SELECT id, division, ano, turno FROM cursos ORDER BY ano, division')->fetchAll());
+        if ($db->query("SHOW TABLES LIKE 'cursos'")->fetch()) {
+            $hasCs = $db->query("SHOW TABLES LIKE 'ciclosuperior'")->fetch();
+            $hasO = $db->query("SHOW TABLES LIKE 'orientaciones'")->fetch();
+            if ($hasCs && $hasO) {
+                $res['cursos'] = castRows($db->query("
+                    SELECT c.id, c.division, c.ano, c.turno, 
+                           COALESCE(o.nombre, 'bas') AS orientacion
+                    FROM cursos c
+                    LEFT JOIN ciclosuperior cs ON c.id = cs.id_cursos
+                    LEFT JOIN orientaciones o ON cs.id_orientaciones = o.id
+                    ORDER BY c.ano, c.division
+                ")->fetchAll());
+            } else {
+                $res['cursos'] = castRows($db->query('SELECT id, division, ano, turno, "bas" AS orientacion FROM cursos ORDER BY ano, division')->fetchAll());
+            }
+        }
         if ($db->query("SHOW TABLES LIKE 'materias'")->fetch())
             $res['materias'] = castRows($db->query('SELECT id, nombre, abreviatura FROM materias ORDER BY nombre')->fetchAll());
         if ($db->query("SHOW TABLES LIKE 'grupos'")->fetch())

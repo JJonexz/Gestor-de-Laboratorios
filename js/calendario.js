@@ -305,13 +305,15 @@ function renderCalendario() {
           var orientKey = (r.orient || 'bas').split(',')[0];
           var ori = ORIENTACIONES[orientKey] || ORIENTACIONES['bas'];
           var p = getProfe(r.profeId);
-          var puedeEditar = esDirectivo() || r.profeId === getCurrentProfId();
+          var puedeEditar = esDirectivo() || String(r.profeId) === String(getCurrentProfId());
+          var isMiReserva = String(r.profeId) === String(getCurrentProfId());
+          var extraClass = isMiReserva ? ' mi-reserva-highlight' : '';
           var _grupoNombre = r.grupoId ? getNombreGrupo(r.grupoId) : '';
           var grupoLabel = (rs.length + hf.length) > 1
             ? (_grupoNombre ? _grupoNombre : String(rIdx + 1))
             : (_grupoNombre ? 'Grupo ' + _grupoNombre : '');
           html +=
-            '<div class=\"at-event ' + ori.ev + '\" role=\"button\" tabindex=\"0\" ' +
+            '<div class=\"at-event ' + ori.ev + extraClass + '\" role=\"button\" tabindex=\"0\" ' +
             (puedeEditar ? 'draggable=\"true\" ondragstart=\"dragReservaStart(event,' + r.id + ')\" ondragend=\"dragReservaEnd(event)\" ' : '') +
             'onclick=\"verDetalle(' + r.id + ')\" title=\"' + r.curso + ' — Prof. ' + p.apellido + (puedeEditar ? ' · Arrastrá para mover' : '') + '\">' +
             '<div class=\"at-ev-curso\">' + r.curso + ' ' + ori.emoji + '</div>' +
@@ -339,8 +341,10 @@ function renderCalendario() {
         var action = modoUsuario === 'admin'
           ? 'verDetalleSolicitud(' + s.id + ')'
           : 'verDetalle_Pendiente(' + s.id + ')';
+        var isMiSoli = String(s.profeId) === String(getCurrentProfId());
+        var extraClassSol = isMiSoli ? ' mi-reserva-highlight' : '';
         html +=
-          '<div class="at-event ev-pendiente" role="button" tabindex="0" ' +
+          '<div class="at-event ev-pendiente' + extraClassSol + '" role="button" tabindex="0" ' +
           'onclick="' + action + '" title="Pendiente: ' + s.curso + '">' +
           '<div class="at-ev-curso">' + s.curso + ' ⏳</div>' +
           '</div>';
