@@ -778,6 +778,48 @@ switch ($resource) {
         }
         err('Not found', 404);
 
+    // ── CALENDAR POLL (actualización en tiempo real) ─────────
+    case 'calendar-poll':
+        if ($method !== 'GET') err('Method not allowed', 405);
+
+        // Datos relevantes para el calendario
+        $reservas    = $db->query('SELECT * FROM gestor_reservas ORDER BY semanaOffset,dia,modulo')->fetchAll();
+        $solicitudes = $db->query('SELECT * FROM gestor_solicitudes ORDER BY id')->fetchAll();
+        $espera      = $db->query('SELECT * FROM gestor_espera ORDER BY id')->fetchAll();
+
+        // Labs: salones + gestor_labs (ocupado/max_grupos)
+        $labs = $db->query("
+            SELECT
+                CAST(s.id_salones AS CHAR) AS id,
+                CONCAT(s.tipo, ' ', s.numero) AS nombre,
+                COALESCE(gl.ocupado, 0) AS ocupado,
+                s.capacidad,
+                CONCAT('Ubicación: ', s.ubicacion) AS notas,
+                COALESCE(gl.max_grupos, 2) AS max_grupos
+            FROM salones s
+            LEFT JOIN gestor_labs gl ON gl.id = CAST(s.id_salones AS CHAR)
+            ORDER BY s.tipo, s.numero
+        ")->fetchAll();
+
+        // Calcular hash para detectar cambios
+        $payload = [
+            'reservas'    => castRows($reservas),
+            'solicitudes' => castRows($solicitudes),
+            'espera'      => castRows($espera),
+            'labs'        => castRows($labs),
+        ];
+        $hash = md5(json_encode($payload));
+
+        // Si el cliente envía el hash anterior y coincide, no hay cambios
+        $clientHash = $_GET['hash'] ?? '';
+        if ($clientHash === $hash) {
+            ok(['changed' => false, 'hash' => $hash]);
+        }
+
+        $payload['changed'] = true;
+        $payload['hash']    = $hash;
+        ok($payload);
+
     default:
         err('Endpoint not found',404);
 }

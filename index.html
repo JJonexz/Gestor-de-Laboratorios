@@ -1026,17 +1026,18 @@
   <!--
   Módulos de JavaScript — cargar EN ESTE ORDEN (cada uno depende del anterior)
   ┌─────────────────────────────────────────────────────────────────┐
-  │  config.js      → constantes y estado global                    │
-  │  db.js          → base de datos SQL via api.php (SQLite)        │
-  │  helpers.js     → utilidades puras (fechas, lookups, roles)     │
-  │  ui.js          → toast, modales, UIHelper                      │
-  │  nav.js         → navegación entre páginas y filtros            │
-  │  calendario.js  → renderizado del calendario semanal            │
-  │  reservas.js    → modal de reserva + aprobación de solicitudes  │
-  │  espera.js      → lista de espera                               │
-  │  misReservas.js → vista "Mis reservas"                          │
-  │  admin.js       → panel de administración + CRUD                │
-  │  init.js        → arranque (sesión, eventos, carga de datos)    │
+  │  config.js         → constantes y estado global                 │
+  │  db.js             → base de datos SQL via api.php (SQLite)     │
+  │  helpers.js        → utilidades puras (fechas, lookups, roles)  │
+  │  ui.js             → toast, modales, UIHelper                   │
+  │  nav.js            → navegación entre páginas y filtros         │
+  │  calendario.js     → renderizado del calendario semanal         │
+  │  reservas.js       → modal de reserva + aprobación de solic.    │
+  │  espera.js         → lista de espera                            │
+  │  misReservas.js    → vista "Mis reservas"                       │
+  │  admin.js          → panel de administración + CRUD             │
+  │  ajax-polling.js   → actualización AJAX en tiempo real          │
+  │  init.js           → arranque (sesión, eventos, carga de datos) │
   └─────────────────────────────────────────────────────────────────┘
 -->
   <script src="js/config.js"></script>
@@ -1054,6 +1055,7 @@
   <script src="js/conflictos.js"></script>
   <script src="js/calendario_escolar.js"></script>
   <script src="js/incidencias.js"></script>
+  <script src="js/ajax-polling.js"></script>
   <script src="js/init.js"></script>
   <script src="js/db-override.js"></script>
 </body>
