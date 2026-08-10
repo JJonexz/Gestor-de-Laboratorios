@@ -16,13 +16,25 @@
 
 // ── Re-renderizado general ───────────────────────────────────
 // Llamar después de cualquier cambio de datos para mantener la UI sincronizada.
-function renderAll() {
-  renderCalendario();
+function refreshCurrentView() {
+  if (typeof renderCalendario === 'function') renderCalendario();
   var activePage = document.querySelector('.page.active');
-  if (activePage) {
-    if (activePage.id === 'page-mis-reservas') renderMisReservas();
-    if (activePage.id === 'page-admin')        renderAdmin();
+  if (!activePage) return;
+  if (activePage.id === 'page-mis-reservas' && typeof renderMisReservas === 'function') {
+    renderMisReservas();
+  } else if (activePage.id === 'page-admin' && typeof renderAdmin === 'function') {
+    renderAdmin();
+  } else if (activePage.id === 'page-fechas-especiales' && typeof renderCalendarioEscolar === 'function') {
+    renderCalendarioEscolar();
+  } else if (activePage.id === 'page-estadisticas' && typeof renderEstadisticas === 'function') {
+    renderEstadisticas();
+  } else if (activePage.id === 'page-incidencias' && typeof renderIncidencias === 'function') {
+    renderIncidencias();
   }
+}
+
+function renderAll() {
+  refreshCurrentView();
 }
 
 // ── Arranque ─────────────────────────────────────────────────

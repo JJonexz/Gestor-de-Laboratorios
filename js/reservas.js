@@ -760,6 +760,24 @@ function procederGuardarReserva(lab, dia, modulo, curso, materia, secuencia, ori
           return s.semanaOffset === checkSem && s.dia === parseInt(dia) && s.modulo === m && s.lab === lab && s.estado === 'pendiente';
         });
         if (solicPendiente) { toast('El módulo ' + getModulo(m).label + ' ya tiene solicitud en la semana ' + checkSem + '.', 'warn'); return; }
+        
+        // Validacion: un curso no puede estar en distintos salones al mismo horario
+        var cursoEnOtroLab = RESERVAS.find(function(r) {
+          return r.semanaOffset === checkSem && r.dia === parseInt(dia) && r.modulo === m && r.curso === curso && r.lab !== lab;
+        });
+        if (cursoEnOtroLab) {
+          toast('El curso ' + curso + ' ya esta reservado en otro laboratorio en ese horario.', 'err');
+          return;
+        }
+        
+        // Tambien verificar en solicitudes
+        var cursoEnOtroLabSolicitud = SOLICITUDES.find(function(s) {
+          return s.semanaOffset === checkSem && s.dia === parseInt(dia) && s.modulo === m && s.curso === curso && s.lab !== lab && s.estado === 'pendiente';
+        });
+        if (cursoEnOtroLabSolicitud) {
+          toast('El curso ' + curso + ' ya tiene solicitud en otro laboratorio en ese horario.', 'err');
+          return;
+        }
       }
     }
   }

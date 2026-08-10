@@ -529,6 +529,11 @@ function eliminarHorarioFijo(fijoId) {
 
 // ── Edición de recreos ────────────────────────────────────────
 function editarRecreo(moduloId) {
+  // Solo directivos pueden editar recreos
+  if (!esDirectivo()) {
+    toast('Solo directivos pueden editar los recreos.', 'err');
+    return;
+  }
   var rec = RECREOS.find(function (r) { return r.modulo === moduloId; });
   var mod = getModulo(moduloId);
   document.getElementById('modal-recreo-title').textContent = mod.icon + ' ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')';
@@ -539,6 +544,12 @@ function editarRecreo(moduloId) {
 }
 
 function guardarRecreo() {
+  // Validar que sea directivo
+  if (!esDirectivo()) {
+    toast('Solo directivos pueden editar los recreos.', 'err');
+    cerrarModal('modal-recreo');
+    return;
+  }
   var moduloId = parseInt(document.getElementById('recreo-modulo-id').value);
   var evento = document.getElementById('recreo-evento').value.trim();
   var notas = document.getElementById('recreo-notas').value.trim();
@@ -593,16 +604,20 @@ function renderEsperaCalendario() {
 
   var bgColors = ['var(--navy)', 'var(--red)', 'var(--green)', 'var(--amber)'];
   var esDir = esDirectivo();
+  var profeActualId = getCurrentProfId();
 
   el.innerHTML = espera.map(function (e, i) {
     var p = getProfe(e.profeId);
     var fecha = getDiaDate(e.semanaOffset, e.dia);
     var mod = getModulo(e.modulo);
-    // Botones de acción solo para directivos
-    var acciones = esDir
-      ? '<button class="espera-btn" onclick="promoverEspera(' + e.id + ')">✓ Asignar</button>' +
-      '<button class="espera-btn cancel" onclick="quitarEspera(' + e.id + ')">✕</button>'
-      : '';
+    // Botones: directivos ven Asignar y Eliminar; docentes ven su propio boton Quitarse
+    var acciones = '';
+    if (esDir) {
+      acciones = '<button class="espera-btn" onclick="promoverEspera(' + e.id + ')">✓ Asignar</button>' +
+        '<button class="espera-btn cancel" onclick="quitarEspera(' + e.id + ')">✕</button>';
+    } else if (e.profeId === profeActualId) {
+      acciones = '<button class="espera-btn cancel" onclick="quitarEspera(' + e.id + ')">✕ Quitarse</button>';
+    }
     return (
       '<div class="espera-item">' +
       '<div class="espera-badge" style="background:' + bgColors[i % 4] + '">' + (i + 1) + '</div>' +

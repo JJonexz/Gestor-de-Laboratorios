@@ -123,6 +123,21 @@ function initSchema($pdo) {
             texto TEXT NOT NULL,
             PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS gestor_notificaciones (
+            id        INT NOT NULL AUTO_INCREMENT,
+            tipo      VARCHAR(50) NOT NULL DEFAULT 'info',
+            titulo    VARCHAR(255) NOT NULL,
+            cuerpo    VARCHAR(500) NOT NULL DEFAULT '',
+            fecha     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            leida     TINYINT NOT NULL DEFAULT 0,
+            profeId   VARCHAR(50) DEFAULT NULL,
+            labId     VARCHAR(10) DEFAULT NULL,
+            reservaId INT DEFAULT NULL,
+            PRIMARY KEY (id),
+            INDEX idx_profe (profeId),
+            INDEX idx_leida (leida)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
     // Migración: asegurar que profeId sea VARCHAR en tablas ya existentes
@@ -705,6 +720,63 @@ switch ($resource) {
         }
 
         ok($res);
+
+    // ── NOTIFICACIONES ────────────────────────────────────────
+    case 'notificaciones':
+        initSchema($db);
+        if ($method === 'GET') {
+            // Opcional: ?profeId=X filtra por docente; sin parámetro devuelve todas (admin)
+            $where = '1=1'; $p = [];
+            if (isset($_GET['profeId'])) {
+                if ($_GET['profeId'] === 'admin') {
+                    $where .= ' AND profeId IS NULL'; // solo notificaciones de admin
+                } else {
+                    $where .= ' AND (profeId=? OR profeId IS NULL)';
+                    $p[] = $_GET['profeId'];
+                }
+            }
+            $s = $db->prepare("SELECT * FROM gestor_notificaciones WHERE $where ORDER BY id DESC LIMIT 100");
+            $s->execute($p);
+            ok(castRows($s->fetchAll()));
+        }
+        if ($method === 'POST') {
+            $b = body();
+            $db->prepare('INSERT INTO gestor_notificaciones(tipo,titulo,cuerpo,profeId,labId,reservaId) VALUES(?,?,?,?,?,?)')
+               ->execute([
+                   $b['tipo']    ?? 'info',
+                   $b['titulo']  ?? '',
+                   $b['cuerpo']  ?? '',
+                   isset($b['profeId'])   && $b['profeId']   !== null ? $b['profeId']           : null,
+                   isset($b['labId'])     && $b['labId']     !== null ? $b['labId']              : null,
+                   isset($b['reservaId']) && $b['reservaId'] !== null ? (int)$b['reservaId']     : null,
+               ]);
+            $newId = (int)$db->lastInsertId();
+            $s = $db->prepare('SELECT * FROM gestor_notificaciones WHERE id=?'); $s->execute([$newId]);
+            ok(castRow($s->fetch()));
+        }
+        if ($method === 'PUT' && $id) {
+            // Marcar como leída
+            $db->prepare('UPDATE gestor_notificaciones SET leida=1 WHERE id=?')->execute([(int)$id]);
+            ok(['updated' => (int)$id]);
+        }
+        if ($method === 'DELETE') {
+            if ($id) {
+                $db->prepare('DELETE FROM gestor_notificaciones WHERE id=?')->execute([(int)$id]);
+                ok(['deleted' => (int)$id]);
+            }
+            // DELETE sin id: borrar todas las del usuario (via body)
+            $b = body();
+            if (isset($b['profeId'])) {
+                if ($b['profeId'] === 'admin') {
+                    $db->exec('DELETE FROM gestor_notificaciones WHERE profeId IS NULL');
+                } else {
+                    $db->prepare('DELETE FROM gestor_notificaciones WHERE profeId=?')->execute([$b['profeId']]);
+                }
+                ok(['deleted_all' => true]);
+            }
+            err('Especificá id o profeId para eliminar', 400);
+        }
+        err('Not found', 404);
 
     default:
         err('Endpoint not found',404);

@@ -284,14 +284,20 @@ function manejarSync(ev) {
     var payload = JSON.parse(ev.newValue);
     var evento = payload.evento;
 
-    if (evento === 'reserva_aprobada' || evento === 'solicitud_rechazada') {
-      // Recargar datos y re-renderizar
-      loadFromLocalStorage();
-      if (typeof renderCalendario === 'function') renderCalendario();
-      var pAdmin = document.getElementById('page-admin');
-      if (pAdmin && pAdmin.classList.contains('active')) renderAdmin();
-      actualizarBadgeNotif && actualizarBadgeNotif();
-      mostrarIndicadorSync('Actualizado desde otra pestaña');
+    if (evento === 'reserva_aprobada' || evento === 'solicitud_rechazada' || evento === 'solicitud_creada') {
+      // Recargar datos desde la API cuando se usa SQL
+      var finishSync = function() {
+        if (typeof renderAll === 'function') renderAll();
+        actualizarBadgeNotif && actualizarBadgeNotif();
+        mostrarIndicadorSync('Actualizado desde otra pestaña');
+      };
+
+      if (typeof loadFromJSON === 'function') {
+        loadFromJSON(finishSync);
+      } else {
+        loadFromLocalStorage();
+        finishSync();
+      }
     }
   } catch(e) {}
 }

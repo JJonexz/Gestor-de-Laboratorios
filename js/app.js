@@ -501,6 +501,11 @@ function renderCalendario() {
 }
 
 function editarRecreo(moduloId) {
+  // Solo directivos pueden editar recreos
+  if (!esDirectivo()) {
+    toast('Solo directivos pueden editar los recreos.', 'err');
+    return;
+  }
   var rec = RECREOS.find(function (r) { return r.modulo === moduloId; });
   var mod = getModulo(moduloId);
   document.getElementById('modal-recreo-title').textContent = mod.icon + ' ' + mod.label + ' (' + mod.inicio + '–' + mod.fin + ')';
@@ -510,6 +515,12 @@ function editarRecreo(moduloId) {
   abrirModal('modal-recreo');
 }
 function guardarRecreo() {
+  // Validar que sea directivo
+  if (!esDirectivo()) {
+    toast('Solo directivos pueden editar los recreos.', 'err');
+    cerrarModal('modal-recreo');
+    return;
+  }
   var moduloId = parseInt(document.getElementById('recreo-modulo-id').value);
   var evento = document.getElementById('recreo-evento').value.trim();
   var notas = document.getElementById('recreo-notas').value.trim();
@@ -545,12 +556,16 @@ function renderEsperaCalendario() {
   if (!espera.length) { el.innerHTML = '<div class="empty-state">No hay docentes en lista de espera esta semana.</div>'; return; }
   var bgColors = ['var(--navy)', 'var(--red)', 'var(--green)', 'var(--amber)'];
   var esDir = esDirectivo();
+  var profeActualId = getCurrentProfId();
   el.innerHTML = espera.map(function (e, i) {
     var p = getProfe(e.profeId); var fecha = getDiaDate(e.semanaOffset, e.dia); var mod = getModulo(e.modulo);
-    // R1a: botón Asignar solo para directivos; botón ✕ también solo para directivos
-    var acciones = (esDir
-      ? '<button class="espera-btn" onclick="promoverEspera(' + e.id + ')">✓ Asignar</button><button class="espera-btn cancel" onclick="quitarEspera(' + e.id + ')">✕</button>'
-      : '');
+    // Botones: directivos ven Asignar y Eliminar; docentes ven su propio botón Quitarse
+    var acciones = '';
+    if (esDir) {
+      acciones = '<button class="espera-btn" onclick="promoverEspera(' + e.id + ')">✓ Asignar</button><button class="espera-btn cancel" onclick="quitarEspera(' + e.id + ')">✕</button>';
+    } else if (e.profeId === profeActualId) {
+      acciones = '<button class="espera-btn cancel" onclick="quitarEspera(' + e.id + ')">✕ Quitarse</button>';
+    }
     return '<div class="espera-item"><div class="espera-badge" style="background:' + bgColors[i % 4] + '">' + (i + 1) + '</div><div style="flex:1;min-width:0;"><div class="item-name">Prof. ' + p.apellido + '</div><div class="item-sub">' + DIAS_SEMANA[e.dia] + ' ' + formatFecha(fecha) + ' · ' + mod.label + ' · Lab.' + e.lab + '</div></div><div class="espera-actions">' + acciones + '</div></div>';
   }).join('');
 }
@@ -1183,9 +1198,17 @@ function eliminarPauta(i) {
 function renderAll() {
   renderCalendario();
   var activePage = document.querySelector('.page.active');
-  if (activePage) {
-    if (activePage.id === 'page-mis-reservas') renderMisReservas();
-    if (activePage.id === 'page-admin') renderAdmin();
+  if (!activePage) return;
+  if (activePage.id === 'page-mis-reservas') {
+    renderMisReservas();
+  } else if (activePage.id === 'page-admin') {
+    renderAdmin();
+  } else if (activePage.id === 'page-fechas-especiales') {
+    if (typeof renderCalendarioEscolar === 'function') renderCalendarioEscolar();
+  } else if (activePage.id === 'page-estadisticas') {
+    if (typeof renderEstadisticas === 'function') renderEstadisticas();
+  } else if (activePage.id === 'page-incidencias') {
+    if (typeof renderIncidencias === 'function') renderIncidencias();
   }
 }
 

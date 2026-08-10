@@ -1936,6 +1936,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--sombra-xs);
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
 }
 
 .at-table { width: max-content; min-width: 100%; border-collapse: collapse; }

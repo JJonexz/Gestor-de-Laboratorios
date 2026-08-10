@@ -197,11 +197,29 @@ function renderMisReservas() {
 function cancelarSolicitudGrupo(ids) {
   var s = SOLICITUDES.find(function(x) { return x.id === ids[0]; });
   if (!s) return;
+  var p = getProfe(s.profeId);
+  var lab = getLab(s.lab);
   confirmar('¿Cancelar esta solicitud pendiente (' + ids.length + ' módulo/s)?', function() {
-    SOLICITUDES = SOLICITUDES.filter(function(x) { return ids.indexOf(x.id) === -1; });
-    saveDB();
-    toast('Solicitud cancelada.', 'info');
-    renderAll();
+    var pendiente = ids.length;
+    ids.forEach(function(id) {
+      dbEliminarSolicitud(id, function() {
+        pendiente--;
+        if (pendiente === 0) {
+          toast('Solicitud cancelada.', 'info');
+          // Notificar a directivos que el profesor canceló su solicitud
+          if (typeof crearNotificacion === 'function') {
+            crearNotificacion(
+              'cancelacion_sol',
+              'Solicitud cancelada por docente',
+              'Prof. ' + (p ? p.apellido : '?') + ' canceló su solicitud en ' + (lab ? lab.nombre : 'Lab.' + s.lab) + ' — ' + DIAS_LARGO[s.dia] + ' (mód. ' + getModulo(s.modulo).label + ')',
+              null, // null = visible para admins
+              { labId: s.lab }
+            );
+          }
+          renderAll();
+        }
+      });
+    });
   });
 }
 
@@ -313,28 +331,40 @@ function cancelarReservaGrupo(ids) {
 function ejecutarCancelacionGrupo(ids) {
   var primerR = RESERVAS.find(function(x) { return x.id === ids[0]; });
   if (!primerR) return;
+  var p = getProfe(primerR.profeId);
+  var lab = getLab(primerR.lab);
 
-  RESERVAS = RESERVAS.filter(function(x) { return ids.indexOf(x.id) === -1; });
-  saveDB();
-  toast('Reservas canceladas.', 'info');
+  var pendiente = ids.length;
+  ids.forEach(function(id) {
+    dbEliminarReserva(id, function() {
+      pendiente--;
+      if (pendiente === 0) {
+        toast('Reservas canceladas.', 'info');
 
-  // Avisar si hay docentes en espera para ese turno
-  var waiting = LISTA_ESPERA.filter(function(e) {
-    // simplificado: si coincide el dia y lab, revisamos si coincide algun modulo
-    if (e.lab === primerR.lab && e.dia === primerR.dia) {
-      // Necesitamos el modulo original de los cancelados
-      // Lamentablemente ya los borramos, pero podemos buscar en primerR si al menos uno coincide
-      // Como solo es un aviso, avisaremos si el modulo de espera coincide con el de la primera reserva cancelada o si simplificamos:
-      return true; // Simplificado para avisar si hay espera el mismo dia/lab
-    }
-    return false;
+        // Notificar a directivos que el profesor canceló su reserva
+        if (typeof crearNotificacion === 'function') {
+          crearNotificacion(
+            'cancelacion_res',
+            'Reserva cancelada por docente',
+            'Prof. ' + (p ? p.apellido : '?') + ' canceló su reserva en ' + (lab ? lab.nombre : 'Lab.' + primerR.lab) + ' — ' + DIAS_LARGO[primerR.dia] + ' (' + ids.length + ' módulo/s)',
+            null, // null = visible para admins
+            { labId: primerR.lab }
+          );
+        }
+
+        // Avisar si hay docentes en espera para ese turno
+        var waiting = LISTA_ESPERA.filter(function(e) {
+          return e.lab === primerR.lab && e.dia === primerR.dia;
+        });
+        if (waiting.length) {
+          setTimeout(function() {
+            toast('Hay ' + waiting.length + ' docente(s) en espera para ese día/lab.', 'warn');
+          }, 400);
+        }
+        renderAll();
+      }
+    });
   });
-  if (waiting.length) {
-    setTimeout(function() {
-      toast('Hay ' + waiting.length + ' docente(s) en espera para ese día/lab.', 'warn');
-    }, 400);
-  }
-  renderAll();
 }
 
 function cancelarSerieAnual(reservaBase) {
@@ -343,20 +373,41 @@ function cancelarSerieAnual(reservaBase) {
   var labOriginal     = reservaBase.lab;
   var diaOriginal     = reservaBase.dia;
 
-  var total = RESERVAS.length;
-  RESERVAS = RESERVAS.filter(function(x) {
-    var coincide = (
+  var idsAEliminar = RESERVAS.filter(function(x) {
+    return (
       x.lab     === labOriginal &&
       x.dia     === diaOriginal &&
       x.profeId === profeIdOriginal &&
       x.curso   === cursoOriginal &&
       x.anual   === true
     );
-    return !coincide;
-  });
+  }).map(function(x) { return x.id; });
 
-  var eliminadas = total - RESERVAS.length;
-  saveDB();
-  toast('Se eliminaron ' + eliminadas + ' reserva(s) de la serie anual.', 'ok');
-  renderAll();
+  if (!idsAEliminar.length) {
+    toast('No se encontraron reservas de la serie.', 'warn');
+    return;
+  }
+
+  var p = getProfe(profeIdOriginal);
+  var lab = getLab(labOriginal);
+  var pendiente = idsAEliminar.length;
+
+  idsAEliminar.forEach(function(id) {
+    dbEliminarReserva(id, function() {
+      pendiente--;
+      if (pendiente === 0) {
+        toast('Se eliminaron ' + idsAEliminar.length + ' reserva(s) de la serie anual.', 'ok');
+        if (typeof crearNotificacion === 'function') {
+          crearNotificacion(
+            'cancelacion_res',
+            'Serie anual cancelada',
+            'Prof. ' + (p ? p.apellido : '?') + ' canceló toda la serie anual en ' + (lab ? lab.nombre : 'Lab.' + labOriginal) + ' — ' + DIAS_LARGO[diaOriginal],
+            null,
+            { labId: labOriginal }
+          );
+        }
+        renderAll();
+      }
+    });
+  });
 }

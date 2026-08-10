@@ -84,6 +84,8 @@ function abrirModal(id) {
   var el = document.getElementById(id);
   if (!el) return;
   el.classList.add('open');
+  // Bloquear scroll del body cuando un modal está abierto
+  document.body.style.overflow = 'hidden';
   // Foco automático al primer campo interactivo
   setTimeout(function() {
     var f = el.querySelector('button, input, select, textarea');
@@ -94,6 +96,10 @@ function abrirModal(id) {
 function cerrarModal(id) {
   var el = document.getElementById(id);
   if (el) el.classList.remove('open');
+  // Restaurar scroll del body cuando no hay más modales abiertos
+  if (!document.querySelector('.modal-overlay.open')) {
+    document.body.style.overflow = '';
+  }
 }
 
 // ── UIHelper — escritura defensiva en el DOM ─────────────────

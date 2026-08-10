@@ -119,6 +119,14 @@ guardarReserva = function() {
       nuevas.forEach(function(s) { SOLICITUDES.push(s); });
       toast('Solicitud enviada (' + nuevas.length + ' modulo' + (nuevas.length > 1 ? 's' : '') + ').', 'info');
       renderAll();
+      if (typeof emitirSync === 'function') {
+        emitirSync('solicitud_creada', {
+          cantidad: nuevas.length,
+          profeId: (window.SESSION ? window.SESSION.profeId : null),
+          lab: lab,
+          dia: parseInt(dia, 10)
+        });
+      }
     }).catch(function(e) { toast('Error al enviar solicitud: ' + e.message, 'err'); });
   }
 };

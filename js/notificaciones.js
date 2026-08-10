@@ -3,57 +3,99 @@
 //
 // Funcionalidades:
 //   • Centro de notificaciones con panel deslizable
-//   • Notificaciones persistentes en localStorage
-//   • Tipos: aprobación, rechazo, espera liberada, vencimiento ciclo
+//   • Notificaciones persistentes en BD via api.php
+//   • Tipos: aprobación, rechazo, espera liberada, vencimiento ciclo,
+//            cancelacion_res, cancelacion_sol
 //   • Badge con contador en el header
 //   • Polling automático cada 15 segundos
 //
-// Depende de: config.js, helpers.js
+// Depende de: config.js, helpers.js, db.js (apiFetch)
 // ============================================================
 
-var NOTIF_KEY = 'gestor_eest1_notifs';
 var _notifPollInterval = null;
+var _cachedNotifs = [];       // cache local para evitar re-fetches innecesarios
+var _notifsCargadas = false;
+var _notifsFingerprint = '';
 
-// ── Modelo de notificación ───────────────────────────────────
-// { id, tipo, titulo, cuerpo, fecha, leida, profeId, reservaId? }
-// Tipos: 'aprobada' | 'rechazada' | 'espera_libre' | 'ciclo_vence' | 'incidencia' | 'conflicto'
+function fingerprintNotifs(list) {
+  return (list || []).map(function(n) { return n.id; }).join(',');
+}
+
+function refreshDataIfNotifsChanged(lista, callback) {
+  var fingerprint = fingerprintNotifs(lista);
+  if (fingerprint === _notifsFingerprint) {
+    if (typeof renderAll === 'function') renderAll();
+    if (callback) callback();
+    return;
+  }
+  _notifsFingerprint = fingerprint;
+  if (typeof loadFromJSON !== 'function') {
+    if (typeof renderAll === 'function') renderAll();
+    if (callback) callback();
+    return;
+  }
+  loadFromJSON(function() {
+    if (typeof renderAll === 'function') renderAll();
+    if (callback) callback();
+  });
+}
+
+// ── Carga de notificaciones desde API ───────────────────────
+function cargarNotificaciones(callback) {
+  var sesion = getSesionActualNotif();
+  if (!sesion) { _cachedNotifs = []; if (callback) callback([]); return; }
+  var qs = sesion.rol === 'admin' ? '?profeId=admin' : '?profeId=' + sesion.profeId;
+  apiGet('notificaciones' + qs).then(function(lista) {
+    _cachedNotifs = lista || [];
+    _notifsCargadas = true;
+    refreshDataIfNotifsChanged(_cachedNotifs, function() {
+      if (callback) callback(_cachedNotifs);
+    });
+  }).catch(function() {
+    if (callback) callback(_cachedNotifs);
+  });
+}
 
 function getNotificaciones() {
-  try {
-    var raw = localStorage.getItem(NOTIF_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch(e) { return []; }
+  return _cachedNotifs;
 }
 
-function saveNotificaciones(lista) {
-  try { localStorage.setItem(NOTIF_KEY, JSON.stringify(lista)); } catch(e) {}
-}
+// saveNotificaciones ya no es necesario (persiste en BD), se mantiene como no-op
+function saveNotificaciones(lista) { _cachedNotifs = lista; }
 
-// ── Crear notificación ───────────────────────────────────────
+// ── Crear notificación (persiste en BD) ──────────────────────
 function crearNotificacion(tipo, titulo, cuerpo, profeId, extra) {
   extra = extra || {};
-  var notifs = getNotificaciones();
-  var nueva = {
-    id:       Date.now() + Math.random(),
-    tipo:     tipo,
-    titulo:   titulo,
-    cuerpo:   cuerpo,
-    fecha:    new Date().toISOString(),
-    leida:    false,
-    profeId:  profeId,
-    reservaId: extra.reservaId || null,
-    labId:    extra.labId || null
+  var datos = {
+    tipo:      tipo,
+    titulo:    titulo,
+    cuerpo:    cuerpo,
+    profeId:   profeId !== undefined ? profeId : null,
+    labId:     extra.labId     || null,
+    reservaId: extra.reservaId || null
   };
-  notifs.unshift(nueva);
-  // Máximo 50 notificaciones
-  if (notifs.length > 50) notifs = notifs.slice(0, 50);
-  saveNotificaciones(notifs);
-  actualizarBadgeNotif();
-  // Toast inmediato si es para el usuario actual
-  var sesion = getSesionActualNotif();
-  if (sesion && sesion.profeId === profeId) {
-    toast(titulo + ': ' + cuerpo, tipo === 'rechazada' ? 'error' : tipo === 'aprobada' ? 'success' : 'info');
-  }
+  apiPost('notificaciones', datos).then(function(nueva) {
+    _cachedNotifs.unshift(nueva);
+    if (_cachedNotifs.length > 100) _cachedNotifs = _cachedNotifs.slice(0, 100);
+    actualizarBadgeNotif();
+    // Toast inmediato si la notificación es para el usuario actual
+    var sesion = getSesionActualNotif();
+    var esParaMi = sesion && (
+      (sesion.rol === 'admin' && profeId === null) ||
+      (sesion.profeId == profeId)
+    );
+    if (esParaMi) {
+      var toastTipo = tipo === 'rechazada' || tipo === 'cancelacion_res' || tipo === 'cancelacion_sol'
+        ? 'err'
+        : tipo === 'aprobada' ? 'ok' : 'info';
+      toast(titulo + ': ' + cuerpo, toastTipo);
+    }
+  }).catch(function(e) {
+    // Fallback local si la API falla
+    _cachedNotifs.unshift({ id: Date.now(), tipo: tipo, titulo: titulo, cuerpo: cuerpo,
+      fecha: new Date().toISOString(), leida: false, profeId: profeId });
+    actualizarBadgeNotif();
+  });
 }
 
 // ── Notificaciones del usuario actual ────────────────────────
@@ -62,7 +104,8 @@ function getNotifsPropias() {
   if (!sesion) return [];
   var todas = getNotificaciones();
   if (sesion.rol === 'admin') return todas;
-  return todas.filter(function(n) { return n.profeId === sesion.profeId || n.profeId === null; });
+  // profeId === null son notificaciones para directivos únicamente; los docentes solo ven las suyas
+  return todas.filter(function(n) { return n.profeId !== null && n.profeId === sesion.profeId; });
 }
 
 function getNoLeidas() {
@@ -112,31 +155,48 @@ function marcarTodasLeidas() {
 }
 
 function limpiarNotificaciones() {
-  var todas = getNotificaciones();
-  var sesion = getSesionActualNotif();
-  if (!sesion) return;
-  var filtradas;
-  if (sesion.rol === 'admin') {
-    filtradas = [];
-  } else {
-    filtradas = todas.filter(function(n) {
-      return n.profeId !== sesion.profeId && n.profeId !== null;
-    });
-  }
-  saveNotificaciones(filtradas);
-  renderNotifPanel();
-  actualizarBadgeNotif();
+  confirmarOpciones(
+    '¿Estás seguro de que deseas eliminar todas las notificaciones?',
+    {
+      ok: {
+        texto: '🗑 Eliminar',
+        callback: function() {
+          var todas = getNotificaciones();
+          var sesion = getSesionActualNotif();
+          if (!sesion) return;
+          var filtradas;
+          if (sesion.rol === 'admin') {
+            filtradas = [];
+          } else {
+            filtradas = todas.filter(function(n) {
+              return n.profeId !== sesion.profeId && n.profeId !== null;
+            });
+          }
+          saveNotificaciones(filtradas);
+          renderNotifPanel();
+          actualizarBadgeNotif();
+          toast('Notificaciones eliminadas.', 'ok');
+        }
+      },
+      extra: {
+        texto: 'Cancelar',
+        style: { background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)' }
+      }
+    }
+  );
 }
 
 // ── Renderizado del panel ────────────────────────────────────
 var NOTIF_ICONS = {
-  aprobada:    { icon: '✓', color: 'var(--green)', bg: 'var(--green-dim)' },
-  rechazada:   { icon: '✕', color: 'var(--red)',   bg: 'var(--red-dim)'   },
-  espera_libre:{ icon: '↑', color: 'var(--blue)',  bg: 'var(--blue-dim)'  },
-  ciclo_vence: { icon: '⟳', color: 'var(--amber)', bg: 'var(--amber-dim)' },
-  incidencia:  { icon: '!', color: 'var(--red)',   bg: 'var(--red-dim)'   },
-  conflicto:   { icon: '⚡', color: 'var(--amber)', bg: 'var(--amber-dim)' },
-  info:        { icon: 'i', color: 'var(--navy)',  bg: 'var(--navy-faint)' }
+  aprobada:        { icon: '✓', color: 'var(--green)', bg: 'var(--green-dim)'  },
+  rechazada:       { icon: '✕', color: 'var(--red)',   bg: 'var(--red-dim)'    },
+  espera_libre:    { icon: '↑', color: 'var(--blue)',  bg: 'var(--blue-dim)'   },
+  ciclo_vence:     { icon: '⟳', color: 'var(--amber)', bg: 'var(--amber-dim)'  },
+  incidencia:      { icon: '!', color: 'var(--red)',   bg: 'var(--red-dim)'    },
+  conflicto:       { icon: '⚡', color: 'var(--amber)', bg: 'var(--amber-dim)'  },
+  cancelacion_res: { icon: '✖', color: 'var(--red)',   bg: 'var(--red-dim)'    },
+  cancelacion_sol: { icon: '↩', color: 'var(--amber)', bg: 'var(--amber-dim)'  },
+  info:            { icon: 'i', color: 'var(--navy)',  bg: 'var(--navy-faint)' }
 };
 
 function renderNotifPanel() {
@@ -269,16 +329,19 @@ function notifConflictoDetectado(reserva) {
 
 // ── Polling automático ───────────────────────────────────────
 function iniciarPollingNotif() {
+  cargarNotificaciones(function() {
+    actualizarBadgeNotif();
+    var panel = document.getElementById('notif-panel');
+    if (panel && panel.classList.contains('open')) renderNotifPanel();
+  });
   checkCiclosVencimiento();
-  actualizarBadgeNotif();
   if (_notifPollInterval) clearInterval(_notifPollInterval);
   _notifPollInterval = setInterval(function() {
+    cargarNotificaciones(function() {
+      actualizarBadgeNotif();
+      var panel = document.getElementById('notif-panel');
+      if (panel && panel.classList.contains('open')) renderNotifPanel();
+    });
     checkCiclosVencimiento();
-    actualizarBadgeNotif();
-    // Si el panel está abierto, refrescar
-    var panel = document.getElementById('notif-panel');
-    if (panel && panel.classList.contains('open')) {
-      renderNotifPanel();
-    }
   }, 15000);
 }

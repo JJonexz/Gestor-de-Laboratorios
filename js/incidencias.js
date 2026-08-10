@@ -55,11 +55,12 @@ function crearIncidencia(datos) {
   actualizarBadgeIncidencias();
 
   if (typeof crearNotificacion === 'function') {
+    // Solo notificar a directivos, no a docentes
     crearNotificacion(
       'incidencia',
       'Nueva incidencia — Lab.' + datos.labId,
       (TIPOS_INCID[datos.tipo] ? TIPOS_INCID[datos.tipo].label : datos.tipo) + ': ' + datos.descripcion.slice(0, 60),
-      null,
+      'admin',  // Solo para directivos
       { labId: datos.labId }
     );
   }

@@ -14,9 +14,13 @@
 // ── Toggle Sidebar ───────────────────────────────────────────
 const sidebar = document.getElementById('sidebar');
 const btn = document.getElementById('toggleBtn');
-let collapsed = false;
+let collapsed = true; // Sidebar escondida por defecto
 
 if (btn && sidebar) {
+  // Inicializar como colapsada
+  sidebar.classList.toggle('collapsed', collapsed);
+  btn.setAttribute('aria-label', collapsed ? 'Mostrar panel lateral' : 'Ocultar panel lateral');
+  
   btn.addEventListener('click', () => {
     collapsed = !collapsed;
     sidebar.classList.toggle('collapsed', collapsed);
