@@ -72,12 +72,13 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
     <div class="box-sub">Gestión de Laboratorios Informáticos</div>
   </div>
 
-  <div class="login-error" id="login-error">Usuario o contraseña incorrectos.</div>
+  <div class="login-error" id="login-error">DNI o contraseña incorrectos.</div>
 
   <div class="form-group">
-    <label class="form-label">Usuario</label>
+    <label class="form-label" for="f-usuario">DNI</label>
     <input class="form-input" type="text" id="f-usuario"
-           placeholder="apellido.nombre, DNI o legajo"
+           placeholder="Ej: 32946869"
+           inputmode="numeric" pattern="[0-9]*"
            autocomplete="username" spellcheck="false">
   </div>
 
@@ -94,10 +95,10 @@ html,body{min-height:100%;background:var(--bg);font-family:var(--font);display:f
 
   <div class="info-box">
     <strong>¿Cómo ingresar?</strong>
-    <div class="info-row"><span>📋</span><span>Usuario: tu <b>apellido.primerNombre</b>, DNI o número de legajo SAEP</span></div>
+    <div class="info-row"><span>📋</span><span>Ingresá con tu <b>DNI</b>, sin puntos ni espacios</span></div>
     <div class="info-row"><span>🔑</span><span>Contraseña: la misma que usás en el sistema escolar (por defecto <b>12345</b>)</span></div>
     <hr class="info-sep">
-    <div class="info-row"><span>ℹ️</span><span>Ejemplos de usuario: <code>ces.leandro</code>, <code>32946869</code> o tu número de legajo</span></div>
+    <div class="info-row"><span>ℹ️</span><span>Ejemplo: <code>32946869</code></span></div>
   </div>
 </div>
 
@@ -110,16 +111,26 @@ function togglePass() {
 }
 
 function doLogin() {
-  var username = document.getElementById('f-usuario').value.trim().toLowerCase();
+  // El DNI es la única forma de ingreso: normalizamos quitando puntos y espacios
+  // para aceptar tanto "32946869" como "32.946.869".
+  var username = document.getElementById('f-usuario').value.replace(/[.\s]/g, '').trim().toLowerCase();
   var password = document.getElementById('f-pass').value;
   var errEl    = document.getElementById('login-error');
   var btn      = document.getElementById('btn-login');
 
   errEl.classList.remove('show');
-  errEl.textContent = 'Usuario o contraseña incorrectos.';
+  errEl.textContent = 'DNI o contraseña incorrectos.';
 
   if (!username || !password) {
-    errEl.textContent = 'Completá usuario y contraseña.';
+    errEl.textContent = 'Completá tu DNI y la contraseña.';
+    errEl.classList.add('show');
+    return;
+  }
+
+  // El unico ingreso para el personal es el DNI. Se deja pasar 'admin' porque
+  // api.php mantiene ese usuario estatico como acceso de emergencia.
+  if (username !== 'admin' && !/^[0-9]+$/.test(username)) {
+    errEl.textContent = 'Ingresá tu DNI (solo números, sin puntos).';
     errEl.classList.add('show');
     return;
   }
@@ -138,7 +149,7 @@ function doLogin() {
     btn.textContent = 'Ingresar →';
 
     if (!json.ok) {
-      errEl.textContent = json.error || 'Usuario o contraseña incorrectos.';
+      errEl.textContent = json.error || 'DNI o contraseña incorrectos.';
       errEl.classList.add('show');
       return;
     }

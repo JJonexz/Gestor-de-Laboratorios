@@ -47,8 +47,10 @@
     if (_paused || _polling) return;
     _polling = true;
 
-    var url = 'calendar-poll';
-    if (_lastHash) url += '?hash=' + encodeURIComponent(_lastHash);
+    // Pedimos sólo la ventana de semanas que el calendario tiene cargada.
+    var v = (typeof VENTANA_SEMANAS !== 'undefined') ? VENTANA_SEMANAS : { desde: -1, hasta: 4 };
+    var url = 'calendar-poll?desde=' + v.desde + '&hasta=' + v.hasta;
+    if (_lastHash) url += '&hash=' + encodeURIComponent(_lastHash);
 
     apiGet(url)
       .then(function (data) {
@@ -66,42 +68,25 @@
         }
 
         // ── Hay cambios: actualizar arrays locales ──────────
+        // El servidor ya nos dijo que cambió (el hash difiere), así que no
+        // hace falta comparar. Antes se hacía JSON.stringify de todo el
+        // dataset dos veces por tick (~30 MB de strings cada 10 segundos).
         var huboActualizacion = false;
+        var cambioSolicitudes = false;
 
-        if (data.reservas) {
-          var newJSON = JSON.stringify(data.reservas);
-          var oldJSON = JSON.stringify(RESERVAS);
-          if (newJSON !== oldJSON) {
-            RESERVAS = data.reservas;
-            huboActualizacion = true;
-          }
-        }
-
+        if (data.reservas) { RESERVAS = data.reservas; huboActualizacion = true; }
         if (data.solicitudes) {
-          var newSJSON = JSON.stringify(data.solicitudes);
-          var oldSJSON = JSON.stringify(SOLICITUDES);
-          if (newSJSON !== oldSJSON) {
-            SOLICITUDES = data.solicitudes;
-            huboActualizacion = true;
-          }
+          cambioSolicitudes = SOLICITUDES.length !== data.solicitudes.length;
+          SOLICITUDES = data.solicitudes;
+          huboActualizacion = true;
         }
+        if (data.espera) { LISTA_ESPERA = data.espera; huboActualizacion = true; }
+        if (data.labs)   { LABS = data.labs; huboActualizacion = true; }
 
-        if (data.espera) {
-          var newEJSON = JSON.stringify(data.espera);
-          var oldEJSON = JSON.stringify(LISTA_ESPERA);
-          if (newEJSON !== oldEJSON) {
-            LISTA_ESPERA = data.espera;
-            huboActualizacion = true;
-          }
-        }
-
-        if (data.labs) {
-          var newLJSON = JSON.stringify(data.labs);
-          var oldLJSON = JSON.stringify(LABS);
-          if (newLJSON !== oldLJSON) {
-            LABS = data.labs;
-            huboActualizacion = true;
-          }
+        if (huboActualizacion) {
+          if (data.ventana && typeof VENTANA_SEMANAS !== 'undefined') VENTANA_SEMANAS = data.ventana;
+          if (typeof SEMANAS_CARGADAS !== 'undefined') SEMANAS_CARGADAS = {};
+          if (typeof invalidarIndices === 'function') invalidarIndices();
         }
 
         // ── Re-renderizar solo si hubo cambios reales ───────
@@ -112,10 +97,20 @@
           // Solo re-renderizar si no hay un modal abierto (para no interrumpir al usuario)
           var modalAbierto = document.querySelector('.modal-overlay.open');
           if (!modalAbierto) {
-            if (typeof renderAll === 'function') {
-              renderAll();
-            } else if (typeof renderCalendario === 'function') {
-              renderCalendario();
+            var activa = document.querySelector('.page.active');
+            var enAdmin = activa && activa.id === 'page-admin';
+
+            if (typeof renderCalendario === 'function') renderCalendario();
+
+            if (enAdmin) {
+              // No rehacemos el panel entero en cada poll: la tabla de reservas
+              // está paginada contra el servidor y volver a pedirla cada 10 s
+              // sería gratuito para nadie. Sólo refrescamos las solicitudes
+              // pendientes, que es lo que el directivo está mirando.
+              if (typeof renderSolicitudesAdmin === 'function') renderSolicitudesAdmin();
+              if (cambioSolicitudes && typeof pintarStatsAdmin === 'function') pintarStatsAdmin();
+            } else if (typeof refreshCurrentView === 'function') {
+              refreshCurrentView();
             }
           }
         }

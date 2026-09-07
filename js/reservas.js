@@ -663,6 +663,80 @@ function getNombreGrupo(id) {
   return g ? String(g.nombre) : '';
 }
 
+// ── Regla de 3 semanas seguidas + 1 de espera ────────────────
+// Un docente puede tomar el mismo slot (laboratorio + día + módulo) durante
+// MAX_SEMANAS_SEGUIDAS semanas consecutivas. Después corresponde
+// SEMANAS_COOLDOWN semana(s) de espera antes de volver a reservarlo.
+// Las reservas anuales ('institucional') están exentas.
+// Espejado en api.php (validarCooldown) para que no se pueda saltear.
+
+// Semanas ya tomadas por ese docente en ese slot exacto.
+function semanasTomadasSlot(profeId, lab, dia, modulo) {
+  var pid = String(profeId);
+  var set = {};
+  RESERVAS.forEach(function (r) {
+    if (Number(r.anual) === 1) return;
+    if (String(r.profeId) === pid && String(r.lab) === String(lab) &&
+        r.dia === dia && r.modulo === modulo) {
+      set[r.semanaOffset] = true;
+    }
+  });
+  SOLICITUDES.forEach(function (s) {
+    if (s.estado !== 'pendiente') return;
+    if (String(s.profeId) === pid && String(s.lab) === String(lab) &&
+        s.dia === dia && s.modulo === modulo) {
+      set[s.semanaOffset] = true;
+    }
+  });
+  return set;
+}
+
+// Largo de la racha consecutiva que termina justo antes de `semana`.
+function rachaPrevia(tomadas, semana) {
+  var n = 0, w = parseInt(semana, 10) - 1;
+  while (tomadas[w]) { n++; w--; }
+  return n;
+}
+
+// ¿Puede reservar ese slot en esa semana?
+// `tomadas` es opcional: pasarlo permite validar varias semanas de un lote
+// acumulando las que se van a crear (3 seguidas pasan, la 4ª no).
+function puedeReservarSlot(profeId, lab, dia, modulo, semana, tomadas) {
+  if (String(profeId) === 'institucional') return { ok: true };
+  var set = tomadas || semanasTomadasSlot(profeId, lab, dia, modulo);
+  if (rachaPrevia(set, semana) >= MAX_SEMANAS_SEGUIDAS) {
+    var libre = parseInt(semana, 10) + SEMANAS_COOLDOWN;
+    return {
+      ok: false,
+      libreDesde: libre,
+      motivo: 'Ya usaste ' + MAX_SEMANAS_SEGUIDAS + ' semanas seguidas en ' +
+        getLab(lab).nombre + ' (' + DIAS_LARGO[dia] + ', ' + getModulo(modulo).label + '). ' +
+        'Corresponde ' + SEMANAS_COOLDOWN + ' semana de espera: podés volver a reservarlo desde el ' +
+        formatFecha(getDiaDate(libre, dia)) + '.'
+    };
+  }
+  return { ok: true };
+}
+
+// Valida un lote completo de semanas x módulos. Devuelve null si está todo
+// bien, o el primer motivo de bloqueo encontrado.
+function motivoBloqueoLote(profeId, lab, dia, modulos, semanas) {
+  if (String(profeId) === 'institucional') return null;
+  var cache = {};
+  var semasOrdenadas = semanas.slice().sort(function (a, b) { return a - b; });
+  for (var mi = 0; mi < modulos.length; mi++) {
+    var m = modulos[mi];
+    cache[m] = semanasTomadasSlot(profeId, lab, dia, m);
+    for (var si = 0; si < semasOrdenadas.length; si++) {
+      var sem = semasOrdenadas[si];
+      var r = puedeReservarSlot(profeId, lab, dia, m, sem, cache[m]);
+      if (!r.ok) return r.motivo;
+      cache[m][sem] = true;   // la semana del propio lote también cuenta
+    }
+  }
+  return null;
+}
+
 // ── Guardar reserva ──────────────────────────────────────────
 function guardarReserva() {
   var lab = document.getElementById('f-lab').value;
@@ -1121,7 +1195,9 @@ function aceptarSolicitudGrupo(ids) {
         dbCrearReserva({
           semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
           curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
-          cicloClases: 1, renovaciones: 0
+          // Conservar el numero de clase dentro del ciclo de 3 semanas.
+          // Fijarlo en 1 hacia que "Clase X/3" nunca avanzara.
+          cicloClases: s.cicloClases || 1, renovaciones: 0
         }, function(nuevaReserva) {
           if (typeof emitirSync === 'function') emitirSync('reserva_aprobada', { reservaId: nuevaReserva.id, lab: labCapturado });
           dbEliminarSolicitud(solId, function() {
@@ -1224,7 +1300,9 @@ function editarReservaGrupo(ids) {
       if (optSiguientes) optSiguientes.style.display = r.anual ? 'none' : 'block';
       if (optAnual) optAnual.style.display = r.anual ? 'block' : 'none';
       var scopeSel = document.getElementById('edit-scope');
-      if (scopeSel) scopeSel.value = 'puntual'; // default
+      // Si es una serie anual, el default es propagar a toda la serie:
+      // es lo que se espera al editar una reserva fija de todo el año.
+      if (scopeSel) scopeSel.value = r.anual ? 'anual' : 'puntual';
     }
   }
   poblarSelectorGrupo(r.curso, r.grupoId || null);
@@ -1268,11 +1346,12 @@ function guardarEdicionReserva() {
     var actualizadas = 0;
     RESERVAS.forEach(function (x) {
       if (
-        x.lab === r.lab &&
+        String(x.lab) === String(r.lab) &&
         x.dia === r.dia &&
-        x.profeId === profeIdOriginal &&
+        String(x.profeId) === String(profeIdOriginal) &&
         x.curso === cursoOriginal &&
-        x.anual === true
+        Number(x.anual) === 1 &&
+        x.semanaOffset >= r.semanaOffset
       ) {
         x.curso = nuevoCurso;
         x.secuencia = nuevaSecuencia;
@@ -1443,13 +1522,15 @@ function obtenerReservasParaReasignar(r, scope) {
         x.profeId === r.profeId;
     });
   } else if (scope === 'anual') {
-    // Toda la serie anual del mismo curso/día/lab/profe
+    // Toda la serie anual del mismo curso/día/lab/profe, de esta semana
+    // en adelante. `anual` llega como int 0/1 desde la API, no como boolean.
     return RESERVAS.filter(function (x) {
-      return x.lab === r.lab &&
+      return String(x.lab) === String(r.lab) &&
         x.dia === r.dia &&
         x.curso === r.curso &&
-        x.profeId === r.profeId &&
-        x.anual === true;
+        String(x.profeId) === String(r.profeId) &&
+        Number(x.anual) === 1 &&
+        x.semanaOffset >= r.semanaOffset;
     });
   }
   return [r];

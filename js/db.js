@@ -12,8 +12,23 @@ var API = './api.php';
 
 // -- Fetch helper --------------------------------------------
 function apiFetch(endpoint, options) {
+  // X-Gestor-User lleva el DNI de sesión para que api.php pueda validar
+  // reglas de rol (p.ej. que sólo un directivo cree reservas anuales).
+  // No es autenticación: el header es falsificable, pero impide que la UI
+  // saltee las reglas por accidente.
+  var headers = { 'Content-Type': 'application/json' };
+  try {
+    if (window.SESSION && window.SESSION.id !== undefined && window.SESSION.id !== null) {
+      // El usuario 'admin' estatico de api.php tiene id 0 y no existe en
+      // `personal`; se identifica por nombre.
+      headers['X-Gestor-User'] = (Number(window.SESSION.id) === 0)
+        ? 'admin'
+        : String(window.SESSION.id);
+    }
+  } catch (e) {}
+
   return fetch(API + '/' + endpoint, Object.assign({
-    headers: { 'Content-Type': 'application/json' }
+    headers: headers
   }, options || {}))
   .then(function(r) {
     if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || 'Error ' + r.status); });
@@ -31,9 +46,13 @@ function apiPut(ep, data)    { return apiFetch(ep, { method: 'PUT',    body: JSO
 function apiDelete(ep, data) { return apiFetch(ep, { method: 'DELETE', body: data ? JSON.stringify(data) : undefined }); }
 
 // -- Carga inicial (un solo request) -------------------------
-function loadFromJSON(callback, repeatFactor) {
-  var factor = repeatFactor || 1;
-  apiGet('all?repeat=' + factor).then(function(data) {
+// Trae sólo la ventana de semanas que el calendario necesita.
+// Antes traía gestor_reservas completa (~69.000 filas) en cada carga.
+function loadFromJSON(callback, ventana) {
+  var v = ventana || VENTANA_SEMANAS;
+  apiGet('all?desde=' + v.desde + '&hasta=' + v.hasta).then(function(data) {
+    if (data.ventana) VENTANA_SEMANAS = data.ventana;
+    SEMANAS_CARGADAS = {};
     LABS         = data.labs        || [];
     PROFESORES   = data.profesores  || [];
     RESERVAS     = data.reservas    || [];
@@ -50,6 +69,7 @@ function loadFromJSON(callback, repeatFactor) {
       { modulo: 13, evento: 'Recreo vespertino',    notas: '20 min - patio' },
     ];
     nextId = 500;
+    invalidarIndices();
     if (callback) callback();
   }).catch(function(err) {
     console.error('[DB] Error cargando datos:', err);
@@ -83,6 +103,72 @@ function dbEliminarReserva(id, callback) {
     RESERVAS = RESERVAS.filter(function(r) { return r.id !== id; });
     if (callback) callback();
   }).catch(function(e) { toast('Error al eliminar reserva: ' + e.message, 'err'); });
+}
+
+// -- Ventana de semanas --------------------------------------
+// True si esa semana ya está en memoria (dentro de la ventana inicial
+// o traída puntualmente al navegar).
+function semanaEstaCargada(sem) {
+  sem = parseInt(sem, 10);
+  if (SEMANAS_CARGADAS[sem]) return true;
+  return sem >= VENTANA_SEMANAS.desde && sem <= VENTANA_SEMANAS.hasta;
+}
+
+// Trae una semana puntual y la mergea en RESERVAS sin duplicar.
+function cargarSemana(sem, callback) {
+  sem = parseInt(sem, 10);
+  if (semanaEstaCargada(sem)) { if (callback) callback(false); return; }
+  apiGet('reservas?semanaOffset=' + sem).then(function(filas) {
+    var vistos = {};
+    RESERVAS.forEach(function(r) { vistos[r.id] = true; });
+    (filas || []).forEach(function(r) { if (!vistos[r.id]) RESERVAS.push(r); });
+    SEMANAS_CARGADAS[sem] = true;
+    invalidarIndices();
+    if (callback) callback(true);
+  }).catch(function(e) {
+    console.warn('[DB] No se pudo cargar la semana ' + sem + ':', e.message);
+    if (callback) callback(false);
+  });
+}
+
+// -- Alta / edición en lote ----------------------------------
+// Una sola request para N reservas (series anuales, 3 semanas seguidas).
+function dbCrearReservasLote(lista, callback, onError) {
+  apiPost('reservas/batch', { reservas: lista }).then(function(nuevas) {
+    (nuevas || []).forEach(function(r) { RESERVAS.push(r); });
+    invalidarIndices();
+    if (callback) callback(nuevas || []);
+  }).catch(function(e) {
+    if (onError) onError(e); else toast('Error al guardar: ' + e.message, 'err');
+  });
+}
+
+// Edita TODA una serie con un solo UPDATE en el servidor.
+// El cliente solo tiene una ventana de semanas en memoria, asi que no puede
+// armar el lote completo de una serie anual: esto alcanza tambien a las
+// semanas que no estan cargadas.
+function dbEditarSerie(match, set, callback, onError) {
+  apiPut('reservas/serie', { match: match, set: set }).then(function(res) {
+    // Resincronizamos la ventana para reflejar los cambios en pantalla.
+    loadFromJSON(function() {
+      if (callback) callback((res && res.updated) || 0);
+    });
+  }).catch(function(e) {
+    if (onError) onError(e); else toast('Error al editar la serie: ' + e.message, 'err');
+  });
+}
+
+function dbEditarReservasLote(lista, callback, onError) {
+  apiPut('reservas/batch', { reservas: lista }).then(function(actualizadas) {
+    (actualizadas || []).forEach(function(act) {
+      var idx = RESERVAS.findIndex(function(r) { return r.id === act.id; });
+      if (idx >= 0) RESERVAS[idx] = act;
+    });
+    invalidarIndices();
+    if (callback) callback(actualizadas || []);
+  }).catch(function(e) {
+    if (onError) onError(e); else toast('Error al editar: ' + e.message, 'err');
+  });
 }
 
 function dbEliminarSerieAnual(datos, callback) {
@@ -225,7 +311,7 @@ function importarDB() {
 
 function resetearDB() {
   if (typeof confirmar === 'function') {
-    confirmar('<strong>Recargar datos iniciales?</strong><br><br>Recargara los datos desde la base de datos.',
+    confirmar('<strong>Recargar datos?</strong><br><br>Volvera a leer los datos desde la base de datos.',
       function() {
         loadFromJSON(function() {
           toast('Datos recargados.', 'ok');

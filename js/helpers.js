@@ -11,17 +11,44 @@
 
 // ── Lookups de datos ────────────────────────────────────────
 
+// Los lookups se hacian con Array.find() en cada llamada. Renderizar una
+// tabla de N reservas costaba N x PROFESORES comparaciones (con 813 docentes,
+// decenas de millones). Ahora se indexan una vez y se invalidan cuando
+// cambia el array de origen (invalidarIndices()).
+var _idxProfes  = null;
+var _idxLabs    = null;
+var _idxModulos = null;
+
+function invalidarIndices() {
+  _idxProfes  = null;
+  _idxLabs    = null;
+  _idxModulos = null;
+  if (typeof invalidarIndiceHorariosFijos === 'function') invalidarIndiceHorariosFijos();
+}
+
 function getModulo(id) {
-  return MODULOS.find(function(m) { return m.id === id; }) || MODULOS[0];
+  if (!_idxModulos) {
+    _idxModulos = {};
+    MODULOS.forEach(function(m) { _idxModulos[m.id] = m; });
+  }
+  return _idxModulos[id] || MODULOS[0];
 }
 
 function getProfe(id) {
-  return PROFESORES.find(function(p) { return p.id === id; })
+  if (!_idxProfes) {
+    _idxProfes = {};
+    PROFESORES.forEach(function(p) { _idxProfes[String(p.id)] = p; });
+  }
+  return _idxProfes[String(id)]
     || { apellido: '—', nombre: '', orientacion: 'bas', materia: '—' };
 }
 
 function getLab(id) {
-  return LABS.find(function(l) { return l.id === id; })
+  if (!_idxLabs) {
+    _idxLabs = {};
+    LABS.forEach(function(l) { _idxLabs[String(l.id)] = l; });
+  }
+  return _idxLabs[String(id)]
     || { nombre: '—', ocupado: false, capacidad: 0, notas: '' };
 }
 
@@ -69,6 +96,40 @@ function getDiaDate(offset, dia) {
 function esHoy(offset, dia) {
   var d = getDiaDate(offset, dia);
   return d.toDateString() === HOY.toDateString();
+}
+
+// ── Ciclo lectivo ─────────────────────────────────
+
+// Último viernes de diciembre del año de `fechaRef` = fin del ciclo lectivo.
+// Si `fechaRef` ya pasó ese viernes (enero/febrero, o fin de diciembre),
+// devolvemos el del año siguiente: el ciclo lectivo "actual" es el que viene.
+function getFinCicloLectivo(fechaRef) {
+  var ref = fechaRef ? new Date(fechaRef) : new Date(HOY);
+  ref.setHours(0, 0, 0, 0);
+
+  function ultimoViernesDeDiciembre(anio) {
+    var d = new Date(anio, 11, 31);       // 31 de diciembre
+    d.setHours(0, 0, 0, 0);
+    while (d.getDay() !== 5) d.setDate(d.getDate() - 1);
+    return d;
+  }
+
+  var fin = ultimoViernesDeDiciembre(ref.getFullYear());
+  if (ref > fin) fin = ultimoViernesDeDiciembre(ref.getFullYear() + 1);
+  return fin;
+}
+
+// Lista de semanaOffset desde `semanaBase` hasta el fin del ciclo lectivo,
+// inclusive. Una semana entra si su lunes cae en o antes del ultimo viernes.
+function getSemanasHastaFinCiclo(semanaBase) {
+  var base = parseInt(semanaBase, 10) || 0;
+  var fin  = getFinCicloLectivo(getSemanaStart(base));
+  var out  = [];
+  for (var sw = base; sw < base + 60; sw++) {   // techo duro por seguridad
+    if (getSemanaStart(sw) > fin) break;
+    out.push(sw);
+  }
+  return out.length ? out : [base];
 }
 // ── Runtime config multi-grupo (SIN columna BD) ──────────────
 // Se carga desde localStorage al iniciar y se persiste ahí.

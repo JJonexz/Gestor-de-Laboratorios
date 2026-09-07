@@ -19,11 +19,21 @@ function renderEstadisticas() {
 
   var stats = calcularStats();
 
+  // Las reservas se cargan por ventana de semanas, no la tabla completa,
+  // así que aclaramos el rango que se está resumiendo para no mostrar
+  // un "total" que en realidad es parcial.
+  var semanas = Object.keys(SEMANAS_CARGADAS).map(Number)
+    .concat([VENTANA_SEMANAS.desde, VENTANA_SEMANAS.hasta]);
+  var desde = Math.min.apply(null, semanas);
+  var hasta = Math.max.apply(null, semanas);
+  var rango = 'Semanas del ' + formatFecha(getSemanaStart(desde)) +
+              ' al ' + formatFecha(getDiaDate(hasta, 4));
+
   el.innerHTML =
     '<div class="page-header">' +
       '<div class="page-title-wrap">' +
         '<div class="page-title">Estadísticas de uso</div>' +
-        '<div class="page-sub">EEST N°1 · Laboratorios informáticos</div>' +
+        '<div class="page-sub">EEST N°1 · Laboratorios informáticos · ' + rango + '</div>' +
       '</div>' +
       '<button class="btn-action btn-detail" style="font-size:.8rem" onclick="exportarCSV()">↓ Exportar CSV</button>' +
     '</div>' +

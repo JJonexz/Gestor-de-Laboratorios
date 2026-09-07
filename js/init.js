@@ -104,15 +104,16 @@ document.addEventListener('DOMContentLoaded', function() {
   // Cerrar menú de sesión al hacer click fuera
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.session-widget')) closeSessionMenu();
-    // Cerrar modal al hacer click en el overlay
-    if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+    // Cerrar modal al hacer click en el overlay.
+    // Siempre via cerrarModal() para que restaure el scroll del body.
+    if (e.target.classList.contains('modal-overlay')) cerrarModal(e.target.id);
   });
 
   // Cerrar modales con Escape
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal-overlay.open').forEach(function(m) {
-        m.classList.remove('open');
+        cerrarModal(m.id);
       });
     }
   });

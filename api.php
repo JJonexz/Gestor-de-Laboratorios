@@ -84,7 +84,8 @@ function initSchema($pdo) {
             cupofId      INT DEFAULT NULL,
             PRIMARY KEY (id),
             INDEX idx_slot (lab, dia, modulo, semanaOffset),
-            INDEX idx_profe (profeId)
+            INDEX idx_profe (profeId),
+            INDEX idx_semana (semanaOffset)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
         CREATE TABLE IF NOT EXISTS gestor_solicitudes (
@@ -148,6 +149,13 @@ function initSchema($pdo) {
         }
     }
 
+    // Migración: índice por semanaOffset. CREATE TABLE IF NOT EXISTS no lo agrega
+    // a tablas que ya existían, y la ventana de semanas filtra por esa columna.
+    $idx = $pdo->query("SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='gestor_reservas' AND INDEX_NAME='idx_semana'")->fetch();
+    if (!$idx) {
+        $pdo->exec("ALTER TABLE gestor_reservas ADD INDEX idx_semana (semanaOffset)");
+    }
+
     // Sincronizar salones → gestor_labs (solo para ocupado/max_grupos)
     $hasSalones = $pdo->query("SHOW TABLES LIKE 'salones'")->fetch();
     if ($hasSalones) {
@@ -198,14 +206,95 @@ function castRow($r) {
 }
 function castRows($rows) { return array_map('castRow', $rows); }
 
+// ── Ventana de semanas ───────────────────────────────────────
+// gestor_reservas guarda `semanaOffset` relativo a la semana actual
+// (0 = esta semana). Nunca devolvemos la tabla entera: sólo la ventana
+// que el calendario necesita. El cliente puede ampliarla con ?desde=&hasta=.
+function qWin($db, $sql, $desde, $hasta) {
+    $st = $db->prepare($sql);
+    $st->execute([$desde, $hasta]);
+    return $st->fetchAll();
+}
+
+function ventanaSemanas() {
+    $desde = isset($_GET['desde']) ? (int)$_GET['desde'] : -1;
+    $hasta = isset($_GET['hasta']) ? (int)$_GET['hasta'] : 4;
+    if ($hasta < $desde) $hasta = $desde;
+    if ($hasta - $desde > 60) $hasta = $desde + 60;  // techo de seguridad
+    return [$desde, $hasta];
+}
+
+// ── Rol del solicitante ──────────────────────────────────────
+// No es autenticación real: api.php no maneja sesiones ni tokens, y el
+// cliente puede falsificar el header. Sirve para que la UI no pueda saltear
+// las reglas por accidente. Una autenticación de verdad es trabajo aparte.
+function usuarioSolicitante($db) {
+    $dni = $_SERVER['HTTP_X_GESTOR_USER'] ?? '';
+    $dni = trim((string)$dni);
+    if ($dni === '') return null;
+    if ($dni === 'admin') return ['dni' => 0, 'esDirectivo' => true];  // admin estático del login
+    if (!ctype_digit($dni)) return null;
+    $st = $db->prepare('SELECT dni, tag FROM personal WHERE dni=? LIMIT 1');
+    $st->execute([(int)$dni]);
+    $row = $st->fetch();
+    if (!$row) return null;
+    return ['dni' => (int)$row['dni'], 'esDirectivo' => trim((string)$row['tag']) !== ''];
+}
+
+function esDirectivoReq($db) {
+    $u = usuarioSolicitante($db);
+    return $u !== null && $u['esDirectivo'];
+}
+
+// ── Reglas de ciclo: 3 semanas seguidas + 1 de espera ────────
+define('MAX_SEMANAS_SEGUIDAS', 3);
+
+// Semanas ya tomadas por ese docente en ese slot exacto (lab+día+módulo).
+// Las reservas anuales ('institucional') no cuentan para el cooldown.
+function semanasTomadasSlot($db, $profeId, $lab, $dia, $modulo) {
+    $st = $db->prepare("
+        SELECT semanaOffset FROM gestor_reservas
+         WHERE profeId=? AND lab=? AND dia=? AND modulo=? AND anual=0
+        UNION
+        SELECT semanaOffset FROM gestor_solicitudes
+         WHERE profeId=? AND lab=? AND dia=? AND modulo=? AND estado='pendiente'
+    ");
+    $st->execute([$profeId, $lab, (int)$dia, (int)$modulo, $profeId, $lab, (int)$dia, (int)$modulo]);
+    $set = [];
+    foreach ($st->fetchAll() as $r) $set[(int)$r['semanaOffset']] = true;
+    return $set;
+}
+
+// Largo de la racha consecutiva que termina justo antes de $semana.
+function rachaPrevia($tomadas, $semana) {
+    $n = 0; $w = (int)$semana - 1;
+    while (isset($tomadas[$w])) { $n++; $w--; }
+    return $n;
+}
+
+// Lanza 409 si $semana cae en la semana de espera. Marca $semana como tomada.
+function validarCooldown(&$tomadas, $semana, $profeId, $etiquetaSlot) {
+    if ($profeId === 'institucional') { return; }  // las anuales están exentas
+    if (rachaPrevia($tomadas, $semana) >= MAX_SEMANAS_SEGUIDAS) {
+        err('Ya usaste ' . MAX_SEMANAS_SEGUIDAS . ' semanas seguidas en ' . $etiquetaSlot .
+            '. Corresponde 1 semana de espera antes de volver a reservarlo.', 409);
+    }
+    $tomadas[(int)$semana] = true;
+}
+
 // ── Router ───────────────────────────────────────────────────
 $method   = $_SERVER['REQUEST_METHOD'];
 $path     = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 $path     = preg_replace('#^.*?api\.php/?#', '', $path);
-$segments = array_values(array_filter(explode('/', $path)));
+// array_filter() a secas descarta los segmentos '0' (son falsy en PHP), y la
+// ruta de borrado de series es api.php/reservas/0/serie: sin el '0' el router
+// leia $id='serie' y borraba por id en vez de borrar la serie.
+$segments = array_values(array_filter(explode('/', $path), function($seg) { return $seg !== ''; }));
 $resource = $segments[0] ?? '';
 $id       = $segments[1] ?? null;
 $action   = $segments[2] ?? null;
+// Ojo: $id puede ser la cadena '0' (falsy en PHP), asi que las guardas de
+// ruta comparan con !== null y no por veracidad.
 
 try { $db = getDB(); }
 catch (Exception $e) { err('No se pudo conectar a la base de datos MySQL: ' . $e->getMessage(), 500); }
@@ -312,7 +401,7 @@ switch ($resource) {
             ok(castRows($rows));
         }
         // PUT: solo actualizar ocupado/max_grupos en gestor_labs
-        if ($method === 'PUT' && $id) {
+        if ($method === 'PUT' && $id !== null) {
             $b = body();
             $db->prepare("INSERT INTO gestor_labs (id, ocupado, max_grupos) VALUES (?,?,?)
                           ON DUPLICATE KEY UPDATE ocupado=VALUES(ocupado), max_grupos=VALUES(max_grupos)")
@@ -350,7 +439,7 @@ switch ($resource) {
         }
         // PUT: permitir cambiar orientacion/materia en gestor_profesores (campo extra)
         // Si se quiere editar un profe, lo guardamos en una tabla auxiliar mínima
-        if ($method === 'PUT' && $id) {
+        if ($method === 'PUT' && $id !== null) {
             $b = body();
             // Guardamos orientacion y materia en gestor_profesores_ext si existen
             // Pero por simplicidad, respondemos con el dato de personal actualizado
@@ -364,13 +453,100 @@ switch ($resource) {
         if ($method === 'GET') {
             $where='1=1'; $p=[];
             if (isset($_GET['semanaOffset'])) { $where.=' AND semanaOffset=?'; $p[]=(int)$_GET['semanaOffset']; }
+            elseif (isset($_GET['desde']) || isset($_GET['hasta'])) {
+                list($wd,$wh) = ventanaSemanas();
+                $where.=' AND semanaOffset BETWEEN ? AND ?'; $p[]=$wd; $p[]=$wh;
+            }
             if (isset($_GET['profeId'])) {
                 $where.=' AND profeId=?';
                 $p[]=($_GET['profeId'] === 'institucional') ? 'institucional' : $_GET['profeId'];
             }
+            if (isset($_GET['orient']) && $_GET['orient'] !== '' && $_GET['orient'] !== 'all') {
+                $where.=' AND orient=?'; $p[]=$_GET['orient'];
+            }
+            if (isset($_GET['lab']) && $_GET['lab'] !== '' && $_GET['lab'] !== 'todos') {
+                $where.=' AND lab=?'; $p[]=$_GET['lab'];
+            }
+
+            // Modo paginado: el panel de Administración nunca trae la tabla entera.
+            if (isset($_GET['limit'])) {
+                $limit  = max(1, min(500, (int)$_GET['limit']));
+                $offset = max(0, (int)($_GET['offset'] ?? 0));
+                $cnt = $db->prepare("SELECT COUNT(*) AS c FROM gestor_reservas WHERE $where");
+                $cnt->execute($p);
+                $total = (int)$cnt->fetch()['c'];
+                $st = $db->prepare("SELECT * FROM gestor_reservas WHERE $where ORDER BY semanaOffset,dia,modulo,lab LIMIT $limit OFFSET $offset");
+                $st->execute($p);
+                ok(['rows'=>castRows($st->fetchAll()), 'total'=>$total, 'limit'=>$limit, 'offset'=>$offset]);
+            }
+
             $s=$db->prepare("SELECT * FROM gestor_reservas WHERE $where ORDER BY semanaOffset,dia,modulo");
             $s->execute($p); ok(castRows($s->fetchAll()));
         }
+        // ── Alta en lote ─────────────────────────────────
+        // Una reserva anual son decenas de filas; antes se mandaba un POST por
+        // cada una (200+ requests en paralelo). Acá va todo en una transacción.
+        if ($method === 'POST' && $id === 'batch') {
+            $b = body();
+            $items = (isset($b['reservas']) && is_array($b['reservas'])) ? $b['reservas'] : [];
+            if (!$items) err('El lote no contiene reservas', 400);
+            if (count($items) > 2000) err('El lote supera el máximo de 2000 reservas', 400);
+
+            $hayAnual = false;
+            foreach ($items as $it) { if ((int)($it['anual'] ?? 0) === 1) { $hayAnual = true; break; } }
+            if ($hayAnual && !esDirectivoReq($db)) err('Sólo un directivo puede crear reservas para todo el año lectivo.', 403);
+
+            $profesValidos = [];
+            $slots = [];
+            foreach ($items as $it) {
+                $dia = (int)($it['dia'] ?? -1); $mod = (int)($it['modulo'] ?? -1);
+                if ($mod < 0 || $mod > 15) err('Módulo inválido (0-15)', 400);
+                if ($dia < 0 || $dia > 4)  err('Día inválido (0-4)', 400);
+                $esInst = (($it['profeId'] ?? '') === 'institucional');
+                if (!$esInst) {
+                    $pid = (int)($it['profeId'] ?? 0);
+                    if (!isset($profesValidos[$pid])) {
+                        $chk = $db->prepare('SELECT dni FROM personal WHERE dni=? LIMIT 1');
+                        $chk->execute([$pid]);
+                        $profesValidos[$pid] = (bool)$chk->fetch();
+                    }
+                    if (!$profesValidos[$pid]) err('El docente no existe en personal', 400);
+                }
+                // Cooldown: acumulamos las semanas del propio lote para que
+                // 3 semanas seguidas pasen, pero la 4ª no.
+                if ((int)($it['anual'] ?? 0) !== 1) {
+                    $pidKey = $esInst ? 'institucional' : (string)(int)$it['profeId'];
+                    $k = $pidKey . '|' . $it['lab'] . '|' . $dia . '|' . $mod;
+                    if (!isset($slots[$k])) $slots[$k] = semanasTomadasSlot($db, $pidKey, $it['lab'], $dia, $mod);
+                    validarCooldown($slots[$k], (int)($it['semanaOffset'] ?? 0), $pidKey, 'ese laboratorio, día y módulo');
+                }
+            }
+
+            $ins = $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)');
+            $nuevos = [];
+            $db->beginTransaction();
+            try {
+                foreach ($items as $it) {
+                    $ins->execute([
+                        (int)($it['semanaOffset'] ?? 0), (int)$it['dia'], (int)$it['modulo'],
+                        $it['lab'], $it['curso'], $it['orient'] ?? 'bas',
+                        (($it['profeId'] ?? '') === 'institucional') ? 'institucional' : (int)$it['profeId'],
+                        $it['secuencia'] ?? '', (int)($it['cicloClases'] ?? 1),
+                        (int)($it['renovaciones'] ?? 0), (int)($it['anual'] ?? 0),
+                        (isset($it['grupoId']) && $it['grupoId'] !== null) ? (int)$it['grupoId'] : null,
+                        (isset($it['cupofId']) && $it['cupofId'] !== null) ? (int)$it['cupofId'] : null,
+                    ]);
+                    $nuevos[] = (int)$db->lastInsertId();
+                }
+                $db->commit();
+            } catch (Exception $e) { $db->rollBack(); throw $e; }
+
+            $ph = implode(',', array_fill(0, count($nuevos), '?'));
+            $sel = $db->prepare("SELECT * FROM gestor_reservas WHERE id IN ($ph) ORDER BY semanaOffset,dia,modulo");
+            $sel->execute($nuevos);
+            ok(castRows($sel->fetchAll()));
+        }
+
         if ($method === 'POST') {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
@@ -378,6 +554,11 @@ switch ($resource) {
             $dia = (int)$b['dia'];
             if ($modulo < 0 || $modulo > 15) err('Módulo inválido (0-15)', 400);
             if ($dia < 0 || $dia > 4) err('Día inválido (0-4)', 400);
+
+            // Sólo directivos pueden crear reservas anuales / institucionales
+            if ((int)($b['anual'] ?? 0) === 1 && !esDirectivoReq($db)) {
+                err('Sólo un directivo puede crear reservas para todo el año lectivo.', 403);
+            }
 
             // Validar profesor en `personal` (si no es 'institucional')
             if (isset($b['profeId']) && $b['profeId'] !== 'institucional') {
@@ -389,6 +570,12 @@ switch ($resource) {
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
             $cupofId = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
 
+            // Regla de 3 semanas seguidas + 1 de espera
+            if ((int)($b['anual'] ?? 0) !== 1) {
+                $tomadas = semanasTomadasSlot($db, (string)$profeIdVal, $b['lab'], $dia, $modulo);
+                validarCooldown($tomadas, (int)($b['semanaOffset'] ?? 0), (string)$profeIdVal, 'ese laboratorio, día y módulo');
+            }
+
             $db->prepare('INSERT INTO gestor_reservas(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),$dia,$modulo,
                            $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
@@ -397,7 +584,95 @@ switch ($resource) {
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
-        if ($method === 'PUT' && $id) {
+
+        // ── Edición de una serie completa ──────────────────
+        // El cliente sólo tiene en memoria una ventana de semanas, así que no
+        // puede armar el lote de una serie anual entera. Acá el UPDATE se
+        // resuelve en SQL: alcanza a TODAS las semanas de la serie.
+        if ($method === 'PUT' && $id === 'serie') {
+            $b     = body();
+            $match = isset($b['match']) && is_array($b['match']) ? $b['match'] : [];
+            $set   = isset($b['set'])   && is_array($b['set'])   ? $b['set']   : [];
+            if (!$match || !$set) err('Faltan los datos de la serie a editar', 400);
+            foreach (['lab','dia','profeId','curso'] as $req) {
+                if (!array_key_exists($req, $match)) err("Falta '$req' en la serie a editar", 400);
+            }
+
+            $where = 'lab=? AND dia=? AND profeId=? AND curso=?';
+            $wp = [(string)$match['lab'], (int)$match['dia'], (string)$match['profeId'], (string)$match['curso']];
+            if (array_key_exists('anual', $match) && $match['anual'] !== null) {
+                $where .= ' AND anual=?'; $wp[] = (int)$match['anual'];
+            }
+            if (array_key_exists('desdeSemana', $match) && $match['desdeSemana'] !== null) {
+                $where .= ' AND semanaOffset>=?'; $wp[] = (int)$match['desdeSemana'];
+            }
+            if (array_key_exists('modulo', $match) && $match['modulo'] !== null) {
+                $where .= ' AND modulo=?'; $wp[] = (int)$match['modulo'];
+            }
+
+            // Sólo campos editables; nunca dia/modulo/semanaOffset por esta vía.
+            $editables = ['curso','secuencia','orient','profeId','grupoId','lab'];
+            $sets = []; $sp = [];
+            foreach ($editables as $f) {
+                if (!array_key_exists($f, $set)) continue;
+                $v = $set[$f];
+                if ($f === 'profeId') $v = ($v === 'institucional') ? 'institucional' : (string)(int)$v;
+                elseif ($f === 'grupoId') $v = ($v === null || $v === '') ? null : (int)$v;
+                else $v = (string)$v;
+                $sets[] = "$f=?"; $sp[] = $v;
+            }
+            if (!$sets) err('No hay campos para actualizar', 400);
+
+            // Al mover de laboratorio, saltear los horarios ya ocupados en destino.
+            $extra = '';
+            if (array_key_exists('lab', $set) && (string)$set['lab'] !== (string)$match['lab']) {
+                $extra = ' AND NOT EXISTS (SELECT 1 FROM (SELECT semanaOffset,dia,modulo FROM gestor_reservas WHERE lab=?) d
+                            WHERE d.semanaOffset=gestor_reservas.semanaOffset AND d.dia=gestor_reservas.dia AND d.modulo=gestor_reservas.modulo)';
+                $wp[] = (string)$set['lab'];
+            }
+
+            $st = $db->prepare("UPDATE gestor_reservas SET " . implode(',', $sets) . " WHERE $where" . $extra);
+            $st->execute(array_merge($sp, $wp));
+            ok(['updated' => $st->rowCount()]);
+        }
+
+        // ── Edición en lote ──────────────────────────────
+        // Editar una serie anual tocaba hasta 40 filas con 40 PUT en paralelo.
+        if ($method === 'PUT' && $id === 'batch') {
+            $b = body();
+            $items = (isset($b['reservas']) && is_array($b['reservas'])) ? $b['reservas'] : [];
+            if (!$items) err('El lote no contiene reservas', 400);
+            if (count($items) > 2000) err('El lote supera el máximo de 2000 reservas', 400);
+
+            $upd = $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=?,cupofId=? WHERE id=?');
+            $ids = [];
+            $db->beginTransaction();
+            try {
+                foreach ($items as $it) {
+                    $rid = (int)($it['id'] ?? 0);
+                    if (!$rid) err('Falta el id de una reserva del lote', 400);
+                    $upd->execute([
+                        (int)($it['semanaOffset'] ?? 0), (int)$it['dia'], (int)$it['modulo'],
+                        $it['lab'], $it['curso'], $it['orient'] ?? 'bas',
+                        (($it['profeId'] ?? '') === 'institucional') ? 'institucional' : (int)$it['profeId'],
+                        $it['secuencia'] ?? '', (int)($it['cicloClases'] ?? 1),
+                        (int)($it['renovaciones'] ?? 0), (int)($it['anual'] ?? 0),
+                        (isset($it['grupoId']) && $it['grupoId'] !== null) ? (int)$it['grupoId'] : null,
+                        (isset($it['cupofId']) && $it['cupofId'] !== null) ? (int)$it['cupofId'] : null,
+                        $rid,
+                    ]);
+                    $ids[] = $rid;
+                }
+                $db->commit();
+            } catch (Exception $e) { $db->rollBack(); throw $e; }
+
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $sel = $db->prepare("SELECT * FROM gestor_reservas WHERE id IN ($ph) ORDER BY semanaOffset,dia,modulo");
+            $sel->execute($ids);
+            ok(castRows($sel->fetchAll()));
+        }
+
+        if ($method === 'PUT' && $id !== null) {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
@@ -409,12 +684,14 @@ switch ($resource) {
                            (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId,(int)$id]);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([(int)$id]); ok(castRow($s->fetch()));
         }
-        if ($method === 'DELETE' && $id) {
+        if ($method === 'DELETE' && $id !== null) {
             if ($action === 'serie') {
                 $b=body();
-                $db->prepare('DELETE FROM gestor_reservas WHERE lab=? AND dia=? AND profeId=? AND curso=? AND anual=1')
-                   ->execute([$b['lab'],(int)$b['dia'],(int)$b['profeId'],$b['curso']]);
-                ok(['deleted_series'=>true]);
+                // profeId es VARCHAR: las series anuales guardan 'institucional'.
+                // Castearlo a int lo convertiía en 0 y el DELETE no borraba nada.
+                $stSerie = $db->prepare('DELETE FROM gestor_reservas WHERE lab=? AND dia=? AND profeId=? AND curso=? AND anual=1');
+                $stSerie->execute([$b['lab'],(int)$b['dia'],(string)$b['profeId'],$b['curso']]);
+                ok(['deleted_series'=>true, 'deleted'=>$stSerie->rowCount()]);
             }
             $db->prepare('DELETE FROM gestor_reservas WHERE id=?')->execute([(int)$id]); ok(['deleted'=>(int)$id]);
         }
@@ -436,6 +713,15 @@ switch ($resource) {
             $b=body();
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
+
+            // Regla de 3 semanas seguidas + 1 de espera.
+            // Las renovaciones quedan exentas: son justamente la excepción
+            // que el directivo aprueba a mano.
+            if ((int)($b['esRenovacion'] ?? 0) !== 1) {
+                $tomadasSol = semanasTomadasSlot($db, (string)$profeIdVal, $b['lab'], (int)$b['dia'], (int)$b['modulo']);
+                validarCooldown($tomadasSol, (int)($b['semanaOffset'] ?? 0), (string)$profeIdVal, 'ese laboratorio, día y módulo');
+            }
+
             $db->prepare('INSERT INTO gestor_solicitudes(semanaOffset,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,estado,esRenovacion,reservaOriginalId,renovacionNum,grupoId,cupofId) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
                            $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
@@ -447,7 +733,7 @@ switch ($resource) {
             $newId=(int)$db->lastInsertId();
             $s=$db->prepare('SELECT * FROM gestor_solicitudes WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
-        if ($method === 'PUT' && $id) {
+        if ($method === 'PUT' && $id !== null) {
             $b=body(); $fields=[]; $vals=[];
             foreach(['semanaOffset','dia','modulo','lab','curso','orient','profeId',
                      'secuencia','cicloClases','estado','esRenovacion','reservaOriginalId','renovacionNum'] as $f) {
@@ -456,7 +742,7 @@ switch ($resource) {
             if ($fields) { $vals[]=(int)$id; $db->prepare('UPDATE gestor_solicitudes SET '.implode(',',$fields).' WHERE id=?')->execute($vals); }
             $s=$db->prepare('SELECT * FROM gestor_solicitudes WHERE id=?'); $s->execute([(int)$id]); ok(castRow($s->fetch()));
         }
-        if ($method === 'DELETE' && $id) {
+        if ($method === 'DELETE' && $id !== null) {
             $db->prepare('DELETE FROM gestor_solicitudes WHERE id=?')->execute([(int)$id]); ok(['deleted'=>(int)$id]);
         }
         err('Not found',404);
@@ -472,7 +758,7 @@ switch ($resource) {
             ok(['id'=>$newId,'profeId'=>$b['profeId'],'lab'=>$b['lab'],
                 'dia'=>(int)$b['dia'],'modulo'=>(int)$b['modulo'],'semanaOffset'=>(int)($b['semanaOffset']??0)]);
         }
-        if ($method === 'DELETE' && $id) {
+        if ($method === 'DELETE' && $id !== null) {
             $db->prepare('DELETE FROM gestor_espera WHERE id=?')->execute([(int)$id]); ok(['deleted'=>(int)$id]);
         }
         err('Not found',404);
@@ -488,7 +774,7 @@ switch ($resource) {
             $db->prepare('INSERT INTO gestor_pautas(texto) VALUES(?)')->execute([$b['texto']]);
             ok(['id'=>(int)$db->lastInsertId(),'texto'=>$b['texto']]);
         }
-        if ($method === 'DELETE' && $id) {
+        if ($method === 'DELETE' && $id !== null) {
             $db->prepare('DELETE FROM gestor_pautas WHERE id=?')->execute([(int)$id]); ok(['deleted'=>(int)$id]);
         }
         err('Not found',404);
@@ -620,7 +906,7 @@ switch ($resource) {
 
     // ── HORARIOS FIJOS (Drag & Drop) ──────────────────────────
     case 'horarios_fijos':
-        if ($method === 'PUT' && $id) {
+        if ($method === 'PUT' && $id !== null) {
             $b = body();
             if (!isset($b['dia'], $b['id_horas'], $b['id_salones'])) {
                 err('Faltan datos requeridos: dia, id_horas, id_salones', 400);
@@ -629,7 +915,7 @@ switch ($resource) {
                ->execute([$b['dia'], (int)$b['id_horas'], (int)$b['id_salones'], (int)$id]);
             ok(['updated'=>(int)$id]);
         }
-        if ($method === 'DELETE' && $id) {
+        if ($method === 'DELETE' && $id !== null) {
             $db->prepare('DELETE FROM horarios WHERE id=?')->execute([(int)$id]);
             ok(['deleted'=>(int)$id]);
         }
@@ -638,15 +924,10 @@ switch ($resource) {
     // ── ALL (carga inicial batch) ─────────────────────────────
     case 'all':
         if ($method !== 'GET') err('Method not allowed', 405);
-        $repeat = isset($_GET['repeat']) ? max(1, (int)$_GET['repeat']) : 1;
+        list($winDesde, $winHasta) = ventanaSemanas();
 
         // Profesores desde `personal`
         $profs = castRows($db->query(sqlProfesores())->fetchAll());
-        if ($repeat > 1) {
-            $expanded = [];
-            for ($i=0; $i<$repeat; $i++) $expanded = array_merge($expanded, $profs);
-            $profs = $expanded;
-        }
 
         // Labs: salones + gestor_labs (ocupado/max_grupos)
         $sql_labs = "
@@ -665,7 +946,10 @@ switch ($resource) {
         $res = [
             'labs'        => castRows($db->query($sql_labs)->fetchAll()),
             'profesores'  => $profs,
-            'reservas'    => castRows($db->query('SELECT * FROM gestor_reservas ORDER BY semanaOffset,dia,modulo')->fetchAll()),
+            'reservas'    => castRows(qWin($db,
+                'SELECT * FROM gestor_reservas WHERE semanaOffset BETWEEN ? AND ? ORDER BY semanaOffset,dia,modulo',
+                $winDesde, $winHasta)),
+            'ventana'     => ['desde' => $winDesde, 'hasta' => $winHasta],
             'solicitudes' => castRows($db->query('SELECT * FROM gestor_solicitudes ORDER BY id')->fetchAll()),
             'espera'      => castRows($db->query('SELECT * FROM gestor_espera ORDER BY id')->fetchAll()),
             'pautas'      => castRows($db->query('SELECT * FROM gestor_pautas ORDER BY id')->fetchAll()),
@@ -754,7 +1038,7 @@ switch ($resource) {
             $s = $db->prepare('SELECT * FROM gestor_notificaciones WHERE id=?'); $s->execute([$newId]);
             ok(castRow($s->fetch()));
         }
-        if ($method === 'PUT' && $id) {
+        if ($method === 'PUT' && $id !== null) {
             // Marcar como leída
             $db->prepare('UPDATE gestor_notificaciones SET leida=1 WHERE id=?')->execute([(int)$id]);
             ok(['updated' => (int)$id]);
@@ -778,12 +1062,72 @@ switch ($resource) {
         }
         err('Not found', 404);
 
+    // ── STATS (contadores del panel de Administración) ──────
+    // Evita que el cliente tenga que cargar todas las reservas sólo para contar.
+    case 'stats':
+        initSchema($db);
+        if ($method !== 'GET') err('Method not allowed', 405);
+        $r1 = $db->query('SELECT COUNT(*) AS total, COUNT(DISTINCT profeId) AS docentes FROM gestor_reservas')->fetch();
+        $r2 = $db->query("SELECT COUNT(*) AS pendientes FROM gestor_solicitudes WHERE estado='pendiente'")->fetch();
+        $r3 = $db->query('SELECT COUNT(*) AS labs FROM salones')->fetch();
+        // Reservas por docente, para la columna "Reservas" de la tabla de docentes
+        $porProfe = [];
+        foreach ($db->query('SELECT profeId, COUNT(*) AS c FROM gestor_reservas GROUP BY profeId')->fetchAll() as $row) {
+            $porProfe[(string)$row['profeId']] = (int)$row['c'];
+        }
+        ok([
+            'reservas'    => (int)$r1['total'],
+            'docentes'    => (int)$r1['docentes'],
+            'pendientes'  => (int)$r2['pendientes'],
+            'labs'        => (int)$r3['labs'],
+            'porProfe'    => $porProfe,
+        ]);
+
     // ── CALENDAR POLL (actualización en tiempo real) ─────────
     case 'calendar-poll':
         if ($method !== 'GET') err('Method not allowed', 405);
 
-        // Datos relevantes para el calendario
-        $reservas    = $db->query('SELECT * FROM gestor_reservas ORDER BY semanaOffset,dia,modulo')->fetchAll();
+        list($winDesde, $winHasta) = ventanaSemanas();
+
+        // Hash barato: agregados sobre la ventana, sin traer ni serializar filas.
+        // Antes esto hacía fetchAll() + castRows() + dos json_encode() de toda la
+        // tabla en CADA poll de CADA cliente, aunque no hubiera cambiado nada.
+        $agg = $db->prepare("
+            SELECT COUNT(*) AS c, COALESCE(MAX(id),0) AS mx, COALESCE(SUM(id),0) AS sm
+            FROM gestor_reservas WHERE semanaOffset BETWEEN ? AND ?
+        ");
+        $agg->execute([$winDesde, $winHasta]);
+        $aR = $agg->fetch();
+        $aS = $db->query('SELECT COUNT(*) AS c, COALESCE(MAX(id),0) AS mx, COALESCE(SUM(id),0) AS sm FROM gestor_solicitudes')->fetch();
+        $aE = $db->query('SELECT COUNT(*) AS c, COALESCE(MAX(id),0) AS mx, COALESCE(SUM(id),0) AS sm FROM gestor_espera')->fetch();
+        $aL = $db->query('SELECT COUNT(*) AS c, COALESCE(SUM(ocupado),0) AS sm, COALESCE(SUM(max_grupos),0) AS mg FROM gestor_labs')->fetch();
+
+        // `estado` y `curso` no se reflejan en los agregados de id, así que
+        // sumamos un checksum de las columnas mutables de solicitudes y reservas.
+        $chk = $db->prepare("
+            SELECT COALESCE(SUM(CRC32(CONCAT_WS('|',id,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual))),0) AS ck
+            FROM gestor_reservas WHERE semanaOffset BETWEEN ? AND ?
+        ");
+        $chk->execute([$winDesde, $winHasta]);
+        $ckR = $chk->fetch();
+        $ckS = $db->query("SELECT COALESCE(SUM(CRC32(CONCAT_WS('|',id,estado,lab,curso,profeId))),0) AS ck FROM gestor_solicitudes")->fetch();
+
+        $hash = md5(json_encode([
+            $winDesde, $winHasta,
+            $aR['c'], $aR['mx'], $aR['sm'], $ckR['ck'],
+            $aS['c'], $aS['mx'], $aS['sm'], $ckS['ck'],
+            $aE['c'], $aE['mx'], $aE['sm'],
+            $aL['c'], $aL['sm'], $aL['mg'],
+        ]));
+
+        // Si el cliente ya tiene ese hash, cortamos acá: ni una fila leída.
+        $clientHash = $_GET['hash'] ?? '';
+        if ($clientHash === $hash) {
+            ok(['changed' => false, 'hash' => $hash]);
+        }
+
+        // Sólo ahora traemos los datos
+        $reservas    = qWin($db, 'SELECT * FROM gestor_reservas WHERE semanaOffset BETWEEN ? AND ? ORDER BY semanaOffset,dia,modulo', $winDesde, $winHasta);
         $solicitudes = $db->query('SELECT * FROM gestor_solicitudes ORDER BY id')->fetchAll();
         $espera      = $db->query('SELECT * FROM gestor_espera ORDER BY id')->fetchAll();
 
@@ -801,23 +1145,15 @@ switch ($resource) {
             ORDER BY s.tipo, s.numero
         ")->fetchAll();
 
-        // Calcular hash para detectar cambios
         $payload = [
             'reservas'    => castRows($reservas),
             'solicitudes' => castRows($solicitudes),
             'espera'      => castRows($espera),
             'labs'        => castRows($labs),
+            'ventana'     => ['desde' => $winDesde, 'hasta' => $winHasta],
+            'changed'     => true,
+            'hash'        => $hash,
         ];
-        $hash = md5(json_encode($payload));
-
-        // Si el cliente envía el hash anterior y coincide, no hay cambios
-        $clientHash = $_GET['hash'] ?? '';
-        if ($clientHash === $hash) {
-            ok(['changed' => false, 'hash' => $hash]);
-        }
-
-        $payload['changed'] = true;
-        $payload['hash']    = $hash;
         ok($payload);
 
     default:

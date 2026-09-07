@@ -255,20 +255,26 @@ function checkCiclosVencimiento() {
   var hoy = new Date();
   hoy.setHours(0,0,0,0);
 
+  // El set de reservas ya notificadas se arma UNA vez.
+  // Antes se llamaba a getNotificaciones().some() dentro del forEach sobre
+  // todas las reservas, cada 15 segundos y para siempre.
+  var yaNotificadas = {};
+  getNotificaciones().forEach(function(n) {
+    if (n.tipo === 'ciclo_vence' && n.reservaId !== undefined) yaNotificadas[n.reservaId] = true;
+  });
+
   RESERVAS.forEach(function(r) {
-    if (r.profeId !== profeId) return;
-    // Si cicloClases === 3, debe renovar
-    if (r.cicloClases >= 3) {
-      var yaNotificado = getNotificaciones().some(function(n) {
-        return n.tipo === 'ciclo_vence' && n.reservaId === r.id;
-      });
-      if (!yaNotificado) {
+    if (String(r.profeId) !== String(profeId)) return;
+    // Si completó el ciclo de 3 clases, debe renovar
+    if (r.cicloClases >= MAX_SEMANAS_SEGUIDAS) {
+      if (!yaNotificadas[r.id]) {
+        yaNotificadas[r.id] = true;
         var mod = getModulo(r.modulo);
         var dia = DIAS_LARGO[r.dia] || 'día ' + r.dia;
         crearNotificacion(
           'ciclo_vence',
           'Renovar turno',
-          'Clase ' + r.cicloClases + '/3 completada — ' + dia + ' ' + mod.label + ' Lab.' + r.lab,
+          'Clase ' + r.cicloClases + '/' + MAX_SEMANAS_SEGUIDAS + ' completada — ' + dia + ' ' + mod.label + ' Lab.' + r.lab,
           profeId,
           { reservaId: r.id, labId: r.lab }
         );

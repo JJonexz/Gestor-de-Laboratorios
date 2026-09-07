@@ -78,7 +78,9 @@ function irA(pagina) {
 
   // Renderizados específicos por página
   if (pagina === 'admin')        renderAdmin();
-  if (pagina === 'mis-reservas') renderMisReservas();
+  // Al entrar a la vista siempre arrancamos en la primera página;
+  // los re-render del polling conservan la página actual.
+  if (pagina === 'mis-reservas') { pagActualMisReservas = 1; renderMisReservas(); }
   if (pagina === 'incidencias')  { if (typeof renderIncidencias === 'function') renderIncidencias(); }
   if (pagina === 'fechas-especiales') { if (typeof renderCalendarioEscolar === 'function') renderCalendarioEscolar(); }
   if (pagina === 'estadisticas') {

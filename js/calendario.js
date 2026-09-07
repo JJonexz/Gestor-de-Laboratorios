@@ -21,12 +21,26 @@ var ID_HORAS_A_MODULO = { 1: 0, 2: 1, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 9, 9: 10,
 var DIA_STR_A_NUM = { 'LUN': 0, 'MAR': 1, 'MIE': 2, 'JUE': 3, 'VIE': 4 };
 
 // Retorna horarios fijos (de cupof) para un slot dia+modulo
+// La tabla de aulas llama a esto una vez por celda (48 labs x 14 modulos).
+// Antes cada llamada recorria HORARIOS_FIJOS entero; ahora se indexa una vez.
+var _idxHorariosFijos = null;
+var _sinHorariosFijos = [];
+
+function invalidarIndiceHorariosFijos() { _idxHorariosFijos = null; }
+
 function getHorariosFijosSlot(diaNum, moduloId) {
-  if (typeof HORARIOS_FIJOS === 'undefined' || !HORARIOS_FIJOS.length) return [];
-  return HORARIOS_FIJOS.filter(function (h) {
-    return DIA_STR_A_NUM[h.dia] === diaNum &&
-      ID_HORAS_A_MODULO[parseInt(h.id_horas)] === moduloId;
-  });
+  if (typeof HORARIOS_FIJOS === 'undefined' || !HORARIOS_FIJOS.length) return _sinHorariosFijos;
+  if (!_idxHorariosFijos) {
+    _idxHorariosFijos = {};
+    HORARIOS_FIJOS.forEach(function (h) {
+      var d = DIA_STR_A_NUM[h.dia];
+      var m = ID_HORAS_A_MODULO[parseInt(h.id_horas)];
+      if (d === undefined || m === undefined) return;
+      var k = d + '|' + m;
+      (_idxHorariosFijos[k] || (_idxHorariosFijos[k] = [])).push(h);
+    });
+  }
+  return _idxHorariosFijos[diaNum + '|' + moduloId] || _sinHorariosFijos;
 }
 
 function renderSidebar() {
@@ -667,6 +681,14 @@ function renderVencimientosCalendario() {
 // ── Navegación de semana ─────────────────────────────────────
 function navSemana(dir) {
   semanaOffset += dir;
+  // RESERVAS solo tiene una ventana de semanas. Si salimos de ella,
+  // pedimos esa semana a la API y re-renderizamos cuando llega.
+  if (typeof cargarSemana === 'function' && !semanaEstaCargada(semanaOffset)) {
+    var pedida = semanaOffset;
+    cargarSemana(pedida, function (huboDatos) {
+      if (huboDatos && semanaOffset === pedida) renderCalendario();
+    });
+  }
   renderCalendario();
 }
 

@@ -274,6 +274,12 @@
         </div>
         <div class="stats-strip" id="mis-stats-strip" aria-label="Estadísticas de mis reservas"></div>
         <div id="mis-reservas-list" aria-live="polite"></div>
+        <div class="pagination-container" id="mis-reservas-pagination" style="display:none;">
+          <button class="week-btn" onclick="cambiarPaginaMisReservas(-1)">Anterior</button>
+          <span id="mis-reservas-pag-info"
+            style="font-size: 12px; font-weight: 600; color: var(--muted);">—</span>
+          <button class="week-btn" onclick="cambiarPaginaMisReservas(1)">Siguiente</button>
+        </div>
         <div id="mis-reservas-empty" style="display:none;text-align:center;padding:60px 20px;color:var(--texto-muted);"
           role="status">
           <div style="font-size:48px;margin-bottom:12px;" aria-hidden="true">📭</div>
@@ -346,16 +352,6 @@
           <div class="admin-section-header">
             <div class="admin-section-title"><span aria-hidden="true">👥</span> Docentes</div>
             <div style="display:flex;gap:10px;align-items:center;">
-              <label for="admin-sim-repeat" style="font-size:11px;color:var(--muted);font-weight:600;">Simular
-                volumen:</label>
-              <select class="search-input" style="width:auto;padding:4px 8px;font-size:11px;" id="admin-sim-repeat"
-                onchange="cambiarSimulacionProfs(this.value)">
-                <option value="1" selected>Sin repetición (x1)</option>
-                <option value="5">Volumen bajo (x5)</option>
-                <option value="10">Volumen medio (x10)</option>
-                <option value="20">Volumen alto (x20)</option>
-                <option value="50">Stress Test (x50)</option>
-              </select>
               <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;"
                 onclick="abrirModalDocente()">+ Agregar</button>
             </div>
@@ -394,14 +390,20 @@
         <div class="admin-section">
           <div class="admin-section-header">
             <div class="admin-section-title"><span aria-hidden="true">📅</span> Todas las reservas</div>
-            <select class="search-input" style="max-width:200px;padding:7px 10px;font-size:12px;"
-              id="admin-filter-orient" onchange="renderAdminReservas()">
-              <option value="all">Todas las orientaciones</option>
-              <option value="info">Programación</option>
-              <option value="const">Construcción</option>
-              <option value="tur">Turismo</option>
-              <option value="bas">Básico</option>
-            </select>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <select class="search-input" style="max-width:200px;padding:7px 10px;font-size:12px;"
+                id="admin-filter-orient" onchange="pagActualReservas=1; renderAdminReservas()">
+                <option value="all">Todas las orientaciones</option>
+                <option value="info">Programación</option>
+                <option value="const">Construcción</option>
+                <option value="tur">Turismo</option>
+                <option value="bas">Básico</option>
+              </select>
+              <select class="search-input" style="max-width:200px;padding:7px 10px;font-size:12px;"
+                id="admin-filter-lab" onchange="pagActualReservas=1; renderAdminReservas()">
+                <option value="todos">Todos los laboratorios</option>
+              </select>
+            </div>
           </div>
           <div style="overflow-x:auto;">
             <table class="prof-table">
@@ -419,6 +421,11 @@
               </thead>
               <tbody id="admin-reservas-tbody"></tbody>
             </table>
+          </div>
+          <div class="pagination-container" id="admin-reservas-pagination">
+            <button class="week-btn" onclick="cambiarPaginaReservas(-1)">Anterior</button>
+            <span id="admin-reservas-pag-info" style="font-size: 12px; font-weight: 600; color: var(--muted);">—</span>
+            <button class="week-btn" onclick="cambiarPaginaReservas(1)">Siguiente</button>
           </div>
         </div>
         <div class="admin-section">
@@ -571,7 +578,9 @@
             <option value="3">3 semanas consecutivas</option>
           </select>
           <div id="f-semanas-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">
-            📌 Se reservará el <strong>mismo día y módulo</strong> en cada una de las semanas seleccionadas. Máx. 3 semanas seguidas, luego 1 semana de espera.
+            📌 Se reservará el <strong>mismo día y módulo</strong> en cada una de las semanas seleccionadas.
+            Máximo <strong>3 semanas seguidas</strong> en el mismo laboratorio, día y módulo; después corresponde
+            <strong>1 semana de espera</strong> antes de volver a tomar ese mismo turno.
           </div>
         </div>
       </div>
@@ -634,14 +643,14 @@
         ⚠️ Ese horario ya está ocupado o tiene una solicitud pendiente.
       </div>
 
-      <!-- RESERVA ANUAL — solo visible para directivos (app.js controla display) -->
+      <!-- RESERVA ANUAL — solo visible para directivos (reservas.js controla display) -->
       <div id="f-anual-wrap" class="admin-only" style="display:none;margin-top:10px;padding:10px 14px;background:var(--navy-faint,#eef2f9);border-radius:6px;border:1px solid #c7d4ee;">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy,#1a3a6b);">
           <input type="checkbox" id="f-anual" style="width:15px;height:15px;cursor:pointer;accent-color:var(--navy,#1a3a6b);">
           📆 Asignar para todo el año lectivo
         </label>
         <div style="font-size:11px;color:var(--muted,#6b7280);margin-top:4px;padding-left:25px;">
-          Se generarán entradas semana a semana para el resto del ciclo lectivo (~40 semanas).
+          Se generarán entradas semana a semana hasta el <strong>fin del ciclo lectivo</strong> (último viernes de diciembre), salteando feriados y recesos.
         </div>
       </div>
 
@@ -728,7 +737,7 @@
           <select class="form-control" id="edit-scope">
             <option value="puntual">Solo esta reserva (semana actual)</option>
             <option value="siguientes" id="opt-siguientes">Esta y todas las siguientes</option>
-            <option value="anual" id="opt-anual" style="display:none;">Anual (todo el año lectivo)</option>
+            <option value="anual" id="opt-anual" style="display:none;">Toda la serie anual (desde esta semana)</option>
           </select>
         </div>
       </div>

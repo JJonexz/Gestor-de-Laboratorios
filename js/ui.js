@@ -94,8 +94,16 @@ function abrirModal(id) {
 }
 
 function cerrarModal(id) {
-  var el = document.getElementById(id);
-  if (el) el.classList.remove('open');
+  var el = id ? document.getElementById(id) : null;
+  if (el) {
+    el.classList.remove('open');
+  } else {
+    // Sin id (o id inexistente): cerramos todos los overlays abiertos.
+    // Evita dejar el scroll del body bloqueado para siempre.
+    document.querySelectorAll('.modal-overlay.open').forEach(function(m) {
+      m.classList.remove('open');
+    });
+  }
   // Restaurar scroll del body cuando no hay más modales abiertos
   if (!document.querySelector('.modal-overlay.open')) {
     document.body.style.overflow = '';

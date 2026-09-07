@@ -17,16 +17,21 @@ function renderMisReservas() {
   // Títulos
   var titleEl = document.getElementById('mis-reservas-title');
   var subEl   = document.getElementById('mis-reservas-sub');
-  if (titleEl) titleEl.textContent = isAdmin ? 'Todas las reservas' : 'Mis reservas';
+  if (titleEl) titleEl.textContent = isAdmin ? 'Reservas de la semana' : 'Mis reservas';
   if (subEl)   subEl.textContent   = isAdmin
-    ? 'Vista directiva · todos los docentes'
+    // Esta vista muestra la semana en pantalla. El listado completo, paginado
+    // y con filtros, está en Administración → Todas las reservas.
+    ? 'Vista directiva · todos los docentes · semana del ' + formatFecha(getSemanaStart(semanaOffset))
     : (window.SESSION ? window.SESSION.display : '');
 
   // Datos a mostrar
+  // La vista directiva se limita a la semana en pantalla: antes clonaba y
+  // ordenaba el array completo de reservas en cada render.
   var misRes = isAdmin
-    ? [].concat(RESERVAS).sort(function(a, b) { return a.dia - b.dia || a.modulo - b.modulo; })
-    : RESERVAS.filter(function(r) { return r.profeId === profId; })
-              .sort(function(a, b) { return a.dia - b.dia || a.modulo - b.modulo; });
+    ? RESERVAS.filter(function(r) { return r.semanaOffset === semanaOffset; })
+              .sort(function(a, b) { return a.dia - b.dia || a.modulo - b.modulo; })
+    : RESERVAS.filter(function(r) { return String(r.profeId) === String(profId); })
+              .sort(function(a, b) { return a.semanaOffset - b.semanaOffset || a.dia - b.dia || a.modulo - b.modulo; });
 
   var misSols = isAdmin
     ? []
@@ -46,29 +51,37 @@ function renderMisReservas() {
   var empty = document.getElementById('mis-reservas-empty');
   if (!list) return;
 
+  var pagWrap = document.getElementById('mis-reservas-pagination');
+
   if (!misRes.length && !misSols.length) {
     list.innerHTML = '';
     if (empty) empty.style.display = 'block';
+    if (pagWrap) pagWrap.style.display = 'none';
     return;
   }
   if (empty) empty.style.display = 'none';
 
   // Función auxiliar para agrupar
+  // groups.find() dentro del forEach era O(n^2): con miles de reservas
+  // (vista directiva) llegaba a cientos de millones de comparaciones.
   function agrupar(lista) {
     var groups = [];
+    var porClave = {};
     lista.forEach(function(item) {
       var key = [item.semanaOffset, item.dia, item.lab, item.curso, item.orient, item.profeId, item.secuencia].join('|');
-      var group = groups.find(function(g) { return g.key === key; });
+      var group = porClave[key];
       if (group) {
         group.items.push(item);
         group.modulos.push(item.modulo);
       } else {
-        groups.push({
+        group = {
           key: key,
           items: [item],
           modulos: [item.modulo],
           first: item
-        });
+        };
+        porClave[key] = group;
+        groups.push(group);
       }
     });
     return groups;
@@ -122,11 +135,31 @@ function renderMisReservas() {
   }
 
   // ── Sección de reservas confirmadas ──────────────────────
+  // Se pagina sobre las tarjetas ya agrupadas: construir el HTML de cientos
+  // de tarjetas de una sola vez era lo que hacía lenta esta vista.
+  var gruposRes = agrupar(misRes);
+  var totalPags = Math.max(1, Math.ceil(gruposRes.length / MIS_RESERVAS_PER_PAGE));
+  if (pagActualMisReservas > totalPags) pagActualMisReservas = totalPags;
+  if (pagActualMisReservas < 1) pagActualMisReservas = 1;
+
+  var desdeIdx = (pagActualMisReservas - 1) * MIS_RESERVAS_PER_PAGE;
+  var gruposPagina = gruposRes.slice(desdeIdx, desdeIdx + MIS_RESERVAS_PER_PAGE);
+
+  if (pagWrap) {
+    pagWrap.style.display = totalPags > 1 ? '' : 'none';
+    var pagInfo = document.getElementById('mis-reservas-pag-info');
+    if (pagInfo) {
+      pagInfo.textContent = 'Página ' + pagActualMisReservas + ' de ' + totalPags +
+        ' (' + gruposRes.length + ' reserva' + (gruposRes.length === 1 ? '' : 's') + ')';
+      pagInfo.dataset.totalPags = String(totalPags);
+    }
+  }
+
   var reservasHtml = '';
-  if (misRes.length) {
+  if (gruposPagina.length) {
     reservasHtml =
       '<div class="reservas-grid">' +
-      agrupar(misRes).map(function(g) {
+      gruposPagina.map(function(g) {
         var r          = g.first;
         var p          = getProfe(r.profeId);
         var oris       = (r.orient || 'bas').split(',');
@@ -191,6 +224,18 @@ function renderMisReservas() {
   }
 
   list.innerHTML = solHtml + reservasHtml;
+}
+
+// Cambia de página en "Mis reservas" y sube al inicio del listado.
+function cambiarPaginaMisReservas(dir) {
+  var info = document.getElementById('mis-reservas-pag-info');
+  var totalPags = info && info.dataset.totalPags ? parseInt(info.dataset.totalPags, 10) : 1;
+  var nueva = pagActualMisReservas + dir;
+  if (nueva < 1 || nueva > totalPags) return;
+  pagActualMisReservas = nueva;
+  renderMisReservas();
+  var list = document.getElementById('mis-reservas-list');
+  if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── Cancelar solicitud propia ─────────────────────────────────
@@ -379,7 +424,7 @@ function cancelarSerieAnual(reservaBase) {
       x.dia     === diaOriginal &&
       x.profeId === profeIdOriginal &&
       x.curso   === cursoOriginal &&
-      x.anual   === true
+      Number(x.anual) === 1
     );
   }).map(function(x) { return x.id; });
 

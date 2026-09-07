@@ -24,6 +24,15 @@ var editLabId = null;   // ID del lab que se está editando (null = nuevo)
 var nextId = 500;    // Autoincremental para IDs de reservas/solicitudes
 var pagActualProfesores = 1;
 var PROFS_PER_PAGE = 30;
+var pagActualReservas = 1;
+var RESERVAS_PER_PAGE = 50;
+// "Mis reservas" pagina sobre las tarjetas agrupadas (un bloque de modulos
+// consecutivos es una sola tarjeta), no sobre las filas sueltas.
+var pagActualMisReservas = 1;
+var MIS_RESERVAS_PER_PAGE = 12;
+// Contadores del panel de Administracion, traidos de api.php/stats.
+// Evita recorrer todas las reservas en el cliente solo para contar.
+var ADMIN_STATS = null;
 
 // ── Nombres de días ─────────────────────────────────────────
 var DIAS_SEMANA = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE'];
@@ -87,4 +96,18 @@ var GRUPOS = [];  // { id, nombre (int: 306, 312...), id_cursos }
 var HORARIOS_FIJOS = [];  // Horarios fijos desde tabla horarios+cupof
 
 // ── Clave de localStorage ───────────────────────────────────
+// Ventana de semanas cargadas en memoria.
+// RESERVAS nunca contiene la tabla entera: solo estas semanas.
+// Al navegar fuera del rango, db.js pide la semana faltante a la API.
+var VENTANA_DESDE_DEFAULT = -1;
+var VENTANA_HASTA_DEFAULT = 4;
+var VENTANA_SEMANAS = { desde: VENTANA_DESDE_DEFAULT, hasta: VENTANA_HASTA_DEFAULT };
+var SEMANAS_CARGADAS = {};   // { semanaOffset: true } - semanas traidas puntualmente
+
+// Reglas de ciclo: maximo de semanas consecutivas en un mismo slot y
+// semanas de espera antes de volver a tomarlo.
+// Espejado en api.php (MAX_SEMANAS_SEGUIDAS).
+var MAX_SEMANAS_SEGUIDAS = 3;
+var SEMANAS_COOLDOWN     = 1;
+
 var LS_KEY = 'gestor_eest1_db';
