@@ -389,6 +389,19 @@
         </div>
         <div class="admin-section">
           <div class="admin-section-header">
+            <div class="admin-section-title"><span aria-hidden="true">🔄</span> Horario oficial (tabla <code>horarios</code>)
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="cta-btn sec" style="width:auto;padding:7px 16px;font-size:12px;"
+                onclick="previsualizarSyncHorarios()">Ver cambios pendientes</button>
+              <button class="cta-btn" style="width:auto;padding:7px 16px;font-size:12px;"
+                onclick="sincronizarHorariosAhora()">Sincronizar ahora</button>
+            </div>
+          </div>
+          <div id="sync-horarios-info" style="padding:12px 18px;font-size:13px;color:var(--muted);">Cargando…</div>
+        </div>
+        <div class="admin-section">
+          <div class="admin-section-header">
             <div class="admin-section-title"><span aria-hidden="true">📅</span> Todas las reservas</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <select class="search-input" style="max-width:200px;padding:7px 10px;font-size:12px;"

@@ -32,6 +32,7 @@ function renderAdmin() {
   }
 
   poblarFiltroLabsAdmin();
+  renderSyncHorarios();
   renderSolicitudesAdmin();
   renderProfesores();
   renderLabsConfig();
@@ -60,6 +61,75 @@ function pintarStatsAdmin() {
     var el = document.getElementById(id);
     if (el) el.textContent = valores[i];
   });
+}
+
+// ── Sincronizacion semanal gestor -> `horarios` ────────────
+// `horarios` es el horario oficial de la escuela: una unica grilla semanal.
+// Una vez por semana se pone al dia con lo que el gestor tiene reservado.
+
+function renderSyncHorarios() {
+  var el = document.getElementById('sync-horarios-info');
+  if (!el) return;
+  apiGet('sync-horarios').then(function(st) {
+    var u = st.ultima;
+    el.innerHTML = u
+      ? 'Semana <strong>' + st.semana + '</strong> (lunes ' + u.lunes + '): última sincronización el ' +
+        u.ejecutado_en + ' (' + u.origen + ').<br>' +
+        // Los contadores son el acumulado de la semana, no de la última corrida.
+        '<span style="color:var(--muted);">Acumulado de la semana: ' + u.insertados + ' clase(s) agregada(s) · ' +
+        u.actualizados + ' cambio(s) de aula · ' + u.eliminados + ' quitada(s).</span>'
+      : 'Semana <strong>' + st.semana + '</strong> (lunes ' + st.lunes + '): <strong>aún no sincronizada</strong>. ' +
+        'Se ejecuta sola la primera vez que se abre la app en la semana.';
+  }).catch(function(e) {
+    el.textContent = 'No se pudo leer el estado de sincronización: ' + e.message;
+  });
+}
+
+// Muestra que cambiaria, sin escribir nada.
+function previsualizarSyncHorarios() {
+  var el = document.getElementById('sync-horarios-info');
+  if (el) el.textContent = 'Calculando diferencias\u2026';
+  apiPost('sync-horarios', { dryRun: true }).then(function(d) {
+    var total = d.insertados + d.actualizados + d.eliminados;
+    if (el) {
+      el.innerHTML = total === 0
+        ? '✅ <strong>Sin diferencias</strong>: el horario oficial ya coincide con el gestor (' +
+          d.en_gestor + ' clases).'
+        : '<strong>' + total + ' cambio(s) pendiente(s)</strong> para la semana ' + d.semana + ':<br>' +
+          '<span style="color:var(--muted);">' + d.insertados + ' a agregar · ' +
+          d.actualizados + ' con cambio de aula · ' + d.eliminados + ' a quitar. ' +
+          'Gestor: ' + d.en_gestor + ' clases · horario oficial: ' + d.en_horarios + '.</span>';
+    }
+  }).catch(function(e) {
+    if (el) el.textContent = 'Error al previsualizar: ' + e.message;
+    toast('Error al previsualizar: ' + e.message, 'err');
+  });
+}
+
+// Aplica los cambios aunque la semana ya se haya sincronizado.
+function sincronizarHorariosAhora() {
+  apiPost('sync-horarios', { dryRun: true }).then(function(d) {
+    var total = d.insertados + d.actualizados + d.eliminados;
+    if (total === 0) {
+      toast('El horario oficial ya está al día.', 'info');
+      renderSyncHorarios();
+      return;
+    }
+    confirmar(
+      'Se van a aplicar <strong>' + total + '</strong> cambio(s) al horario oficial:<br>' +
+      d.insertados + ' clase(s) a agregar, ' + d.actualizados + ' cambio(s) de aula y ' +
+      d.eliminados + ' a quitar.<br><small>Afecta la tabla <code>horarios</code> del sistema escolar.</small>',
+      function() {
+        apiPost('sync-horarios', { forzar: true, origen: 'manual' }).then(function(r) {
+          toast('Horario oficial actualizado: ' + r.insertados + ' agregadas, ' +
+                r.actualizados + ' con cambio de aula, ' + r.eliminados + ' quitadas.', 'ok');
+          renderSyncHorarios();
+          // `horarios` cambió: recargamos para refrescar los horarios fijos del calendario
+          loadFromJSON(function() { renderAll(); });
+        }).catch(function(e) { toast('Error al sincronizar: ' + e.message, 'err'); });
+      }
+    );
+  }).catch(function(e) { toast('Error al previsualizar: ' + e.message, 'err'); });
 }
 
 // Llena el filtro de laboratorio de la tabla de reservas (una sola vez).

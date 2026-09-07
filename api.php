@@ -149,6 +149,24 @@ function initSchema($pdo) {
         }
     }
 
+    // Control de la sincronización semanal gestor -> horarios.
+    // La clave única por semana es lo que garantiza que corra una sola vez,
+    // aunque varias pestañas abran la app el mismo lunes.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS gestor_sync_horarios (
+            id           INT NOT NULL AUTO_INCREMENT,
+            semana       VARCHAR(10) NOT NULL,
+            lunes        DATE NOT NULL,
+            ejecutado_en DATETIME NOT NULL,
+            insertados   INT NOT NULL DEFAULT 0,
+            actualizados INT NOT NULL DEFAULT 0,
+            eliminados   INT NOT NULL DEFAULT 0,
+            origen       VARCHAR(16) NOT NULL DEFAULT 'auto',
+            PRIMARY KEY (id),
+            UNIQUE KEY uk_semana (semana)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
     // Migración: índice por semanaOffset. CREATE TABLE IF NOT EXISTS no lo agrega
     // a tablas que ya existían, y la ventana de semanas filtra por esa columna.
     $idx = $pdo->query("SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='gestor_reservas' AND INDEX_NAME='idx_semana'")->fetch();
@@ -246,6 +264,92 @@ function esDirectivoReq($db) {
     return $u !== null && $u['esDirectivo'];
 }
 
+// ── Mapeo gestor <-> tabla `horarios` ───────────────────
+// El gestor numera los módulos 0-15 incluyendo recreos; `horarios.id_horas`
+// usa 1-13 sin recreos. Espejo de moduloAHorarioAcademico() en helpers.js.
+function moduloAIdHoras($m) {
+    static $map = [0=>1, 1=>2, 3=>3, 4=>4, 5=>5, 6=>6, 7=>7, 9=>8, 10=>9, 11=>10, 12=>11, 14=>12, 15=>13];
+    $m = (int)$m;
+    return array_key_exists($m, $map) ? $map[$m] : null;   // null = recreo
+}
+
+// `horarios.dia` es VARCHAR(3): 'LUN'..'VIE' (igual que DIA_STR_A_NUM en calendario.js)
+function diaAStrHorarios($d) {
+    $dias = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
+    $d = (int)$d;
+    return ($d >= 0 && $d <= 4) ? $dias[$d] : null;
+}
+
+// Lunes de la semana `offset` (0 = semana en curso), según la fecha del servidor.
+function lunesDeSemana($offset) {
+    $d = new DateTime('today');
+    $dow = (int)$d->format('N');               // 1=lunes ... 7=domingo
+    $d->modify('-' . ($dow - 1) . ' days');
+    $offset = (int)$offset;
+    if ($offset !== 0) $d->modify(($offset > 0 ? '+' : '-') . abs($offset) . ' weeks');
+    return $d;
+}
+
+// Compara la grilla del gestor de esa semana contra `horarios` y devuelve el
+// plan de cambios. No escribe nada.
+function planSyncHorarios($db, $semanaOffset) {
+    $st = $db->prepare("
+        SELECT dia, modulo, lab, cupofId
+          FROM gestor_reservas
+         WHERE semanaOffset = ? AND cupofId IS NOT NULL AND cupofId > 0
+    ");
+    $st->execute([(int)$semanaOffset]);
+
+    $deseado = [];
+    $omitidos = 0;
+    foreach ($st->fetchAll() as $r) {
+        $dia   = diaAStrHorarios($r['dia']);
+        $hora  = moduloAIdHoras($r['modulo']);
+        $salon = (int)$r['lab'];
+        // Los recreos y los salones no numéricos no tienen lugar en `horarios`
+        if ($dia === null || $hora === null || $salon <= 0) { $omitidos++; continue; }
+        $k = $dia . '|' . $hora . '|' . (int)$r['cupofId'];
+        if (!isset($deseado[$k])) {
+            $deseado[$k] = ['dia'=>$dia, 'id_horas'=>$hora, 'id_salones'=>$salon, 'cupof'=>(int)$r['cupofId']];
+        }
+    }
+
+    $actual = [];
+    $duplicados = [];
+    foreach ($db->query("SELECT id, dia, id_horas, id_salones, cupof FROM horarios")->fetchAll() as $r) {
+        $k = $r['dia'] . '|' . (int)$r['id_horas'] . '|' . (int)$r['cupof'];
+        if (isset($actual[$k])) { $duplicados[] = (int)$r['id']; continue; }
+        $actual[$k] = $r;
+    }
+
+    $insertar = []; $actualizar = []; $eliminar = $duplicados;
+    foreach ($deseado as $k => $d) {
+        if (!isset($actual[$k])) { $insertar[] = $d; continue; }
+        if ((int)$actual[$k]['id_salones'] !== $d['id_salones']) {
+            $actualizar[] = [
+                'id'         => (int)$actual[$k]['id'],
+                'dia'        => $d['dia'],
+                'id_horas'   => $d['id_horas'],
+                'cupof'      => $d['cupof'],
+                'salon_de'   => (int)$actual[$k]['id_salones'],
+                'salon_a'    => $d['id_salones'],
+            ];
+        }
+    }
+    foreach ($actual as $k => $a) {
+        if (!isset($deseado[$k])) $eliminar[] = (int)$a['id'];
+    }
+
+    return [
+        'insertar'   => $insertar,
+        'actualizar' => $actualizar,
+        'eliminar'   => $eliminar,
+        'omitidos'   => $omitidos,
+        'en_gestor'  => count($deseado),
+        'en_horarios'=> count($actual),
+    ];
+}
+
 // ── Reglas de ciclo: 3 semanas seguidas + 1 de espera ────────
 define('MAX_SEMANAS_SEGUIDAS', 3);
 
@@ -309,11 +413,6 @@ switch ($resource) {
         $b        = body();
         $username = strtolower(trim($b['username'] ?? ''));
         $password = $b['password'] ?? '';
-
-        // Administrador estático
-        if ($username === 'admin' && $password === 'admin123') {
-            ok(['id'=>0,'display'=>'Administrador','role'=>'admin','profeId'=>null,'tag'=>'admin']);
-        }
 
         $row = null;
 
@@ -393,10 +492,13 @@ switch ($resource) {
                     COALESCE(gl.ocupado, 0) AS ocupado,
                     s.capacidad,
                     CONCAT('Ubicación: ', s.ubicacion) AS notas,
+                    s.numero,
+                    s.piso,
+                    s.tipo,
                     COALESCE(gl.max_grupos, 2) AS max_grupos
                 FROM salones s
                 LEFT JOIN gestor_labs gl ON gl.id = CAST(s.id_salones AS CHAR)
-                ORDER BY s.tipo, s.numero
+                ORDER BY s.numero, s.tipo
             ")->fetchAll();
             ok(castRows($rows));
         }
@@ -413,6 +515,9 @@ switch ($resource) {
                     COALESCE(gl.ocupado,0) AS ocupado,
                     s.capacidad,
                     CONCAT('Ubicación: ',s.ubicacion) AS notas,
+                    s.numero,
+                    s.piso,
+                    s.tipo,
                     COALESCE(gl.max_grupos,2) AS max_grupos
                 FROM salones s
                 LEFT JOIN gestor_labs gl ON gl.id=CAST(s.id_salones AS CHAR)
@@ -937,10 +1042,13 @@ switch ($resource) {
                 COALESCE(gl.ocupado, 0) AS ocupado,
                 s.capacidad,
                 CONCAT('Ubicación: ', s.ubicacion) AS notas,
+                s.numero,
+                s.piso,
+                s.tipo,
                 COALESCE(gl.max_grupos, 2) AS max_grupos
             FROM salones s
             LEFT JOIN gestor_labs gl ON gl.id = CAST(s.id_salones AS CHAR)
-            ORDER BY s.tipo, s.numero
+            ORDER BY s.numero, s.tipo
         ";
 
         $res = [
@@ -1062,6 +1170,113 @@ switch ($resource) {
         }
         err('Not found', 404);
 
+    // ── SINCRONIZACIÓN SEMANAL gestor -> `horarios` ──────────
+    // `horarios` es una única grilla semanal (dia, id_horas, id_salones, cupof):
+    // no tiene columna de semana. Una vez por semana la ponemos al día con lo
+    // que el gestor tiene reservado para esa semana, aplicando sólo las
+    // diferencias. La identidad de una clase es (dia, id_horas, cupof); lo que
+    // cambia entre el horario oficial y el gestor es el salón.
+    case 'sync-horarios':
+        initSchema($db);
+
+        $off   = isset($_GET['semanaOffset']) ? (int)$_GET['semanaOffset'] : 0;
+        $lunes = lunesDeSemana($off);
+        $sem   = $lunes->format('o-\WW');       // p.ej. 2026-W37
+
+        $ultimaQ = $db->prepare('SELECT * FROM gestor_sync_horarios WHERE semana=? LIMIT 1');
+        $ultimaQ->execute([$sem]);
+        $yaCorrio = $ultimaQ->fetch();
+
+        // Estado: lo consulta la app al abrir para saber si toca sincronizar.
+        if ($method === 'GET') {
+            $hist = $db->query('SELECT * FROM gestor_sync_horarios ORDER BY id DESC LIMIT 8')->fetchAll();
+            ok([
+                'semana'    => $sem,
+                'lunes'     => $lunes->format('Y-m-d'),
+                'yaCorrio'  => (bool)$yaCorrio,
+                'ultima'    => $yaCorrio ? castRow($yaCorrio) : null,
+                'historial' => castRows($hist),
+            ]);
+        }
+
+        if ($method !== 'POST') err('Method not allowed', 405);
+
+        $b      = body();
+        $dryRun = !empty($b['dryRun']);
+        $forzar = !empty($b['forzar']);
+        $origen = ($b['origen'] ?? 'auto') === 'manual' ? 'manual' : 'auto';
+
+        // La corrida automática es determinista y sólo puede ocurrir una vez por
+        // semana, así que no exige credenciales (permite agendarla por cron).
+        // Previsualizar o forzar sí son acciones de directivo.
+        if (($dryRun || $forzar || $origen === 'manual') && !esDirectivoReq($db)) {
+            err('Sólo un directivo puede sincronizar `horarios` a mano.', 403);
+        }
+
+        if ($yaCorrio && !$forzar && !$dryRun) {
+            ok(['semana'=>$sem, 'yaCorrio'=>true, 'aplicado'=>false, 'ultima'=>castRow($yaCorrio)]);
+        }
+
+        $plan = planSyncHorarios($db, $off);
+        $resumen = [
+            'semana'       => $sem,
+            'lunes'        => $lunes->format('Y-m-d'),
+            'semanaOffset' => $off,
+            'insertados'   => count($plan['insertar']),
+            'actualizados' => count($plan['actualizar']),
+            'eliminados'   => count($plan['eliminar']),
+            'omitidos'     => $plan['omitidos'],
+            'en_gestor'    => $plan['en_gestor'],
+            'en_horarios'  => $plan['en_horarios'],
+        ];
+
+        if ($dryRun) {
+            // Muestra acotada para que el directivo vea qué va a pasar
+            $resumen['aplicado'] = false;
+            $resumen['muestra'] = [
+                'insertar'   => array_slice($plan['insertar'], 0, 10),
+                'actualizar' => array_slice($plan['actualizar'], 0, 10),
+            ];
+            ok($resumen);
+        }
+
+        $db->beginTransaction();
+        try {
+            if ($plan['insertar']) {
+                $ins = $db->prepare('INSERT INTO horarios (dia, id_horas, id_salones, cupof) VALUES (?,?,?,?)');
+                foreach ($plan['insertar'] as $d) {
+                    $ins->execute([$d['dia'], $d['id_horas'], $d['id_salones'], $d['cupof']]);
+                }
+            }
+            if ($plan['actualizar']) {
+                $upd = $db->prepare('UPDATE horarios SET id_salones=? WHERE id=?');
+                foreach ($plan['actualizar'] as $d) $upd->execute([$d['salon_a'], $d['id']]);
+            }
+            if ($plan['eliminar']) {
+                $del = $db->prepare('DELETE FROM horarios WHERE id=?');
+                foreach ($plan['eliminar'] as $hid) $del->execute([$hid]);
+            }
+
+            // El UNIQUE por semana evita que dos pestañas la registren dos veces.
+            $log = $db->prepare('
+                INSERT INTO gestor_sync_horarios (semana, lunes, ejecutado_en, insertados, actualizados, eliminados, origen)
+                VALUES (?,?,NOW(),?,?,?,?)
+                ON DUPLICATE KEY UPDATE
+                    ejecutado_en=NOW(),
+                    insertados=insertados+VALUES(insertados),
+                    actualizados=actualizados+VALUES(actualizados),
+                    eliminados=eliminados+VALUES(eliminados),
+                    origen=VALUES(origen)
+            ');
+            $log->execute([$sem, $lunes->format('Y-m-d'),
+                           $resumen['insertados'], $resumen['actualizados'], $resumen['eliminados'], $origen]);
+            $db->commit();
+        } catch (Exception $e) { $db->rollBack(); throw $e; }
+
+        $resumen['aplicado'] = true;
+        $resumen['origen']   = $origen;
+        ok($resumen);
+
     // ── STATS (contadores del panel de Administración) ──────
     // Evita que el cliente tenga que cargar todas las reservas sólo para contar.
     case 'stats':
@@ -1139,10 +1354,13 @@ switch ($resource) {
                 COALESCE(gl.ocupado, 0) AS ocupado,
                 s.capacidad,
                 CONCAT('Ubicación: ', s.ubicacion) AS notas,
+                s.numero,
+                s.piso,
+                s.tipo,
                 COALESCE(gl.max_grupos, 2) AS max_grupos
             FROM salones s
             LEFT JOIN gestor_labs gl ON gl.id = CAST(s.id_salones AS CHAR)
-            ORDER BY s.tipo, s.numero
+            ORDER BY s.numero, s.tipo
         ")->fetchAll();
 
         $payload = [

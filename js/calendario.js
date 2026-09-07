@@ -102,11 +102,16 @@ function renderSidebar() {
   // Botones de filtro rápido por lab
   var lfb = document.getElementById('lab-filter-btns');
   if (lfb) {
+    // La etiqueta es el número de salón (salones.numero), no id_salones.
+    // El nombre completo va en el title porque hay números repetidos entre
+    // dos salones distintos (por ejemplo el 6: MECÁNICA A y MECÁNICA B).
     lfb.innerHTML = LABS.map(function (l) {
       var active = filtroLab === l.id ? 'active' : '';
+      var etiqueta = (l.numero !== undefined && l.numero !== null) ? l.numero : l.id;
       return (
         '<button class="lab-filter-btn ' + active + '" data-lab-filter="' + l.id + '" ' +
-        'onclick="setLabFilter(\'' + l.id + '\')">Lab. ' + l.id + '</button>'
+        'title="' + (l.nombre || '') + '" ' +
+        'onclick="setLabFilter(\'' + l.id + '\')">Aula ' + etiqueta + '</button>'
       );
     }).join('');
   }
@@ -192,7 +197,12 @@ function renderCalendario() {
 
   var labsFiltrados = LABS.filter(function (l) {
     var matchLab = filtroLab === 'todos' || filtroLab === l.id;
-    var matchSearch = filtroBusquedaLab === '' || l.nombre.toLowerCase().indexOf(filtroBusquedaLab) !== -1 || l.id.toString().toLowerCase().indexOf(filtroBusquedaLab) !== -1;
+    // Se busca por nombre y por número de salón (que es lo que se ve en los
+    // filtros); el id interno queda como último recurso.
+    var matchSearch = filtroBusquedaLab === '' ||
+      l.nombre.toLowerCase().indexOf(filtroBusquedaLab) !== -1 ||
+      String(l.numero) === filtroBusquedaLab ||
+      l.id.toString().toLowerCase().indexOf(filtroBusquedaLab) !== -1;
     return matchLab && matchSearch;
   });
 

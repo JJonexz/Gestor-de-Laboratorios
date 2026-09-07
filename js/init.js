@@ -141,6 +141,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
   // ── 8. Inicializar módulos nuevos ─────────────────────────
+  // Sincronizacion semanal del horario oficial (tabla `horarios`).
+  // Corre una sola vez por semana: la primera vez que alguien abre la app.
+  // El servidor rechaza la repeticion (clave unica por semana), asi que
+  // varias pestanas abiertas a la vez no la duplican.
+  if (typeof sincronizarHorariosSiCorresponde === 'function') sincronizarHorariosSiCorresponde();
+
   if (typeof iniciarPollingNotif === 'function') iniciarPollingNotif();
   if (typeof iniciarSyncPestanas === 'function') iniciarSyncPestanas();
   if (typeof iniciarIncidencias  === 'function') iniciarIncidencias();

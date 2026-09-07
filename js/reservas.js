@@ -287,11 +287,14 @@ function poblarSelectsReserva() {
   ['f-dia', 'espera-dia'].forEach(function (sid) {
     var sel = document.getElementById(sid);
     if (!sel) return;
-    sel.innerHTML = '<option value="">Seleccionar día…</option>';
+    // Se arma el HTML completo y se asigna una sola vez: con `innerHTML +=`
+    // el navegador reparsea todo el select en cada vuelta del bucle.
+    var opts = ['<option value="">Seleccionar día…</option>'];
     for (var d = 0; d < 5; d++) {
       var f = getDiaDate(semanaOffset, d);
-      sel.innerHTML += '<option value="' + d + '">' + DIAS_SEMANA[d] + ' ' + formatFecha(f) + '</option>';
+      opts.push('<option value="' + d + '">' + DIAS_SEMANA[d] + ' ' + formatFecha(f) + '</option>');
     }
+    sel.innerHTML = opts.join('');
   });
 
   // Módulos agrupados por turno
@@ -1491,17 +1494,14 @@ function checkConflictosReasignacion(r) {
   });
 
   if (conflictos.length) {
+    var sinLugar = conflictos.length >= aReasignar.length;
     confEl.style.display = 'block';
     confEl.innerHTML = '⚠️ <strong>' + conflictos.length + ' conflicto(s)</strong> en ' +
       getLab(nuevoLab).nombre + ': ' + conflictos.slice(0, 5).join(', ') +
       (conflictos.length > 5 ? ' y ' + (conflictos.length - 5) + ' más…' : '') +
-      '<br><small>Esas horas se omitirán en la reasignación.</small>';
-    if (conflictos.length >= aReasignar.length) {
-      btnOk.disabled = true;
-      confEl.innerHTML += '<br><strong>No hay horas disponibles para reasignar.</strong>';
-    } else {
-      btnOk.disabled = false;
-    }
+      '<br><small>Esas horas se omitirán en la reasignación.</small>' +
+      (sinLugar ? '<br><strong>No hay horas disponibles para reasignar.</strong>' : '');
+    btnOk.disabled = sinLugar;
   } else {
     confEl.style.display = 'none';
     btnOk.disabled = false;

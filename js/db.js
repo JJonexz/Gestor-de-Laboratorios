@@ -131,6 +131,28 @@ function cargarSemana(sem, callback) {
   });
 }
 
+// -- Sincronizacion semanal del horario oficial ---------------
+// Pregunta al servidor si la semana en curso ya se sincronizo y, si no,
+// la dispara. Silenciosa: si algo falla solo queda en la consola.
+function sincronizarHorariosSiCorresponde() {
+  apiGet('sync-horarios').then(function(st) {
+    if (!st || st.yaCorrio) return;
+    return apiPost('sync-horarios', { origen: 'auto' }).then(function(r) {
+      if (!r || !r.aplicado) return;
+      var total = r.insertados + r.actualizados + r.eliminados;
+      console.log('[Horarios] Semana ' + r.semana + ' sincronizada: ' +
+                  r.insertados + ' agregadas, ' + r.actualizados + ' con cambio de aula, ' +
+                  r.eliminados + ' quitadas.');
+      if (total > 0) {
+        // Cambio el horario oficial: recargamos para refrescar los horarios fijos
+        loadFromJSON(function() { if (typeof renderAll === 'function') renderAll(); });
+      }
+    });
+  }).catch(function(e) {
+    console.warn('[Horarios] No se pudo sincronizar el horario oficial:', e.message);
+  });
+}
+
 // -- Alta / edición en lote ----------------------------------
 // Una sola request para N reservas (series anuales, 3 semanas seguidas).
 function dbCrearReservasLote(lista, callback, onError) {
