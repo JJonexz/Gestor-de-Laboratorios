@@ -12,7 +12,7 @@
 //
 // Profesores: tabla `personal` de la BDD escuela (sin gestor_profesores)
 // Autenticación: tabla `personal` (dni + pass)
-// Roles: tabla `usuarios2` (dni, tipo = 'Administrador' | 'Director').
+// Roles: tabla `usuarios2` (usuario = DNI, tipo = 'Administrador' | 'Director').
 //        Quien no figura ahí es docente.
 // ============================================================
 
@@ -268,13 +268,13 @@ function tipoDirectivo($db, $dni) {
     static $hayTabla = null;
     if ($hayTabla === null) $hayTabla = (bool)$db->query("SHOW TABLES LIKE 'usuarios2'")->fetch();
     if (!$hayTabla) return null;
-    $st = $db->prepare("SELECT TRIM(tipo) AS tipo FROM usuarios2
-                         WHERE dni=? AND LOWER(TRIM(tipo)) IN ('administrador','director')
-                         ORDER BY LOWER(TRIM(tipo))='director' DESC LIMIT 1");
-    $st->execute([(int)$dni]);
+    // `usuarios2.usuario` guarda el DNI; `tipo` se escribe 'Administrador' o 'Director'
+    $st = $db->prepare("SELECT tipo FROM usuarios2
+                         WHERE usuario=? AND tipo IN ('Administrador','Director')
+                         ORDER BY tipo='Director' DESC LIMIT 1");
+    $st->execute([(string)(int)$dni]);
     $row = $st->fetch();
-    if (!$row) return null;
-    return strtolower($row['tipo']) === 'director' ? 'Director' : 'Administrador';
+    return $row ? $row['tipo'] : null;
 }
 
 function esDirectivoReq($db) {
