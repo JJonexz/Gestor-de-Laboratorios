@@ -63,9 +63,12 @@ function pintarStatsAdmin() {
   });
 }
 
-// ── Sincronizacion semanal gestor -> `horarios` ────────────
+// ── Sincronizacion gestor -> `horarios` ────────────────────
 // `horarios` es el horario oficial de la escuela: una unica grilla semanal.
-// Una vez por semana se pone al dia con lo que el gestor tiene reservado.
+// El servidor la actualiza solo despues de cada cambio en las reservas de la
+// semana en curso, y una vez al empezar cada semana. Desde aca se puede ver
+// si quedo alguna diferencia y forzarla a mano.
+var ORIGEN_SYNC = { auto: 'automática semanal', manual: 'manual', cambio: 'tras un cambio en el gestor' };
 
 function renderSyncHorarios() {
   var el = document.getElementById('sync-horarios-info');
@@ -74,7 +77,7 @@ function renderSyncHorarios() {
     var u = st.ultima;
     el.innerHTML = u
       ? 'Semana <strong>' + st.semana + '</strong> (lunes ' + u.lunes + '): última sincronización el ' +
-        u.ejecutado_en + ' (' + u.origen + ').<br>' +
+        u.ejecutado_en + ' (' + (ORIGEN_SYNC[u.origen] || u.origen) + ').<br>' +
         // Los contadores son el acumulado de la semana, no de la última corrida.
         '<span style="color:var(--muted);">Acumulado de la semana: ' + u.insertados + ' clase(s) agregada(s) · ' +
         u.actualizados + ' cambio(s) de aula · ' + u.eliminados + ' quitada(s).</span>'

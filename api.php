@@ -368,6 +368,61 @@ function planSyncHorarios($db, $semanaOffset) {
     ];
 }
 
+// Aplica un plan de planSyncHorarios() sobre `horarios` y lo registra en
+// gestor_sync_horarios. Devuelve la cantidad de filas tocadas en `horarios`.
+function aplicarPlanHorarios($db, $plan, $lunes, $origen) {
+    $total = count($plan['insertar']) + count($plan['actualizar']) + count($plan['eliminar']);
+
+    $db->beginTransaction();
+    try {
+        if ($plan['insertar']) {
+            $ins = $db->prepare('INSERT INTO horarios (dia, id_horas, id_salones, cupof) VALUES (?,?,?,?)');
+            foreach ($plan['insertar'] as $d) {
+                $ins->execute([$d['dia'], $d['id_horas'], $d['id_salones'], $d['cupof']]);
+            }
+        }
+        if ($plan['actualizar']) {
+            $upd = $db->prepare('UPDATE horarios SET id_salones=? WHERE id=?');
+            foreach ($plan['actualizar'] as $d) $upd->execute([$d['salon_a'], $d['id']]);
+        }
+        if ($plan['eliminar']) {
+            $del = $db->prepare('DELETE FROM horarios WHERE id=?');
+            foreach ($plan['eliminar'] as $hid) $del->execute([$hid]);
+        }
+
+        // El UNIQUE por semana evita que dos pestañas la registren dos veces.
+        $log = $db->prepare('
+            INSERT INTO gestor_sync_horarios (semana, lunes, ejecutado_en, insertados, actualizados, eliminados, origen)
+            VALUES (?,?,NOW(),?,?,?,?)
+            ON DUPLICATE KEY UPDATE
+                ejecutado_en=NOW(),
+                insertados=insertados+VALUES(insertados),
+                actualizados=actualizados+VALUES(actualizados),
+                eliminados=eliminados+VALUES(eliminados),
+                origen=VALUES(origen)
+        ');
+        $log->execute([$lunes->format('o-\WW'), $lunes->format('Y-m-d'),
+                       count($plan['insertar']), count($plan['actualizar']), count($plan['eliminar']), $origen]);
+        $db->commit();
+    } catch (Exception $e) { $db->rollBack(); throw $e; }
+
+    return $total;
+}
+
+// Después de cualquier alta/baja/cambio en gestor_reservas: deja `horarios`
+// igual a lo que el gestor tiene en la semana en curso. Sólo escribe si hay
+// diferencias. Un fallo acá no debe tirar abajo el cambio de la reserva (que ya
+// quedó guardado): se registra en el log y la próxima sincronización lo corrige.
+function syncHorariosTrasCambio($db) {
+    try {
+        $plan = planSyncHorarios($db, 0);
+        if (!$plan['insertar'] && !$plan['actualizar'] && !$plan['eliminar']) return;
+        aplicarPlanHorarios($db, $plan, lunesDeSemana(0), 'cambio');
+    } catch (Exception $e) {
+        error_log('[sync-horarios] No se pudo actualizar `horarios` tras un cambio: ' . $e->getMessage());
+    }
+}
+
 // ── Reglas de ciclo: 3 semanas seguidas + 1 de espera ────────
 define('MAX_SEMANAS_SEGUIDAS', 3);
 
@@ -661,7 +716,9 @@ switch ($resource) {
             $ph = implode(',', array_fill(0, count($nuevos), '?'));
             $sel = $db->prepare("SELECT * FROM gestor_reservas WHERE id IN ($ph) ORDER BY semanaOffset,dia,modulo");
             $sel->execute($nuevos);
-            ok(castRows($sel->fetchAll()));
+            $filas = castRows($sel->fetchAll());
+            syncHorariosTrasCambio($db);
+            ok($filas);
         }
 
         if ($method === 'POST') {
@@ -699,6 +756,7 @@ switch ($resource) {
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId]);
             $newId=(int)$db->lastInsertId();
+            syncHorariosTrasCambio($db);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
 
@@ -750,7 +808,9 @@ switch ($resource) {
 
             $st = $db->prepare("UPDATE gestor_reservas SET " . implode(',', $sets) . " WHERE $where" . $extra);
             $st->execute(array_merge($sp, $wp));
-            ok(['updated' => $st->rowCount()]);
+            $actualizadas = $st->rowCount();
+            syncHorariosTrasCambio($db);
+            ok(['updated' => $actualizadas]);
         }
 
         // ── Edición en lote ──────────────────────────────
@@ -761,7 +821,9 @@ switch ($resource) {
             if (!$items) err('El lote no contiene reservas', 400);
             if (count($items) > 2000) err('El lote supera el máximo de 2000 reservas', 400);
 
-            $upd = $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=?,cupofId=? WHERE id=?');
+            // cupofId es lo que enlaza la reserva con `horarios`: si el cliente no
+            // lo manda se conserva el que ya tenía, en vez de pisarlo con NULL.
+            $upd = $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=?,cupofId=IF(?=1,?,cupofId) WHERE id=?');
             $ids = [];
             $db->beginTransaction();
             try {
@@ -775,6 +837,7 @@ switch ($resource) {
                         $it['secuencia'] ?? '', (int)($it['cicloClases'] ?? 1),
                         (int)($it['renovaciones'] ?? 0), (int)($it['anual'] ?? 0),
                         (isset($it['grupoId']) && $it['grupoId'] !== null) ? (int)$it['grupoId'] : null,
+                        array_key_exists('cupofId', $it) ? 1 : 0,
                         (isset($it['cupofId']) && $it['cupofId'] !== null) ? (int)$it['cupofId'] : null,
                         $rid,
                     ]);
@@ -786,7 +849,9 @@ switch ($resource) {
             $ph = implode(',', array_fill(0, count($ids), '?'));
             $sel = $db->prepare("SELECT * FROM gestor_reservas WHERE id IN ($ph) ORDER BY semanaOffset,dia,modulo");
             $sel->execute($ids);
-            ok(castRows($sel->fetchAll()));
+            $filas = castRows($sel->fetchAll());
+            syncHorariosTrasCambio($db);
+            ok($filas);
         }
 
         if ($method === 'PUT' && $id !== null) {
@@ -794,11 +859,14 @@ switch ($resource) {
             $grupoId = isset($b['grupoId']) && $b['grupoId'] !== null ? (int)$b['grupoId'] : null;
             $profeIdVal = ($b['profeId'] === 'institucional') ? 'institucional' : (int)$b['profeId'];
             $cupofId = isset($b['cupofId']) && $b['cupofId'] !== null ? (int)$b['cupofId'] : null;
-            $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=?,cupofId=? WHERE id=?')
+            // Sin cupofId en el cuerpo se conserva el actual (ver PUT batch)
+            $db->prepare('UPDATE gestor_reservas SET semanaOffset=?,dia=?,modulo=?,lab=?,curso=?,orient=?,profeId=?,secuencia=?,cicloClases=?,renovaciones=?,anual=?,grupoId=?,cupofId=IF(?=1,?,cupofId) WHERE id=?')
                ->execute([(int)($b['semanaOffset']??0),(int)$b['dia'],(int)$b['modulo'],
                            $b['lab'],$b['curso'],$b['orient']??'bas',$profeIdVal,
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
-                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId,(int)$id]);
+                           (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,
+                           array_key_exists('cupofId', $b) ? 1 : 0,$cupofId,(int)$id]);
+            syncHorariosTrasCambio($db);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([(int)$id]); ok(castRow($s->fetch()));
         }
         if ($method === 'DELETE' && $id !== null) {
@@ -808,9 +876,13 @@ switch ($resource) {
                 // Castearlo a int lo convertiía en 0 y el DELETE no borraba nada.
                 $stSerie = $db->prepare('DELETE FROM gestor_reservas WHERE lab=? AND dia=? AND profeId=? AND curso=? AND anual=1');
                 $stSerie->execute([$b['lab'],(int)$b['dia'],(string)$b['profeId'],$b['curso']]);
-                ok(['deleted_series'=>true, 'deleted'=>$stSerie->rowCount()]);
+                $borradas = $stSerie->rowCount();
+                syncHorariosTrasCambio($db);
+                ok(['deleted_series'=>true, 'deleted'=>$borradas]);
             }
-            $db->prepare('DELETE FROM gestor_reservas WHERE id=?')->execute([(int)$id]); ok(['deleted'=>(int)$id]);
+            $db->prepare('DELETE FROM gestor_reservas WHERE id=?')->execute([(int)$id]);
+            syncHorariosTrasCambio($db);
+            ok(['deleted'=>(int)$id]);
         }
         err('Not found',404);
 
@@ -1144,11 +1216,12 @@ switch ($resource) {
         }
         err('Not found', 404);
 
-    // ── SINCRONIZACIÓN SEMANAL gestor -> `horarios` ──────────
+    // ── SINCRONIZACIÓN gestor -> `horarios` ──────────────────
     // `horarios` es una única grilla semanal (dia, id_horas, id_salones, cupof):
-    // no tiene columna de semana. Una vez por semana la ponemos al día con lo
-    // que el gestor tiene reservado para esa semana, aplicando sólo las
-    // diferencias. La identidad de una clase es (dia, id_horas, cupof); lo que
+    // no tiene columna de semana. Refleja lo que el gestor tiene reservado para
+    // la semana en curso, aplicando sólo las diferencias. Se aplica sola tras
+    // cada cambio en gestor_reservas (syncHorariosTrasCambio) y, además, una vez
+    // al empezar cada semana, cuando la semana en curso pasa a ser otra. La identidad de una clase es (dia, id_horas, cupof); lo que
     // cambia entre el horario oficial y el gestor es el salón.
     case 'sync-horarios':
         initSchema($db);
@@ -1214,38 +1287,7 @@ switch ($resource) {
             ok($resumen);
         }
 
-        $db->beginTransaction();
-        try {
-            if ($plan['insertar']) {
-                $ins = $db->prepare('INSERT INTO horarios (dia, id_horas, id_salones, cupof) VALUES (?,?,?,?)');
-                foreach ($plan['insertar'] as $d) {
-                    $ins->execute([$d['dia'], $d['id_horas'], $d['id_salones'], $d['cupof']]);
-                }
-            }
-            if ($plan['actualizar']) {
-                $upd = $db->prepare('UPDATE horarios SET id_salones=? WHERE id=?');
-                foreach ($plan['actualizar'] as $d) $upd->execute([$d['salon_a'], $d['id']]);
-            }
-            if ($plan['eliminar']) {
-                $del = $db->prepare('DELETE FROM horarios WHERE id=?');
-                foreach ($plan['eliminar'] as $hid) $del->execute([$hid]);
-            }
-
-            // El UNIQUE por semana evita que dos pestañas la registren dos veces.
-            $log = $db->prepare('
-                INSERT INTO gestor_sync_horarios (semana, lunes, ejecutado_en, insertados, actualizados, eliminados, origen)
-                VALUES (?,?,NOW(),?,?,?,?)
-                ON DUPLICATE KEY UPDATE
-                    ejecutado_en=NOW(),
-                    insertados=insertados+VALUES(insertados),
-                    actualizados=actualizados+VALUES(actualizados),
-                    eliminados=eliminados+VALUES(eliminados),
-                    origen=VALUES(origen)
-            ');
-            $log->execute([$sem, $lunes->format('Y-m-d'),
-                           $resumen['insertados'], $resumen['actualizados'], $resumen['eliminados'], $origen]);
-            $db->commit();
-        } catch (Exception $e) { $db->rollBack(); throw $e; }
+        aplicarPlanHorarios($db, $plan, $lunes, $origen);
 
         $resumen['aplicado'] = true;
         $resumen['origen']   = $origen;
