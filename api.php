@@ -11,7 +11,9 @@
 //    que no existen en la tabla salones original)
 //
 // Profesores: tabla `personal` de la BDD escuela (sin gestor_profesores)
-// Autenticación: tabla `personal` + campo `tag` para admins
+// Autenticación: tabla `personal` (dni + pass)
+// Roles: tabla `usuarios2` (dni, tipo = 'Administrador' | 'Director').
+//        Quien no figura ahí es docente.
 // ============================================================
 
 ini_set('display_errors', 0);
@@ -252,11 +254,27 @@ function usuarioSolicitante($db) {
     if ($dni === '') return null;
     if ($dni === 'admin') return ['dni' => 0, 'esDirectivo' => true];  // admin estático del login
     if (!ctype_digit($dni)) return null;
-    $st = $db->prepare('SELECT dni, tag FROM personal WHERE dni=? LIMIT 1');
+    $st = $db->prepare('SELECT dni FROM personal WHERE dni=? LIMIT 1');
     $st->execute([(int)$dni]);
     $row = $st->fetch();
     if (!$row) return null;
-    return ['dni' => (int)$row['dni'], 'esDirectivo' => trim((string)$row['tag']) !== ''];
+    return ['dni' => (int)$row['dni'], 'esDirectivo' => tipoDirectivo($db, $row['dni']) !== null];
+}
+
+// Rol directivo desde `usuarios2`: devuelve 'Administrador' o 'Director', o
+// null si el DNI no tiene rol (docente). Reemplaza al viejo `personal.tag`.
+// Si la tabla todavía no existe, nadie es directivo (salvo el admin estático).
+function tipoDirectivo($db, $dni) {
+    static $hayTabla = null;
+    if ($hayTabla === null) $hayTabla = (bool)$db->query("SHOW TABLES LIKE 'usuarios2'")->fetch();
+    if (!$hayTabla) return null;
+    $st = $db->prepare("SELECT TRIM(tipo) AS tipo FROM usuarios2
+                         WHERE dni=? AND LOWER(TRIM(tipo)) IN ('administrador','director')
+                         ORDER BY LOWER(TRIM(tipo))='director' DESC LIMIT 1");
+    $st->execute([(int)$dni]);
+    $row = $st->fetch();
+    if (!$row) return null;
+    return strtolower($row['tipo']) === 'director' ? 'Director' : 'Administrador';
 }
 
 function esDirectivoReq($db) {
@@ -423,13 +441,6 @@ switch ($resource) {
             $row = $s->fetch() ?: null;
         }
 
-        // Por tag (número SAEP)
-        if (!$row) {
-            $s = $db->prepare("SELECT * FROM personal WHERE tag=? AND tag<>'' LIMIT 1");
-            $s->execute([$username]);
-            $row = $s->fetch() ?: null;
-        }
-
         // Por apellido.primerNombre
         if (!$row) {
             $s = $db->prepare(
@@ -457,15 +468,16 @@ switch ($resource) {
         if ($row['pass'] !== $password) err('Contraseña incorrecta', 401);
 
         $display = ucwords(strtolower(trim($row['apellido'])));
-        $computedRole = (isset($row['tag']) && !empty(trim($row['tag']))) ? 'admin' : 'prof';
+        $tipo = tipoDirectivo($db, $row['dni']);   // 'Administrador' | 'Director' | null
+        $computedRole = $tipo !== null ? 'admin' : 'prof';
 
         // profeId = dni del personal (el mismo id que usamos en PROFESORES)
         ok([
             'id'      => (int)$row['dni'],
             'display' => ($computedRole === 'admin' ? '' : 'Prof. ') . $display,
             'role'    => $computedRole,
+            'tipo'    => $tipo ?? '',
             'profeId' => (int)$row['dni'],   // dni directo, sin gestor_profesores
-            'tag'     => $row['tag'] ?? '',
         ]);
 
     // ── PERSONAL (búsqueda de docentes) ──────────────────────
@@ -474,7 +486,7 @@ switch ($resource) {
         $q = trim($_GET['q'] ?? '');
         if (strlen($q) < 2) ok([]);
         $s = $db->prepare(
-            "SELECT dni,apellido,nombre,email,tag FROM personal
+            "SELECT dni,apellido,nombre,email FROM personal
              WHERE apellido LIKE ? OR nombre LIKE ?
              ORDER BY apellido,nombre LIMIT 20"
         );
@@ -1009,23 +1021,6 @@ switch ($resource) {
         $r2 = castRows($db->query("SELECT cupof, id_materias, id_cursos, turno, funcion FROM cupof WHERE cupof IN (SELECT cupof FROM revista WHERE dni_personal=$dni) LIMIT 20")->fetchAll());
         ok(['revista' => $r1, 'cupofs' => $r2, 'dni_buscado' => $dni]);
 
-    // ── HORARIOS FIJOS (Drag & Drop) ──────────────────────────
-    case 'horarios_fijos':
-        if ($method === 'PUT' && $id !== null) {
-            $b = body();
-            if (!isset($b['dia'], $b['id_horas'], $b['id_salones'])) {
-                err('Faltan datos requeridos: dia, id_horas, id_salones', 400);
-            }
-            $db->prepare('UPDATE horarios SET dia=?, id_horas=?, id_salones=? WHERE id=?')
-               ->execute([$b['dia'], (int)$b['id_horas'], (int)$b['id_salones'], (int)$id]);
-            ok(['updated'=>(int)$id]);
-        }
-        if ($method === 'DELETE' && $id !== null) {
-            $db->prepare('DELETE FROM horarios WHERE id=?')->execute([(int)$id]);
-            ok(['deleted'=>(int)$id]);
-        }
-        err('Not found',404);
-
     // ── ALL (carga inicial batch) ─────────────────────────────
     case 'all':
         if ($method !== 'GET') err('Method not allowed', 405);
@@ -1085,31 +1080,10 @@ switch ($resource) {
         if ($db->query("SHOW TABLES LIKE 'grupos'")->fetch())
             $res['grupos'] = castRows($db->query('SELECT id, nombre, id_cursos FROM grupos ORDER BY id_cursos, nombre')->fetchAll());
 
-        // Horarios fijos
-        $hasH = $db->query("SHOW TABLES LIKE 'horarios'")->fetch();
-        $hasC = $db->query("SHOW TABLES LIKE 'cupof'")->fetch();
-        if ($hasH && $hasC) {
-            $res['horarios_fijos'] = castRows($db->query("
-                SELECT
-                    h.id, h.dia, h.id_horas, h.id_salones, h.cupof,
-                    c.id_materias, c.id_cursos,
-                    c.turno       AS cupof_turno,
-                    m.abreviatura AS materia_abrev,
-                    m.nombre      AS materia_nombre,
-                    cu.ano        AS curso_ano,
-                    cu.division   AS curso_division,
-                    CONCAT(cu.ano, '\u00b0 ', cu.division) AS curso_label,
-                    CONCAT(s.piso, '-', LPAD(s.numero, 2, '0')) AS aula_codigo,
-                    s.numero      AS aula_numero,
-                    s.tipo        AS aula_tipo
-                FROM horarios h
-                JOIN cupof c  ON h.cupof     = c.cupof
-                LEFT JOIN materias m   ON c.id_materias = m.id
-                LEFT JOIN cursos   cu  ON c.id_cursos   = cu.id
-                LEFT JOIN salones  s   ON h.id_salones  = s.id_salones
-                ORDER BY h.dia, h.id_horas
-            ")->fetchAll());
-        }
+        // El gestor ya no lee la tabla `horarios` para mostrar la grilla: la
+        // fuente de verdad son las reservas del gestor, y `horarios` se
+        // escribe desde ellas en la sincronizaci\u00f3n semanal (sync-horarios).
+        // Mostrar ambas duplicaba cada clase en el calendario.
 
         ok($res);
 
@@ -1319,8 +1293,10 @@ switch ($resource) {
 
         // `estado` y `curso` no se reflejan en los agregados de id, así que
         // sumamos un checksum de las columnas mutables de solicitudes y reservas.
+        // dia/modulo entran porque el drag & drop sólo cambia esas columnas: sin
+        // ellas las otras pestañas no veían la reserva movida.
         $chk = $db->prepare("
-            SELECT COALESCE(SUM(CRC32(CONCAT_WS('|',id,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual))),0) AS ck
+            SELECT COALESCE(SUM(CRC32(CONCAT_WS('|',id,dia,modulo,lab,curso,orient,profeId,secuencia,cicloClases,renovaciones,anual,grupoId,cupofId))),0) AS ck
             FROM gestor_reservas WHERE semanaOffset BETWEEN ? AND ?
         ");
         $chk->execute([$winDesde, $winHasta]);

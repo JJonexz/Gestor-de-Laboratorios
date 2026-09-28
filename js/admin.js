@@ -124,8 +124,6 @@ function sincronizarHorariosAhora() {
           toast('Horario oficial actualizado: ' + r.insertados + ' agregadas, ' +
                 r.actualizados + ' con cambio de aula, ' + r.eliminados + ' quitadas.', 'ok');
           renderSyncHorarios();
-          // `horarios` cambió: recargamos para refrescar los horarios fijos del calendario
-          loadFromJSON(function() { renderAll(); });
         }).catch(function(e) { toast('Error al sincronizar: ' + e.message, 'err'); });
       }
     );

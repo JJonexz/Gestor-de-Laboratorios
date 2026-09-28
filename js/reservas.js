@@ -1602,9 +1602,10 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
             secuencia: r.secuencia || '', 
             cicloClases: r.cicloClases || 1, 
             estado: 'pendiente',
-            esRenovacion: 0, 
-            renovacionNum: 0, 
-            grupoId: r.grupoId || null
+            esRenovacion: 0,
+            renovacionNum: 0,
+            grupoId: r.grupoId || null,
+            cupofId: r.cupofId || null
           });
         }).then(function(nuevaSolicitud) {
           SOLICITUDES.push(nuevaSolicitud);
@@ -1640,7 +1641,10 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
           cicloClases:  r.cicloClases  || 1,
           renovaciones: r.renovaciones || 0,
           anual:        r.anual ? 1 : 0,
-          grupoId:      r.grupoId || null
+          grupoId:      r.grupoId || null,
+          // Sin esto el PUT dejaba cupofId en NULL y la clase desaparecía de
+          // `horarios` en la próxima sincronización.
+          cupofId:      r.cupofId || null
         })
       })
       .then(function(res) { return res.json(); })

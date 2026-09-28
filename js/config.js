@@ -93,7 +93,6 @@ var RECREOS = [];
 var CURSOS = [];
 var MATERIAS = [];
 var GRUPOS = [];  // { id, nombre (int: 306, 312...), id_cursos }
-var HORARIOS_FIJOS = [];  // Horarios fijos desde tabla horarios+cupof
 
 // ── Clave de localStorage ───────────────────────────────────
 // Ventana de semanas cargadas en memoria.

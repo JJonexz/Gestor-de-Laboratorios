@@ -62,7 +62,6 @@ function loadFromJSON(callback, ventana) {
     CURSOS          = data.cursos          || [];
     MATERIAS        = data.materias        || [];
     GRUPOS          = data.grupos          || [];
-    HORARIOS_FIJOS  = data.horarios_fijos  || [];
     RECREOS      = [
       { modulo: 2,  evento: 'Recreo de manana',    notas: '30 min - patio principal' },
       { modulo: 8,  evento: 'Recreo de tarde',      notas: '30 min - patio y cantina' },
@@ -143,10 +142,7 @@ function sincronizarHorariosSiCorresponde() {
       console.log('[Horarios] Semana ' + r.semana + ' sincronizada: ' +
                   r.insertados + ' agregadas, ' + r.actualizados + ' con cambio de aula, ' +
                   r.eliminados + ' quitadas.');
-      if (total > 0) {
-        // Cambio el horario oficial: recargamos para refrescar los horarios fijos
-        loadFromJSON(function() { if (typeof renderAll === 'function') renderAll(); });
-      }
+      // El calendario no lee `horarios`, así que no hace falta recargar nada.
     });
   }).catch(function(e) {
     console.warn('[Horarios] No se pudo sincronizar el horario oficial:', e.message);

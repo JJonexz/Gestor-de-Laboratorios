@@ -23,7 +23,6 @@ function invalidarIndices() {
   _idxProfes  = null;
   _idxLabs    = null;
   _idxModulos = null;
-  if (typeof invalidarIndiceHorariosFijos === 'function') invalidarIndiceHorariosFijos();
 }
 
 function getModulo(id) {

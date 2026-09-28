@@ -84,9 +84,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // ── 4. Inyectar UI de sesión (usa UIHelper para no romper si falta el elemento) ──
   UIHelper.setAvatar(session.display);
   UIHelper.setText('s-name',  session.display,                                       'header nombre');
-  UIHelper.setText('s-role',  session.role === 'admin' ? 'directivo' : 'docente',    'header rol');
+  // session.tipo viene de usuarios2: 'Administrador' o 'Director'
+  var tipoRol = session.role === 'admin' ? (session.tipo || 'Directivo') : 'Docente';
+  UIHelper.setText('s-role',  tipoRol.toLowerCase(),                                 'header rol');
   UIHelper.setText('sm-name', session.display,                                       'dropdown nombre');
-  UIHelper.setText('sm-role', session.role === 'admin' ? 'Directivo / Administrador' : 'Docente', 'dropdown rol largo');
+  UIHelper.setText('sm-role', tipoRol,                                               'dropdown rol largo');
   UIHelper.toggleClass('s-role', 'admin', session.role === 'admin');
 
   // Mostrar/ocultar elementos exclusivos de admin

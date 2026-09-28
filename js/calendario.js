@@ -20,28 +20,6 @@
 var ID_HORAS_A_MODULO = { 1: 0, 2: 1, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 9, 9: 10, 10: 11, 11: 12, 12: 14, 13: 15 };
 var DIA_STR_A_NUM = { 'LUN': 0, 'MAR': 1, 'MIE': 2, 'JUE': 3, 'VIE': 4 };
 
-// Retorna horarios fijos (de cupof) para un slot dia+modulo
-// La tabla de aulas llama a esto una vez por celda (48 labs x 14 modulos).
-// Antes cada llamada recorria HORARIOS_FIJOS entero; ahora se indexa una vez.
-var _idxHorariosFijos = null;
-var _sinHorariosFijos = [];
-
-function invalidarIndiceHorariosFijos() { _idxHorariosFijos = null; }
-
-function getHorariosFijosSlot(diaNum, moduloId) {
-  if (typeof HORARIOS_FIJOS === 'undefined' || !HORARIOS_FIJOS.length) return _sinHorariosFijos;
-  if (!_idxHorariosFijos) {
-    _idxHorariosFijos = {};
-    HORARIOS_FIJOS.forEach(function (h) {
-      var d = DIA_STR_A_NUM[h.dia];
-      var m = ID_HORAS_A_MODULO[parseInt(h.id_horas)];
-      if (d === undefined || m === undefined) return;
-      var k = d + '|' + m;
-      (_idxHorariosFijos[k] || (_idxHorariosFijos[k] = [])).push(h);
-    });
-  }
-  return _idxHorariosFijos[diaNum + '|' + moduloId] || _sinHorariosFijos;
-}
 
 function renderSidebar() {
   // Lab cards
@@ -286,38 +264,21 @@ function renderCalendario() {
       var rs = reservasDia.filter(function (x) { return x.modulo === mid && x.lab === lab.id; });
       var s = solicDia.find(function (x) { return x.modulo === mid && x.lab === lab.id; });
       var maxG = getLabMaxGrupos(lab.id);
-      // Horarios fijos (cursos de BD) para este slot
-      var hf = getHorariosFijosSlot(diaActual, mid).filter(function (h) {
-        return String(h.id_salones) === String(lab.id);
-      });
-      // Total de ítems en el slot (fijos + reservas)
-      var totalEnSlot = hf.length + rs.length;
-      var tdCls = hf.length > 0 ? ' at-cell-fijo' : '';
-      html += '<td class="at-event-cell' + tdCls + '">';
+      // La celda muestra solo lo que tiene el gestor (reservas y solicitudes).
+      // No se leen los horarios de la tabla `horarios`: esa tabla se escribe
+      // desde el gestor en la sincronización semanal.
+      var totalEnSlot = rs.length;
+      // Toda la celda recibe el drop, no sólo el "+": con una reserva en el
+      // slot el "+" extra mide 0px (sólo se abre con :hover, que no se dispara
+      // mientras se arrastra) y no había dónde soltar para sumar un 2º grupo.
+      html += '<td class="at-event-cell" ' +
+        'ondragover="dragOverLibre(event,' + diaActual + ',' + mid + ',\'' + lab.id + '\')" ' +
+        'ondragleave="dragLeaveLibre(event)" ' +
+        'ondrop="dropReserva(event,' + diaActual + ',' + mid + ',\'' + lab.id + '\')">';
 
       // Usar stack siempre que haya más de 1 ítem o haya espacio libre
-      var usaStack = totalEnSlot > 1 || totalEnSlot < maxG || (hf.length > 0 && rs.length > 0);
+      var usaStack = totalEnSlot > 1 || totalEnSlot < maxG;
       if (usaStack) html += '<div class="at-cell-stack">';
-
-      // Mostrar horarios fijos dentro del stack
-      if (hf.length > 0) {
-        hf.forEach(function (h) {
-          var cursoLbl = h.curso_label || (h.curso_ano ? h.curso_ano + '° ' + (h.curso_division || '') : 'Curso');
-          var matAbrev = h.materia_abrev || h.materia_nombre || '';
-          var aulaCod = h.aula_codigo || h.aula_numero || h.id_salones;
-
-          // Habilitado para todos por ahora (si querés restringirlo a admins, cambiá a: var puedeEditarFijo = esDirectivo(); )
-          var puedeEditarFijo = true;
-
-          html += '<div class="at-event ev-fijo drag-target" title="Horario fijo: ' + cursoLbl + ' — ' + (h.materia_nombre || '') + ' — Aula ' + aulaCod + '" ' +
-            (puedeEditarFijo ? 'role="button" tabindex="0" draggable="true" ondragstart="dragReservaStart(event,' + h.id + ',\'fijo\')" ondragend="dragReservaEnd(event)" onclick="verDetalleFijo(' + h.id + ')" ondragover="dragOverLibre(event)" ondragleave="dragLeaveLibre(event)" ondrop="dropReserva(event,' + diaActual + ',' + mid + ',\'' + lab.id + '\')"' : '') + '>' +
-            '<div class="at-ev-curso">' + cursoLbl + '</div>' +
-            (matAbrev ? '<div class="at-ev-prof at-ev-materia">' + matAbrev + '</div>' : '') +
-            '<div class="at-ev-aula">🏫 ' + aulaCod + '</div>' +
-            (puedeEditarFijo ? '<div class=\"at-ev-edit-hint drag-hint\">⠿</div>' : '') +
-            '</div>';
-        });
-      }
 
       // Mostrar reservas normales dentro del mismo stack
       if (rs.length > 0) {
@@ -333,7 +294,7 @@ function renderCalendario() {
           var isMiReserva = String(r.profeId) === String(getCurrentProfId());
           var extraClass = isMiReserva ? ' mi-reserva-highlight' : '';
           var _grupoNombre = r.grupoId ? getNombreGrupo(r.grupoId) : '';
-          var grupoLabel = (rs.length + hf.length) > 1
+          var grupoLabel = rs.length > 1
             ? (_grupoNombre ? _grupoNombre : String(rIdx + 1))
             : (_grupoNombre ? 'Grupo ' + _grupoNombre : '');
           html +=
@@ -346,7 +307,7 @@ function renderCalendario() {
             (puedeEditar ? '<div class=\"at-ev-edit-hint drag-hint\">⠿</div>' : '') +
             '</div>';
         });
-        if (rendered === 0 && hf.length === 0) {
+        if (rendered === 0) {
           html += _celdaLibre(diaActual, mid, lab.id);
         }
       }
@@ -360,8 +321,8 @@ function renderCalendario() {
         }
       }
 
-      // Solicitud pendiente (se muestra solo si no hay reservas ni fijos)
-      if (s && rs.length === 0 && hf.length === 0) {
+      // Solicitud pendiente (se muestra solo si no hay reservas)
+      if (s && rs.length === 0) {
         var action = modoUsuario === 'admin'
           ? 'verDetalleSolicitud(' + s.id + ')'
           : 'verDetalle_Pendiente(' + s.id + ')';
@@ -393,9 +354,8 @@ function renderCalendario() {
 // Genera el HTML de una celda libre (helper interno)
 function _celdaLibre(dia, modulo, labId) {
   return (
-    '<div class="at-event at-libre drag-target" role="button" tabindex="0" ' +
+    '<div class="at-event at-libre" role="button" tabindex="0" ' +
     'onclick="abrirModalReservaSlot(' + dia + ',' + modulo + ',\'' + labId + '\')" ' +
-    'ondragover="dragOverLibre(event)" ondragleave="dragLeaveLibre(event)" ondrop="dropReserva(event,' + dia + ',' + modulo + ',\'' + labId + '\')" ' +
     'title="Disponible — clic para reservar">' +
     '<span class="at-ev-plus">+</span>' +
     '</div>'
@@ -405,8 +365,8 @@ function _celdaLibre(dia, modulo, labId) {
 // ── Drag & Drop de reservas ───────────────────────────────────
 var _dragReservaId = null;
 
-function dragReservaStart(event, reservaId, tipo) {
-  _dragReservaId = tipo === 'fijo' ? 'fijo_' + reservaId : reservaId;
+function dragReservaStart(event, reservaId) {
+  _dragReservaId = reservaId;
   event.dataTransfer.effectAllowed = 'move';
   event.dataTransfer.setData('text/plain', _dragReservaId);
   // Pequeño delay para que el navegador muestre el ghost antes de opacar
@@ -419,136 +379,53 @@ function dragReservaEnd(event) {
   var el = event.currentTarget;
   if (el) el.classList.remove('dragging');
   // Limpiar highlights en targets
-  document.querySelectorAll('.drag-over').forEach(function (e) { e.classList.remove('drag-over'); });
+  document.querySelectorAll('.drag-over, .drag-full').forEach(function (e) {
+    e.classList.remove('drag-over', 'drag-full');
+  });
 }
 
-function dragOverLibre(event) {
+// ¿Entra la reserva arrastrada en ese slot? Mismo criterio que moverReservaASlot:
+// cupo de grupos del aula (sin contarse a sí misma) y sin solicitud pendiente.
+function _slotAdmiteReserva(dia, modulo, labId, reservaId) {
+  var enSlot = RESERVAS.filter(function (x) {
+    return x.semanaOffset === semanaOffset && x.dia === dia && x.modulo === modulo &&
+      x.lab === labId && x.id !== reservaId;
+  }).length;
+  if (enSlot >= getLabMaxGrupos(labId)) return false;
+  return !SOLICITUDES.some(function (s) {
+    return s.semanaOffset === semanaOffset && s.dia === dia && s.modulo === modulo &&
+      s.lab === labId && s.estado === 'pendiente';
+  });
+}
+
+function dragOverLibre(event, dia, modulo, labId) {
   if (_dragReservaId === null) return;
+  var cell = event.currentTarget;
+  if (!_slotAdmiteReserva(dia, modulo, labId, _dragReservaId)) {
+    // Sin preventDefault el navegador no permite soltar acá
+    cell.classList.add('drag-full');
+    return;
+  }
   event.preventDefault();
   event.dataTransfer.dropEffect = 'move';
-  event.currentTarget.classList.add('drag-over');
+  cell.classList.add('drag-over');
 }
 
 function dragLeaveLibre(event) {
-  event.currentTarget.classList.remove('drag-over');
+  var cell = event.currentTarget;
+  // dragleave también salta al pasar sobre un hijo de la celda: sólo limpiar
+  // cuando el puntero sale de verdad.
+  if (event.relatedTarget && cell.contains(event.relatedTarget)) return;
+  cell.classList.remove('drag-over', 'drag-full');
 }
 
 function dropReserva(event, nuevoDia, nuevoModulo, nuevoLab) {
   event.preventDefault();
-  event.currentTarget.classList.remove('drag-over');
+  event.currentTarget.classList.remove('drag-over', 'drag-full');
   var reservaIdData = _dragReservaId !== null ? _dragReservaId : event.dataTransfer.getData('text/plain');
   if (!reservaIdData) return;
 
-  if (typeof reservaIdData === 'string' && reservaIdData.startsWith('fijo_')) {
-    var fijoId = parseInt(reservaIdData.split('_')[1]);
-    moverHorarioFijoASlot(fijoId, nuevoDia, nuevoModulo, nuevoLab);
-  } else {
-    moverReservaASlot(parseInt(reservaIdData), nuevoDia, nuevoModulo, nuevoLab);
-  }
-}
-
-// ── Modificar Horarios Fijos (Drag & Drop) ────────────────────────
-function moverHorarioFijoASlot(fijoId, nuevoDiaNum, nuevoModulo, nuevoLab) {
-  var h = HORARIOS_FIJOS.find(function (x) { return x.id === fijoId; });
-  if (!h) return;
-
-  var nuevoDiaStr = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'][nuevoDiaNum];
-  var nuevoIdHoras = null;
-  // Buscamos el id_horas correspondiente al nuevoModulo
-  for (var k in ID_HORAS_A_MODULO) {
-    if (ID_HORAS_A_MODULO[k] === nuevoModulo) {
-      nuevoIdHoras = parseInt(k);
-      break;
-    }
-  }
-
-  if (!nuevoIdHoras) {
-    toast('Este horario no coincide con un módulo académico.', 'err');
-    return;
-  }
-
-  if (h.dia === nuevoDiaStr && h.id_horas === nuevoIdHoras && h.id_salones == nuevoLab) return;
-
-  var oldDiaStr = h.dia;
-  var oldIdHoras = h.id_horas;
-  var oldSalones = h.id_salones;
-
-  var modOrig  = getModulo(ID_HORAS_A_MODULO[oldIdHoras] || 0);
-  var modDest  = getModulo(nuevoModulo);
-  var labOrig  = getLab(oldSalones);
-  var labDest  = getLab(nuevoLab);
-
-  var cursoLbl = h.curso_label || (h.curso_ano ? h.curso_ano + '° ' + (h.curso_division || '') : 'Curso');
-
-  var desdeStr = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'].indexOf(oldDiaStr) >= 0 
-    ? DIAS_SEMANA[['LUN', 'MAR', 'MIE', 'JUE', 'VIE'].indexOf(oldDiaStr)] + ' · ' + modOrig.label
-    : 'Origen desconocido';
-  var hastaStr = DIAS_SEMANA[nuevoDiaNum] + ' · ' + modDest.label + ' (' + modDest.inicio + '–' + modDest.fin + ')';
-
-  confirmar(
-    '¿Mover horario fijo <strong>' + cursoLbl + '</strong>?<br>' +
-    '<small style="color:var(--muted)">De: ' + desdeStr + '</small><br>' +
-    '<small style="color:var(--muted)">A:&nbsp;&nbsp; ' + hastaStr + '</small>',
-    function() {
-      h.dia = nuevoDiaStr;
-      h.id_horas = nuevoIdHoras;
-      h.id_salones = nuevoLab;
-      renderAll();
-
-      apiPut('horarios_fijos/' + h.id, {
-        dia: nuevoDiaStr,
-        id_horas: nuevoIdHoras,
-        id_salones: nuevoLab
-      }).then(function () {
-        toast('Horario fijo actualizado en base de datos.', 'ok');
-      }).catch(function (e) {
-        h.dia = oldDiaStr;
-        h.id_horas = oldIdHoras;
-        h.id_salones = oldSalones;
-        renderAll();
-        toast('Error al mover horario fijo: ' + e.message, 'err');
-      });
-    }
-  );
-}
-
-function verDetalleFijo(fijoId) {
-  var h = HORARIOS_FIJOS.find(function (x) { return x.id === fijoId; });
-  if (!h) return;
-
-  var cursoLbl = h.curso_label || (h.curso_ano ? h.curso_ano + '° ' + (h.curso_division || '') : 'Curso');
-  var matAbrev = h.materia_abrev || h.materia_nombre || '';
-  var aulaCod = h.aula_codigo || h.aula_numero || h.id_salones;
-
-  var body = document.getElementById('modal-detalle-body');
-  if (body) {
-    body.innerHTML =
-      '<div class="detail-row"><div class="detail-label">Tipo</div><div class="detail-value"><strong>Horario Fijo (Cupof)</strong></div></div>' +
-      '<div class="detail-row"><div class="detail-label">Materia</div><div class="detail-value">' + (h.materia_nombre || matAbrev) + '</div></div>' +
-      '<div class="detail-row"><div class="detail-label">Curso</div><div class="detail-value">' + cursoLbl + '</div></div>' +
-      '<div class="detail-row"><div class="detail-label">Laboratorio</div><div class="detail-value">Aula ' + aulaCod + '</div></div>';
-  }
-
-  var footer = document.getElementById('modal-detalle-footer');
-  if (footer) {
-    footer.innerHTML =
-      '<button class="btn-cancel" onclick="cerrarModal(\'modal-detalle\')">Cerrar</button>' +
-      (esDirectivo() ? '<button class="btn-danger" onclick="cerrarModal(\'modal-detalle\');eliminarHorarioFijo(' + h.id + ')">Eliminar</button>' : '');
-  }
-
-  abrirModal('modal-detalle');
-}
-
-function eliminarHorarioFijo(fijoId) {
-  confirmar('¿Estás seguro de eliminar este horario fijo de la base de datos?', function () {
-    apiDelete('horarios_fijos/' + fijoId).then(function () {
-      HORARIOS_FIJOS = HORARIOS_FIJOS.filter(function (x) { return x.id !== fijoId; });
-      renderAll();
-      toast('Horario fijo eliminado.', 'ok');
-    }).catch(function (e) {
-      toast('Error al eliminar horario fijo: ' + e.message, 'err');
-    });
-  });
+  moverReservaASlot(parseInt(reservaIdData), nuevoDia, nuevoModulo, nuevoLab);
 }
 
 // ── Edición de recreos ────────────────────────────────────────

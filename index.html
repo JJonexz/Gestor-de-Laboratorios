@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/styles.css?v=20260928b" />
   <style>
     /* ── Drag & Drop de reservas ── */
     .at-event[draggable="true"] { cursor: grab; }
@@ -17,11 +17,18 @@
     .at-event.dragging { opacity: .45; box-shadow: 0 0 0 2px var(--navy); }
     .drag-hint { font-size: 14px; color: rgba(255,255,255,.6); margin-top: 1px; }
     .at-event[draggable="true"]:hover .drag-hint { color: rgba(255,255,255,.95); }
-    .at-libre.drag-over {
+    /* La celda entera es el destino del drop (ver renderCalendario) */
+    .at-event-cell.drag-over {
       background: var(--navy-faint, #eef2f9) !important;
-      border: 2px dashed var(--navy, #1a3a6b) !important;
-      transform: scale(1.04);
-      transition: transform .1s, border .1s;
+      outline: 2px dashed var(--navy, #1a3a6b);
+      outline-offset: -2px;
+    }
+    .at-event-cell.drag-over .at-slot-extra { flex: 0 0 22px; max-width: 22px; margin-left: 5px; opacity: 1; }
+    .at-event-cell.drag-full {
+      background: #fef2f2 !important;
+      outline: 2px dashed #dc2626;
+      outline-offset: -2px;
+      cursor: not-allowed;
     }
   </style>
   <link rel="icon" type="image/webp" href="img/logo.webp">
@@ -1062,24 +1069,24 @@
   │  init.js           → arranque (sesión, eventos, carga de datos) │
   └─────────────────────────────────────────────────────────────────┘
 -->
-  <script src="js/config.js"></script>
-  <script src="js/db.js"></script>
-  <script src="js/helpers.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/nav.js"></script>
-  <script src="js/calendario.js"></script>
-  <script src="js/reservas.js"></script>
-  <script src="js/espera.js"></script>
-  <script src="js/misReservas.js"></script>
-  <script src="js/admin.js"></script>
-  <script src="js/notificaciones.js"></script>
-  <script src="js/estadisticas.js"></script>
-  <script src="js/conflictos.js"></script>
-  <script src="js/calendario_escolar.js"></script>
-  <script src="js/incidencias.js"></script>
-  <script src="js/ajax-polling.js"></script>
-  <script src="js/init.js"></script>
-  <script src="js/db-override.js"></script>
+  <script src="js/config.js?v=20260928b"></script>
+  <script src="js/db.js?v=20260928b"></script>
+  <script src="js/helpers.js?v=20260928b"></script>
+  <script src="js/ui.js?v=20260928b"></script>
+  <script src="js/nav.js?v=20260928b"></script>
+  <script src="js/calendario.js?v=20260928b"></script>
+  <script src="js/reservas.js?v=20260928b"></script>
+  <script src="js/espera.js?v=20260928b"></script>
+  <script src="js/misReservas.js?v=20260928b"></script>
+  <script src="js/admin.js?v=20260928b"></script>
+  <script src="js/notificaciones.js?v=20260928b"></script>
+  <script src="js/estadisticas.js?v=20260928b"></script>
+  <script src="js/conflictos.js?v=20260928b"></script>
+  <script src="js/calendario_escolar.js?v=20260928b"></script>
+  <script src="js/incidencias.js?v=20260928b"></script>
+  <script src="js/ajax-polling.js?v=20260928b"></script>
+  <script src="js/init.js?v=20260928b"></script>
+  <script src="js/db-override.js?v=20260928b"></script>
 </body>
 
 </html>

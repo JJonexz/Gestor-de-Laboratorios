@@ -155,11 +155,13 @@ function doLogin() {
     }
 
     var found = json.data;
-    var userRole = (found.tag && found.tag.trim() !== '') ? 'admin' : 'prof';
+    // El rol lo resuelve api.php con la tabla usuarios2 (Administrador / Director)
+    var userRole = found.role === 'admin' ? 'admin' : 'prof';
 
     var sessionPayload = {
       user:    username,
       role:    userRole,
+      tipo:    found.tipo || '',
       id:      found.id,
       display: found.display,
       profeId: found.profeId != null ? found.profeId : found.id

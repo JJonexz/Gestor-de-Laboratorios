@@ -219,7 +219,8 @@ aceptarSolicitud = function(solId) {
       apiPost('reservas', {
         semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
         curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
-        cicloClases: 1, renovaciones: s.renovacionNum || 1, anual: 0
+        cicloClases: 1, renovaciones: s.renovacionNum || 1, anual: 0,
+        grupoId: s.grupoId || null, cupofId: s.cupofId || null
       }).then(function(nueva) {
         RESERVAS.push(nueva);
         return apiDelete('solicitudes/' + solId);
@@ -236,7 +237,8 @@ aceptarSolicitud = function(solId) {
     semanaOffset: s.semanaOffset, dia: s.dia, modulo: s.modulo, lab: s.lab,
     curso: s.curso, orient: s.orient, profeId: s.profeId, secuencia: s.secuencia,
     // Conservar el numero de clase dentro del ciclo de 3 semanas.
-    cicloClases: s.cicloClases || 1, renovaciones: 0, anual: 0
+    cicloClases: s.cicloClases || 1, renovaciones: 0, anual: 0,
+    grupoId: s.grupoId || null, cupofId: s.cupofId || null
   }).then(function(nueva) {
     RESERVAS.push(nueva);
     if (typeof notifSolicitudAprobada === 'function') notifSolicitudAprobada(s);
