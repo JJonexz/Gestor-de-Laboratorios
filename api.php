@@ -237,7 +237,7 @@ function castRows($rows) { return array_map('castRow', $rows); }
 
 // ── Ventana de semanas ───────────────────────────────────────
 // gestor_reservas guarda `semanaOffset` relativo a la semana actual
-// (0 = esta semana). Nunca devolvemos la tabla entera: sólo la ventana
+// (0 = esta semana; rotarSemanas() lo corre cada lunes). Nunca devolvemos la tabla entera: sólo la ventana
 // que el calendario necesita. El cliente puede ampliarla con ?desde=&hasta=.
 function qWin($db, $sql, $desde, $hasta) {
     $st = $db->prepare($sql);
@@ -317,9 +317,9 @@ function lunesDeSemana($offset) {
     return $d;
 }
 
-// Compara la grilla del gestor de esa semana contra `horarios` y devuelve el
-// plan de cambios. No escribe nada.
-function planSyncHorarios($db, $semanaOffset) {
+// Clases que el gestor tiene en esa semana, por clave 'DIA|id_horas|cupof'.
+// Devuelve [$deseado, $omitidos].
+function deseadoGestor($db, $semanaOffset) {
     $st = $db->prepare("
         SELECT dia, modulo, lab, cupofId
           FROM gestor_reservas
@@ -340,18 +340,47 @@ function planSyncHorarios($db, $semanaOffset) {
             $deseado[$k] = ['dia'=>$dia, 'id_horas'=>$hora, 'id_salones'=>$salon, 'cupof'=>(int)$r['cupofId']];
         }
     }
+    return [$deseado, $omitidos];
+}
+
+// Compara la grilla del gestor de esa semana contra `horarios` y devuelve el
+// plan de cambios. No escribe nada.
+// `horarios` es el horario oficial completo: sólo se puede quitar o mover una
+// fila cuya clave el gestor tenía en $antes (su estado previo) y ya no tiene.
+// Lo que el gestor nunca tuvo no se toca. Sin $antes, nunca borra.
+function planSyncHorarios($db, $semanaOffset, $antes = []) {
+    list($deseado, $omitidos) = deseadoGestor($db, $semanaOffset);
 
     $actual = [];
     $duplicados = [];
     foreach ($db->query("SELECT id, dia, id_horas, id_salones, cupof FROM horarios")->fetchAll() as $r) {
         $k = $r['dia'] . '|' . (int)$r['id_horas'] . '|' . (int)$r['cupof'];
-        if (isset($actual[$k])) { $duplicados[] = (int)$r['id']; continue; }
+        if (isset($actual[$k])) {
+            if (isset($deseado[$k]) || isset($antes[$k])) $duplicados[] = (int)$r['id'];
+            continue;
+        }
         $actual[$k] = $r;
     }
 
-    $insertar = []; $actualizar = []; $eliminar = $duplicados;
+    // Claves que el gestor dejó de tener y siguen en `horarios`
+    $sale = [];
+    foreach ($antes as $k => $_) {
+        if (!isset($deseado[$k]) && isset($actual[$k])) $sale[$k] = $actual[$k];
+    }
+
+    $insertar = []; $actualizar = []; $mover = []; $eliminar = $duplicados;
     foreach ($deseado as $k => $d) {
-        if (!isset($actual[$k])) { $insertar[] = $d; continue; }
+        if (!isset($actual[$k])) {
+            // Misma clase (cupof) que salió de otro día/hora: se mueve la fila.
+            foreach ($sale as $ks => $a) {
+                if ((int)$a['cupof'] !== $d['cupof']) continue;
+                $mover[] = ['id'=>(int)$a['id'], 'dia'=>$d['dia'], 'id_horas'=>$d['id_horas'], 'id_salones'=>$d['id_salones']];
+                unset($sale[$ks]);
+                continue 2;
+            }
+            $insertar[] = $d;
+            continue;
+        }
         if ((int)$actual[$k]['id_salones'] !== $d['id_salones']) {
             $actualizar[] = [
                 'id'         => (int)$actual[$k]['id'],
@@ -363,13 +392,12 @@ function planSyncHorarios($db, $semanaOffset) {
             ];
         }
     }
-    foreach ($actual as $k => $a) {
-        if (!isset($deseado[$k])) $eliminar[] = (int)$a['id'];
-    }
+    foreach ($sale as $a) $eliminar[] = (int)$a['id'];
 
     return [
         'insertar'   => $insertar,
         'actualizar' => $actualizar,
+        'mover'      => $mover,
         'eliminar'   => $eliminar,
         'omitidos'   => $omitidos,
         'en_gestor'  => count($deseado),
@@ -380,7 +408,8 @@ function planSyncHorarios($db, $semanaOffset) {
 // Aplica un plan de planSyncHorarios() sobre `horarios` y lo registra en
 // gestor_sync_horarios. Devuelve la cantidad de filas tocadas en `horarios`.
 function aplicarPlanHorarios($db, $plan, $lunes, $origen) {
-    $total = count($plan['insertar']) + count($plan['actualizar']) + count($plan['eliminar']);
+    $actualizados = count($plan['actualizar']) + count($plan['mover']);
+    $total = count($plan['insertar']) + $actualizados + count($plan['eliminar']);
 
     $db->beginTransaction();
     try {
@@ -393,6 +422,10 @@ function aplicarPlanHorarios($db, $plan, $lunes, $origen) {
         if ($plan['actualizar']) {
             $upd = $db->prepare('UPDATE horarios SET id_salones=? WHERE id=?');
             foreach ($plan['actualizar'] as $d) $upd->execute([$d['salon_a'], $d['id']]);
+        }
+        if ($plan['mover']) {
+            $mov = $db->prepare('UPDATE horarios SET dia=?, id_horas=?, id_salones=? WHERE id=?');
+            foreach ($plan['mover'] as $d) $mov->execute([$d['dia'], $d['id_horas'], $d['id_salones'], $d['id']]);
         }
         if ($plan['eliminar']) {
             $del = $db->prepare('DELETE FROM horarios WHERE id=?');
@@ -411,7 +444,7 @@ function aplicarPlanHorarios($db, $plan, $lunes, $origen) {
                 origen=VALUES(origen)
         ');
         $log->execute([$lunes->format('o-\WW'), $lunes->format('Y-m-d'),
-                       count($plan['insertar']), count($plan['actualizar']), count($plan['eliminar']), $origen]);
+                       count($plan['insertar']), $actualizados, count($plan['eliminar']), $origen]);
         $db->commit();
     } catch (Exception $e) { $db->rollBack(); throw $e; }
 
@@ -422,13 +455,58 @@ function aplicarPlanHorarios($db, $plan, $lunes, $origen) {
 // igual a lo que el gestor tiene en la semana en curso. Sólo escribe si hay
 // diferencias. Un fallo acá no debe tirar abajo el cambio de la reserva (que ya
 // quedó guardado): se registra en el log y la próxima sincronización lo corrige.
-function syncHorariosTrasCambio($db) {
+// $antes = deseadoGestor($db, 0)[0] tomado antes de escribir en gestor_reservas.
+function syncHorariosTrasCambio($db, $antes) {
     try {
-        $plan = planSyncHorarios($db, 0);
-        if (!$plan['insertar'] && !$plan['actualizar'] && !$plan['eliminar']) return;
+        $plan = planSyncHorarios($db, 0, $antes);
+        if (!$plan['insertar'] && !$plan['actualizar'] && !$plan['mover'] && !$plan['eliminar']) return;
         aplicarPlanHorarios($db, $plan, lunesDeSemana(0), 'cambio');
     } catch (Exception $e) {
         error_log('[sync-horarios] No se pudo actualizar `horarios` tras un cambio: ' . $e->getMessage());
+    }
+}
+
+// `semanaOffset` es relativo a la semana en curso, así que al empezar una semana
+// nueva hay que correr todas las filas N semanas hacia atrás (lo que era "la
+// semana que viene" pasa a ser "esta semana"). La última semana procesada es la
+// última registrada en gestor_sync_horarios: su UNIQUE por semana hace que sólo
+// una request haga el corrimiento, y la referencia viaja con los datos si se
+// restaura un backup. Después se sincroniza `horarios` con la semana nueva.
+function rotarSemanas($db) {
+    $lunes = lunesDeSemana(0);
+    $sem   = $lunes->format('o-\WW');
+    try {
+        $st = $db->prepare('SELECT 1 FROM gestor_sync_horarios WHERE semana=?');
+        $st->execute([$sem]);
+        if ($st->fetch()) return;
+    } catch (Exception $e) { return; }   // tabla todavía no creada: la crea initSchema
+
+    $db->beginTransaction();
+    try {
+        $ult = $db->prepare('SELECT MAX(lunes) FROM gestor_sync_horarios WHERE lunes < ?');
+        $ult->execute([$lunes->format('Y-m-d')]);
+        $ult = $ult->fetchColumn();
+
+        $ins = $db->prepare("INSERT IGNORE INTO gestor_sync_horarios (semana, lunes, ejecutado_en, origen) VALUES (?,?,NOW(),'auto')");
+        $ins->execute([$sem, $lunes->format('Y-m-d')]);
+        if ($ins->rowCount() === 0) { $db->rollBack(); return; }   // otra request ya la corrió
+
+        if ($ult) {
+            $n = (int)round(($lunes->getTimestamp() - (new DateTime($ult))->getTimestamp()) / 604800);
+            if ($n > 0) {
+                foreach (['gestor_reservas', 'gestor_solicitudes', 'gestor_espera'] as $t) {
+                    $db->exec("UPDATE $t SET semanaOffset = semanaOffset - $n");
+                }
+            }
+        }
+        $db->commit();
+    } catch (Exception $e) { $db->rollBack(); throw $e; }
+
+    // La semana que terminó quedó en -1: sólo eso se puede mover/borrar de `horarios`.
+    try {
+        aplicarPlanHorarios($db, planSyncHorarios($db, 0, deseadoGestor($db, -1)[0]), $lunes, 'auto');
+    } catch (Exception $e) {
+        error_log('[sync-horarios] No se pudo sincronizar `horarios` al cambiar de semana: ' . $e->getMessage());
     }
 }
 
@@ -484,6 +562,8 @@ $action   = $segments[2] ?? null;
 
 try { $db = getDB(); }
 catch (Exception $e) { err('No se pudo conectar a la base de datos MySQL: ' . $e->getMessage(), 500); }
+
+rotarSemanas($db);
 
 switch ($resource) {
 
@@ -666,6 +746,9 @@ switch ($resource) {
 
     // ── RESERVAS ──────────────────────────────────────────────
     case 'reservas':
+        // Semana actual del gestor antes del cambio: la sync de `horarios` sólo
+        // mueve o borra lo que estaba acá (ver planSyncHorarios).
+        $antes = $method === 'GET' ? [] : deseadoGestor($db, 0)[0];
         if ($method === 'GET') {
             $where='1=1'; $p=[];
             if (isset($_GET['semanaOffset'])) { $where.=' AND semanaOffset=?'; $p[]=(int)$_GET['semanaOffset']; }
@@ -761,7 +844,7 @@ switch ($resource) {
             $sel = $db->prepare("SELECT * FROM gestor_reservas WHERE id IN ($ph) ORDER BY semanaOffset,dia,modulo");
             $sel->execute($nuevos);
             $filas = castRows($sel->fetchAll());
-            syncHorariosTrasCambio($db);
+            syncHorariosTrasCambio($db, $antes);
             ok($filas);
         }
 
@@ -800,7 +883,7 @@ switch ($resource) {
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,$cupofId]);
             $newId=(int)$db->lastInsertId();
-            syncHorariosTrasCambio($db);
+            syncHorariosTrasCambio($db, $antes);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([$newId]); ok(castRow($s->fetch()));
         }
 
@@ -853,7 +936,7 @@ switch ($resource) {
             $st = $db->prepare("UPDATE gestor_reservas SET " . implode(',', $sets) . " WHERE $where" . $extra);
             $st->execute(array_merge($sp, $wp));
             $actualizadas = $st->rowCount();
-            syncHorariosTrasCambio($db);
+            syncHorariosTrasCambio($db, $antes);
             ok(['updated' => $actualizadas]);
         }
 
@@ -894,7 +977,7 @@ switch ($resource) {
             $sel = $db->prepare("SELECT * FROM gestor_reservas WHERE id IN ($ph) ORDER BY semanaOffset,dia,modulo");
             $sel->execute($ids);
             $filas = castRows($sel->fetchAll());
-            syncHorariosTrasCambio($db);
+            syncHorariosTrasCambio($db, $antes);
             ok($filas);
         }
 
@@ -910,7 +993,7 @@ switch ($resource) {
                            $b['secuencia']??'',(int)($b['cicloClases']??1),
                            (int)($b['renovaciones']??0),(int)($b['anual']??0),$grupoId,
                            array_key_exists('cupofId', $b) ? 1 : 0,$cupofId,(int)$id]);
-            syncHorariosTrasCambio($db);
+            syncHorariosTrasCambio($db, $antes);
             $s=$db->prepare('SELECT * FROM gestor_reservas WHERE id=?'); $s->execute([(int)$id]); ok(castRow($s->fetch()));
         }
         if ($method === 'DELETE' && $id !== null) {
@@ -921,11 +1004,11 @@ switch ($resource) {
                 $stSerie = $db->prepare('DELETE FROM gestor_reservas WHERE lab=? AND dia=? AND profeId=? AND curso=? AND anual=1');
                 $stSerie->execute([$b['lab'],(int)$b['dia'],(string)$b['profeId'],$b['curso']]);
                 $borradas = $stSerie->rowCount();
-                syncHorariosTrasCambio($db);
+                syncHorariosTrasCambio($db, $antes);
                 ok(['deleted_series'=>true, 'deleted'=>$borradas]);
             }
             $db->prepare('DELETE FROM gestor_reservas WHERE id=?')->execute([(int)$id]);
-            syncHorariosTrasCambio($db);
+            syncHorariosTrasCambio($db, $antes);
             ok(['deleted'=>(int)$id]);
         }
         err('Not found',404);
@@ -1308,13 +1391,14 @@ switch ($resource) {
             ok(['semana'=>$sem, 'yaCorrio'=>true, 'aplicado'=>false, 'ultima'=>castRow($yaCorrio)]);
         }
 
-        $plan = planSyncHorarios($db, $off);
+        // Al cambiar de semana, sólo se mueve/borra lo que el gestor tenía la anterior.
+        $plan = planSyncHorarios($db, $off, deseadoGestor($db, $off - 1)[0]);
         $resumen = [
             'semana'       => $sem,
             'lunes'        => $lunes->format('Y-m-d'),
             'semanaOffset' => $off,
             'insertados'   => count($plan['insertar']),
-            'actualizados' => count($plan['actualizar']),
+            'actualizados' => count($plan['actualizar']) + count($plan['mover']),
             'eliminados'   => count($plan['eliminar']),
             'omitidos'     => $plan['omitidos'],
             'en_gestor'    => $plan['en_gestor'],
