@@ -1628,6 +1628,7 @@ function moverReservaASlot(reservaId, nuevoDia, nuevoModulo, nuevoLab) {
       // Persistir en la base de datos via API
       fetch('api.php/reservas/' + r.id, {
         method: 'PUT',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           semanaOffset: r.semanaOffset,

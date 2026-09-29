@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20260928c" />
+  <link rel="stylesheet" href="css/styles.css?v=20260929" />
   <style>
     /* ── Drag & Drop de reservas ── */
     .at-event[draggable="true"] { cursor: grab; }
@@ -100,6 +100,8 @@
           </div>
           <button class="sm-item" role="menuitem" onclick="irA('mis-reservas');closeSessionMenu()"><span
               aria-hidden="true">📋</span> Mis reservas</button>
+          <button class="sm-item" role="menuitem" onclick="verificarRol();closeSessionMenu()"><span
+              aria-hidden="true">🩺</span> Verificar rol</button>
           <div class="sm-sep" role="separator"></div>
           <button class="sm-item danger" role="menuitem" onclick="cerrarSesion()"><span aria-hidden="true">🚪</span>
             Cerrar sesión</button>
@@ -694,6 +696,20 @@
     </div>
   </div>
 
+  <!-- Diagnóstico de rol (menú de usuario → Verificar rol) -->
+  <div class="modal-overlay" id="modal-rol" role="dialog" aria-modal="true" aria-labelledby="modal-rol-title">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="modal-rol-title"><span aria-hidden="true">🩺</span> Verificar rol</h3>
+        <button class="modal-close" onclick="cerrarModal('modal-rol')" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body" id="modal-rol-body"></div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="cerrarModal('modal-rol')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Editar recreo -->
   <div class="modal-overlay" id="modal-recreo" role="dialog" aria-modal="true" aria-labelledby="modal-recreo-title">
     <div class="modal modal-sm">
@@ -1069,24 +1085,24 @@
   │  init.js           → arranque (sesión, eventos, carga de datos) │
   └─────────────────────────────────────────────────────────────────┘
 -->
-  <script src="js/config.js?v=20260928c"></script>
-  <script src="js/db.js?v=20260928c"></script>
-  <script src="js/helpers.js?v=20260928c"></script>
-  <script src="js/ui.js?v=20260928c"></script>
-  <script src="js/nav.js?v=20260928c"></script>
-  <script src="js/calendario.js?v=20260928c"></script>
-  <script src="js/reservas.js?v=20260928c"></script>
-  <script src="js/espera.js?v=20260928c"></script>
-  <script src="js/misReservas.js?v=20260928c"></script>
-  <script src="js/admin.js?v=20260928c"></script>
-  <script src="js/notificaciones.js?v=20260928c"></script>
-  <script src="js/estadisticas.js?v=20260928c"></script>
-  <script src="js/conflictos.js?v=20260928c"></script>
-  <script src="js/calendario_escolar.js?v=20260928c"></script>
-  <script src="js/incidencias.js?v=20260928c"></script>
-  <script src="js/ajax-polling.js?v=20260928c"></script>
-  <script src="js/init.js?v=20260928c"></script>
-  <script src="js/db-override.js?v=20260928c"></script>
+  <script src="js/config.js?v=20260929"></script>
+  <script src="js/db.js?v=20260929"></script>
+  <script src="js/helpers.js?v=20260929"></script>
+  <script src="js/ui.js?v=20260929"></script>
+  <script src="js/nav.js?v=20260929"></script>
+  <script src="js/calendario.js?v=20260929"></script>
+  <script src="js/reservas.js?v=20260929"></script>
+  <script src="js/espera.js?v=20260929"></script>
+  <script src="js/misReservas.js?v=20260929"></script>
+  <script src="js/admin.js?v=20260929"></script>
+  <script src="js/notificaciones.js?v=20260929"></script>
+  <script src="js/estadisticas.js?v=20260929"></script>
+  <script src="js/conflictos.js?v=20260929"></script>
+  <script src="js/calendario_escolar.js?v=20260929"></script>
+  <script src="js/incidencias.js?v=20260929"></script>
+  <script src="js/ajax-polling.js?v=20260929"></script>
+  <script src="js/init.js?v=20260929"></script>
+  <script src="js/db-override.js?v=20260929"></script>
 </body>
 
 </html>

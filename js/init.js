@@ -154,3 +154,84 @@ document.addEventListener('DOMContentLoaded', function() {
   if (typeof iniciarIncidencias  === 'function') iniciarIncidencias();
 
 }); // fin DOMContentLoaded
+
+// ── Verificar rol (menú de usuario) ──────────────────────────
+// Diagnóstico sin consola: compara el rol que ve la página con el que le
+// asigna el servidor. Si difieren, mover una reserva toma el camino de
+// docente (borra la reserva y crea una solicitud) aunque arriba diga directivo.
+function verificarRol() {
+  function esc(v) {
+    return String(v === undefined ? '(sin definir)' : v === null ? '(vacío)' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function fila(label, valor, ok) {
+    var color = ok === true ? 'var(--green)' : ok === false ? 'var(--red)' : 'inherit';
+    return '<div class="detail-row"><div class="detail-label">' + label + '</div>' +
+      '<div class="detail-value" style="color:' + color + '">' + valor + '</div></div>';
+  }
+
+  var s = window.SESSION || {};
+  var cliente = {
+    rolSesion: s.role,
+    tipoSesion: s.tipo,
+    roleSaep: window.ROLE,
+    esDirectivo: esDirectivo()
+  };
+  var scriptRes = Array.prototype.slice.call(document.scripts)
+    .map(function (x) { return x.src; })
+    .filter(function (x) { return x.indexOf('reservas.js') >= 0; })[0] || '';
+  var version = (scriptRes.split('?v=')[1]) || '(sin versión)';
+
+  var body = document.getElementById('modal-rol-body');
+  body.innerHTML = '<div class="empty-state">Consultando al servidor…</div>';
+  abrirModal('modal-rol');
+
+  apiGet('whoami').then(function (sv) {
+    var conclusion;
+    if (cliente.esDirectivo && sv.esDirectivo) {
+      conclusion = '✅ Página y servidor te reconocen como directivo. Mover una reserva debería editarla (PUT), no borrarla.';
+    } else if (!cliente.esDirectivo && sv.esDirectivo) {
+      conclusion = cliente.roleSaep
+        ? '❌ El servidor te reconoce como directivo, pero la página usa el rol que carga SAEP (window.ROLE = "' +
+          esc(cliente.roleSaep) + '"), que el gestor no reconoce. Por eso mover borra la reserva.'
+        : '❌ El servidor te reconoce como directivo, pero la sesión guardada es de docente. Cerrá sesión y volvé a entrar.';
+    } else if (cliente.esDirectivo && !sv.esDirectivo) {
+      conclusion = '⚠️ La página te trata como directivo pero el servidor no: las acciones de directivo van a ser rechazadas. ' +
+        'Cerrá sesión y volvé a entrar.';
+    } else if (!sv.tabla_usuarios2) {
+      conclusion = '❌ En esta base no existe la tabla usuarios2, así que nadie es directivo.';
+    } else if (sv.error_usuarios2) {
+      conclusion = '❌ La tabla usuarios2 existe pero no se pudo leer (¿columnas distintas de usuario / tipo?).';
+    } else if (!sv.filas_usuarios2.length) {
+      conclusion = '❌ Tu usuario (' + esc(sv.usuario_header) + ') no figura en usuarios2.';
+    } else {
+      conclusion = '❌ Figurás en usuarios2 pero el tipo no es exactamente "Administrador" ni "Director".';
+    }
+
+    body.innerHTML =
+      '<p style="margin:0 0 12px;font-weight:600;">' + conclusion + '</p>' +
+      '<div style="font-size:12px;color:var(--muted);margin:6px 0;">En la página</div>' +
+      fila('¿Directivo?', cliente.esDirectivo ? 'Sí' : 'No', cliente.esDirectivo) +
+      fila('Rol de la sesión', esc(cliente.rolSesion)) +
+      fila('Tipo de la sesión', esc(cliente.tipoSesion)) +
+      fila('Rol de SAEP (window.ROLE)', esc(cliente.roleSaep)) +
+      fila('Versión de reservas.js', esc(version)) +
+      '<div style="font-size:12px;color:var(--muted);margin:12px 0 6px;">En el servidor</div>' +
+      fila('¿Directivo?', sv.esDirectivo ? 'Sí' : 'No', sv.esDirectivo) +
+      fila('Usuario enviado', esc(sv.usuario_header)) +
+      fila('Está en personal', sv.en_personal ? 'Sí' : 'No', sv.en_personal) +
+      fila('Existe usuarios2', sv.tabla_usuarios2 ? 'Sí' : 'No', sv.tabla_usuarios2) +
+      fila('Tipo en usuarios2', sv.filas_usuarios2.length
+        ? sv.filas_usuarios2.map(function (t) { return '"' + esc(t) + '"'; }).join(', ')
+        : '(ninguno)') +
+      (sv.error_usuarios2 ? fila('Error', esc(sv.error_usuarios2), false) : '');
+  }).catch(function (e) {
+    body.innerHTML =
+      '<p style="margin:0 0 12px;font-weight:600;">❌ No se pudo consultar al servidor: ' + esc(e.message) + '</p>' +
+      '<p style="margin:0;">Si dice "Not found", el api.php del servidor es una versión anterior: subí el actual.</p>' +
+      fila('¿Directivo en la página?', cliente.esDirectivo ? 'Sí' : 'No', cliente.esDirectivo) +
+      fila('Rol de la sesión', esc(cliente.rolSesion)) +
+      fila('Rol de SAEP (window.ROLE)', esc(cliente.roleSaep)) +
+      fila('Versión de reservas.js', esc(version));
+  });
+}

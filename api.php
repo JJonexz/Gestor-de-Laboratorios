@@ -31,6 +31,11 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+// Ningún proxy, hosting ni navegador debe guardar respuestas de la API: si la
+// recarga recibe un `all` cacheado, los cambios parecen "volver a su lugar".
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
@@ -52,7 +57,11 @@ function getDB() {
     $pdo = new PDO($dsn, DB_USER, DB_PASS, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+        // autocommit=1 explícito: hay servidores MySQL hosteados que lo apagan
+        // (init_connect='SET autocommit=0'). Así un UPDATE sin transacción
+        // quedaba sin confirmar y se deshacía al terminar el request, aunque la
+        // respuesta ya mostrara los valores nuevos.
+        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4, autocommit = 1",
     ]);
 
     return $pdo;
@@ -534,6 +543,41 @@ switch ($resource) {
             'tipo'    => $tipo ?? '',
             'profeId' => (int)$row['dni'],   // dni directo, sin gestor_profesores
         ]);
+
+    // ── WHOAMI (diagnóstico de rol) ───────────────────────────
+    // Qué rol le asigna el servidor al usuario del header X-Gestor-User.
+    // Lo usa "Verificar rol" del menú de usuario, para diagnosticar sin consola.
+    case 'whoami':
+        if ($method !== 'GET') err('Method not allowed', 405);
+        $hdr = trim((string)($_SERVER['HTTP_X_GESTOR_USER'] ?? ''));
+        $info = [
+            'usuario_header'   => $hdr,
+            'en_personal'      => false,
+            'tabla_usuarios2'  => (bool)$db->query("SHOW TABLES LIKE 'usuarios2'")->fetch(),
+            'filas_usuarios2'  => [],     // `tipo` tal cual está guardado, para detectar errores de tipeo
+            'tipo'             => null,
+            'esDirectivo'      => false,
+            'error_usuarios2'  => null,
+        ];
+        try { $info['esDirectivo'] = esDirectivoReq($db); }
+        catch (Exception $e) { $info['error_usuarios2'] = $e->getMessage(); }
+        if (ctype_digit($hdr)) {
+            $st = $db->prepare('SELECT 1 FROM personal WHERE dni=? LIMIT 1');
+            $st->execute([(int)$hdr]);
+            $info['en_personal'] = (bool)$st->fetch();
+            if ($info['tabla_usuarios2']) {
+                try {
+                    $st = $db->prepare('SELECT tipo FROM usuarios2 WHERE usuario=?');
+                    $st->execute([(string)(int)$hdr]);
+                    $info['filas_usuarios2'] = array_column($st->fetchAll(), 'tipo');
+                    $info['tipo'] = tipoDirectivo($db, $hdr);
+                } catch (Exception $e) {
+                    // p.ej. la tabla existe pero las columnas no se llaman usuario / tipo
+                    $info['error_usuarios2'] = $e->getMessage();
+                }
+            }
+        }
+        ok($info);
 
     // ── PERSONAL (búsqueda de docentes) ──────────────────────
     case 'personal':

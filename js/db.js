@@ -28,7 +28,8 @@ function apiFetch(endpoint, options) {
   } catch (e) {}
 
   return fetch(API + '/' + endpoint, Object.assign({
-    headers: headers
+    headers: headers,
+    cache: 'no-store'   // nunca reusar una respuesta vieja de la API
   }, options || {}))
   .then(function(r) {
     if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || 'Error ' + r.status); });
